@@ -110,3 +110,23 @@ InitTestScene*.unity*
 *.pbxuser
 *.mode1v3
 *.mode2v3
+
+# Resources Large Files
+*.wav
+*.mp3
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+*.webm
+*.m4a
+*.m4v
+*.m4b
+*.m4r
+*.m4p
+*.m4v
+*.m4b
+*.m4r
+*.m4p
