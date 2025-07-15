@@ -97,3 +97,16 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+
+# Add
+/.plastic/
+*.stacktrace
+*.crash
+.idea/
+*.iml
+*.xcworkspace
+*.xcuserdata
+*.pbxuser
+*.mode1v3
+*.mode2v3

@@ -1,0 +1,43 @@
+# Unity 기본 무시 파일
+Library/
+Temp/
+Obj/
+Build/
+Builds/
+Logs/
+MemoryCaptures/
+UserSettings/
+.vscode/
+.DS_Store
+
+# Windows 관련 임시 파일
+Thumbs.db
+Desktop.ini
+
+# Rider / VS Code / Visual Studio
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+
+# macOS 관련
+*.DS_Store
+
+# Android/iOS 빌드 산출물
+*.apk
+*.aab
+*.ipa
+*.xcodeproj
+*.xcworkspace
+
+# Live2D 모델 불필요 파일 (예: 편집용 데이터)
+*.cmo3              # Live2D 모델 편집 파일 (Cubism Editor에서 사용)
+*.psd               # 원본 이미지 파일
+
+# 기타
+*.log
+*.bak
+*.meta~             # 임시 메타파일
