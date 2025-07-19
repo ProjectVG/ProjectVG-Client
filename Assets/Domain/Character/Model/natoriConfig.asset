@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 34536df5454d00746a54eb51f544f4d5, type: 3}
+  m_Name: natoriConfig
+  m_EditorClassIdentifier: 
+  modelName: Natori
+  modelDescription: "\uC774\uC9C0\uC801\uC778 \uC9D1\uC0AC"
+  thumbnail: {fileID: 0}
+  lookSensitivity: 5
+  lockAtDamping: 0.15
+  isLockAtActive: 1
+  modelPrefab: {fileID: 6181935751025943507, guid: 43e77a085e1072e4dbc6393f20643f3b, type: 3}
