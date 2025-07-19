@@ -12,6 +12,7 @@ public class SystemManager : Singleton<SystemManager>
 
     private void Start()
     {
+        ScreenTapManager.Instance.Initialize(mCamera);
         ModelInit(initModelConfig);
     }
 
@@ -28,7 +29,7 @@ public class SystemManager : Singleton<SystemManager>
 
         modelController.Damping = newModelConfig.LockAtDamping;
 
-        cubismLookTarget.Initialize(mCamera, initModelConfig);
+        cubismLookTarget.Initialize(initModelConfig);
     }
 
 }
