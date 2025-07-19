@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public interface IInputProvider
 {
@@ -9,20 +11,54 @@ public class DefaultInputProvider : IInputProvider
 {
     public bool TryGetPosition(out Vector3 position)
     {
-#if UNITY_IOS || UNITY_ANDROID
+        position = Vector3.zero;
+
+        if (IsPointerOverIgnoredUI())
+        {
+            return false;
+        }
+
+    #if UNITY_IOS || UNITY_ANDROID
         if (Input.touchCount > 0)
         {
             position = Input.GetTouch(0).position;
             return true;
         }
-#else
+    #else
         if (Input.GetMouseButton(0))
         {
             position = Input.mousePosition;
             return true;
         }
-#endif
-        position = Vector3.zero;
+    #endif
+
+        return false;
+    }
+
+    /// <summary>
+    /// "IgnoreLookAt" 태그가 달린 UI 클릭 여부 체크
+    /// </summary>
+    private bool IsPointerOverIgnoredUI()
+    {
+        if (EventSystem.current == null) return false;
+
+        PointerEventData eventData = new PointerEventData(EventSystem.current)
+        {
+        #if UNITY_IOS || UNITY_ANDROID
+            position = Input.touchCount > 0 ? Input.GetTouch(0).position : Vector2.zero
+        #else
+            position = Input.mousePosition
+        #endif
+        };
+
+        List<RaycastResult> results = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(eventData, results);
+
+        foreach (var result in results)
+        {
+            if (result.gameObject.CompareTag("IgnoreLookAt"))
+                return true;
+        }
         return false;
     }
 }
@@ -47,21 +83,6 @@ public class ScreenTapManager : Singleton<ScreenTapManager>
         }
         lookDir = Vector3.zero;
         return false;
-    }
-
-    /// <summary>
-    /// 입력된 화면 좌표를 가져옴
-    /// </summary>
-    public Vector3 GetScreenInputPosition()
-    {
-    #if UNITY_IOS || UNITY_ANDROID
-        if (Input.touchCount > 0)
-            return Input.GetTouch(0).position;
-    #else
-        if (Input.GetMouseButton(0))
-            return Input.mousePosition;
-    #endif
-        return Vector3.zero;
     }
 
     /// <summary>
