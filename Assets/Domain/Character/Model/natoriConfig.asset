@@ -17,5 +17,7 @@ MonoBehaviour:
   thumbnail: {fileID: 0}
   lookSensitivity: 5
   lockAtDamping: 0.15
-  isLockAtActive: 1
+  isLockAtActive: 0
+  gain: 10
+  smoothing: 1
   modelPrefab: {fileID: 6181935751025943507, guid: 43e77a085e1072e4dbc6393f20643f3b, type: 3}

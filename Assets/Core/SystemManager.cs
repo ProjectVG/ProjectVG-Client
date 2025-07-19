@@ -1,6 +1,6 @@
 using Live2D.Cubism.Framework.LookAt;
+using Live2D.Cubism.Framework.MouthMovement;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 public class SystemManager : Singleton<SystemManager>
 {
@@ -10,26 +10,47 @@ public class SystemManager : Singleton<SystemManager>
 
     private GameObject _currentModel = null;
 
+    // TODO : test 추후 삭제
+    [SerializeField] private AudioSource voiceSource = null;
+
     private void Start()
     {
         ScreenTapManager.Instance.Initialize(mCamera);
+        AudioManager.Instance.Initialize();
+
         ModelInit(initModelConfig);
     }
 
-    private void ModelInit(ModelConfig newModelConfig)
+    private void ModelInit(ModelConfig modelConfig)
     {
         if (_currentModel != null)
         {
             Destroy(_currentModel);
         }
 
-        _currentModel = Instantiate(newModelConfig.ModelPrefab);
-        var modelController = _currentModel.GetComponent<CubismLookController>();
-        modelController.Target = cubismLookTarget.gameObject;
+        _currentModel = Instantiate(modelConfig.ModelPrefab);
 
-        modelController.Damping = newModelConfig.LockAtDamping;
+        // LockAt 설정
+        SetLockAt(modelConfig);
 
-        cubismLookTarget.Initialize(initModelConfig);
+        // LipSync 설정
+        SetLipSync(modelConfig);
     }
 
+    private void SetLockAt(ModelConfig modelConfig)
+    {
+        var lookController = _currentModel.GetComponent<CubismLookController>();
+        lookController.Target = cubismLookTarget.gameObject;
+        lookController.Damping = modelConfig.LockAtDamping;
+
+        cubismLookTarget.Initialize(modelConfig);
+    }
+
+    private void SetLipSync(ModelConfig modelConfig)
+    {
+        var mouthController = _currentModel.GetComponent<CubismAudioMouthInput>();
+        mouthController.AudioInput = voiceSource;
+        mouthController.Gain = modelConfig.Gain;
+        mouthController.Smoothing = modelConfig.Smoothing;
+    }
 }

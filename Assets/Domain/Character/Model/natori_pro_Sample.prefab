@@ -20745,6 +20745,8 @@ GameObject:
   - component: {fileID: 223926811476575423}
   - component: {fileID: 4018225441432941569}
   - component: {fileID: 4587239800635656125}
+  - component: {fileID: 2839167193978712956}
+  - component: {fileID: 4938581114171699054}
   m_Layer: 0
   m_Name: natori_pro_t06
   m_TagString: Untagged
@@ -20861,7 +20863,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adeec4ed250bae44d8777078a3ec1e00, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  BlendMode: 2
+  BlendMode: 1
   MouthOpening: 1
 --- !u!114 &6458988075448185459
 MonoBehaviour:
@@ -21554,6 +21556,37 @@ MonoBehaviour:
   _target: {fileID: 0}
   Center: {fileID: 0}
   Damping: 0.15
+--- !u!114 &2839167193978712956
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6181935751025943507}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 090aae4f094a5c641b26e9e4b9da2604, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  AudioInput: {fileID: 0}
+  SamplingQuality: 0
+  Gain: 5
+  Smoothing: 0.97
+--- !u!114 &4938581114171699054
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6181935751025943507}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 084c42df15c721f42b28ff9d23a21c8a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Mean: 2.5
+  MaximumDeviation: 2
+  Timescale: 10
 --- !u!1 &6225196883205444550
 GameObject:
   m_ObjectHideFlags: 0
