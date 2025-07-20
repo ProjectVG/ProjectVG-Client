@@ -1,10 +1,16 @@
 using System.Collections.Generic;
+using Live2D.Cubism.Framework.Raycasting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 public interface IInputProvider
 {
     bool TryGetPosition(out Vector3 position);
+}
+
+public interface IInputUpProvider
+{
+    bool TryGetPosition(out Vector3 position); // 터치 종료 시점만 반환
 }
 
 public class DefaultInputProvider : IInputProvider
@@ -63,17 +69,48 @@ public class DefaultInputProvider : IInputProvider
     }
 }
 
+public class DefaultInputUpProvider : IInputUpProvider
+{
+    public bool TryGetPosition(out Vector3 position)
+    {
+    #if UNITY_IOS || UNITY_ANDROID
+        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Ended)
+        {
+            position = Input.GetTouch(0).position;
+            return true;
+        }
+    #else
+        if (Input.GetMouseButtonUp(0))
+        {
+            position = Input.mousePosition;
+            return true;
+        }
+    #endif
+        position = Vector3.zero;
+        return false;
+    }
+}
+
 public class ScreenTapManager : Singleton<ScreenTapManager>
 {
-    private Camera _camera;
-    private IInputProvider _inputProvider;
+    private Camera _camera = null;
 
-    public void Initialize(Camera cam, IInputProvider inputProvider = null)
+    private IInputProvider _inputProvider = null;
+    private IInputUpProvider _inputUpProvider = null;
+
+    private CubismRaycaster _raycaster = null;
+
+    public void Initialize(Camera cam)
     {
-        _camera = cam;
-        _inputProvider = inputProvider ?? new DefaultInputProvider();
+        if (_camera == null)
+            _camera = cam;
+        if(_inputProvider == null)
+            _inputProvider = new DefaultInputProvider();
+        if (_inputUpProvider == null)
+            _inputUpProvider = new DefaultInputUpProvider();
     }
 
+    #region LockAt
     public bool TryGetLookDirection(out Vector3 lookDir)
     {
         if (_inputProvider.TryGetPosition(out var screenPos))
@@ -94,4 +131,36 @@ public class ScreenTapManager : Singleton<ScreenTapManager>
         viewportPos = (viewportPos * 2) - Vector3.one;  // [-1,1]로 정규화
         return viewportPos;
     }
+
+    #endregion
+
+    #region Raycaster
+
+    public void SetRaycaster(CubismRaycaster cubismRaycaster)
+    {
+        _raycaster = cubismRaycaster;
+    }
+    public bool TryGetTapUpPosition(out CubismRaycastHit[] hitResults)
+    {
+        hitResults = null;
+
+        // 손 뗀 시점이 아니면 false
+        if (!_inputUpProvider.TryGetPosition(out var screenPosition))
+        {
+            return false;
+        }
+
+        var results = new CubismRaycastHit[4];
+        var ray = _camera.ScreenPointToRay(screenPosition);
+        var hitCount = _raycaster.Raycast(ray, results);
+
+        if (hitCount > 0)
+        {
+            hitResults = results;
+            return true;
+        }
+
+        return false;
+    }
+    #endregion
 }

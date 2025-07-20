@@ -285,6 +285,7 @@ MonoBehaviour:
   mCamera: {fileID: 519420031}
   initModelConfig: {fileID: 11400000, guid: 9b853af81060d2646a9abf7dd8dc00db, type: 2}
   voiceSource: {fileID: 1913479639}
+  expressionChangeBtn: {fileID: 1894485477}
 --- !u!4 &157800298
 Transform:
   m_ObjectHideFlags: 0
@@ -635,7 +636,11 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Motion Play
+  m_text: 'Motion Play
+
+    (Unrealized)
+
+'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -662,8 +667,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 70
-  m_fontSizeBase: 70
+  m_fontSize: 72
+  m_fontSizeBase: 72
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 0
@@ -1038,7 +1043,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Voice Play
 
-    LockAtActive'
+    (LockAtActive)'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1948,7 +1953,7 @@ GameObject:
   - component: {fileID: 1894485478}
   - component: {fileID: 1894485477}
   m_Layer: 5
-  m_Name: '[Debug] ExpressionPlay_btn'
+  m_Name: '[Debug] ExpressionChange_btn'
   m_TagString: IgnoreLookAt
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

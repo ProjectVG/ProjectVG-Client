@@ -1,6 +1,7 @@
 using Live2D.Cubism.Framework.LookAt;
 using Live2D.Cubism.Framework.MouthMovement;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class SystemManager : Singleton<SystemManager>
 {
@@ -8,10 +9,13 @@ public class SystemManager : Singleton<SystemManager>
     [SerializeField] private Camera mCamera = null;
     [SerializeField] private ModelConfig initModelConfig = null;
 
+
+
     private GameObject _currentModel = null;
 
     // TODO : test 추후 삭제
     [SerializeField] private AudioSource voiceSource = null;
+    [SerializeField] private Button expressionChangeBtn = null;
 
     private void Start()
     {
@@ -35,6 +39,9 @@ public class SystemManager : Singleton<SystemManager>
 
         // LipSync 설정
         SetLipSync(modelConfig);
+
+        // raycast 설정
+        SetRayCast(modelConfig);
     }
 
     private void SetLockAt(ModelConfig modelConfig)
@@ -52,5 +59,12 @@ public class SystemManager : Singleton<SystemManager>
         mouthController.AudioInput = voiceSource;
         mouthController.Gain = modelConfig.Gain;
         mouthController.Smoothing = modelConfig.Smoothing;
+    }
+
+    private void SetRayCast(ModelConfig modelConfig)
+    {
+        var hitHandler = _currentModel.GetComponent<CubismHitHandler>();
+        hitHandler.Initialize();
+        expressionChangeBtn.onClick.AddListener(hitHandler.ExpressionChange_Btn);
     }
 }

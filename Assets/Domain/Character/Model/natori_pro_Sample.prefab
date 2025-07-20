@@ -20766,6 +20766,8 @@ GameObject:
   - component: {fileID: 2839167193978712956}
   - component: {fileID: 4938581114171699054}
   - component: {fileID: -2621011207111397788}
+  - component: {fileID: 6188898768195860194}
+  - component: {fileID: 2504539113633562397}
   m_Layer: 0
   m_Name: natori_pro_t06
   m_TagString: Untagged
@@ -21621,6 +21623,30 @@ MonoBehaviour:
   BlendMode: 1
   ChannelTimescales:
   - 1
+--- !u!114 &6188898768195860194
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6181935751025943507}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a162b857e4416245819153f6e443839, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &2504539113633562397
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6181935751025943507}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49951858c8af46f4c85cecf4a03db08b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &6225196883205444550
 GameObject:
   m_ObjectHideFlags: 0
