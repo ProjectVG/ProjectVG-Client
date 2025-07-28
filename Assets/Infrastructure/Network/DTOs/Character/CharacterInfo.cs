@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace ProjectVG.Infrastructure.Network.DTOs.Character
 {
@@ -6,12 +7,12 @@ namespace ProjectVG.Infrastructure.Network.DTOs.Character
     /// 캐릭터 정보 DTO
     /// </summary>
     [Serializable]
-    public class CharacterInfo
+    public class CharacterData
     {
-        public string id;
-        public string name;
-        public string description;
-        public string role;
-        public bool isActive;
+        [SerializeField] public string id;
+        [SerializeField] public string name;
+        [SerializeField] public string description;
+        [SerializeField] public string role;
+        [SerializeField] public bool isActive;
     }
 } 

@@ -49,28 +49,44 @@ Assets/Infrastructure/Network/
 
 ## 🚀 사용법
 
-### HTTP API 사용
+### 1. 전체 흐름 테스트 (권장)
+```csharp
+// NetworkTestManager 사용
+var testManager = FindObjectOfType<NetworkTestManager>();
 
+// 1. WebSocket 연결
+await testManager.ConnectWebSocket();
+
+// 2. HTTP 요청 전송
+await testManager.SendChatRequest();
+
+// 3. WebSocket으로 결과 수신 (자동)
+// 서버가 비동기 작업 완료 후 WebSocket으로 결과 전송
+```
+
+### 2. 개별 모듈 사용
+
+#### HTTP API 사용
 ```csharp
 // API 서비스 매니저 사용
 var apiManager = ApiServiceManager.Instance;
 
 // 채팅 API 사용
-var chatResponse = await apiManager.Chat.SendChatAsync(
-    sessionId: "session-123",
-    actor: "user",
-    message: "안녕하세요!",
-    characterId: "char-456",
-    userId: "user-789"
+var chatResponse = await apiManager.ChatApiService.SendChatAsync(
+    new ChatRequest
+    {
+        message = "안녕하세요!",
+        characterId = "char-456",
+        userId = "user-789",
+        sessionId = "session-123"
+    }
 );
 
 // 캐릭터 API 사용
-var characters = await apiManager.Character.GetCharactersAsync();
-var character = await apiManager.Character.GetCharacterAsync("char-456");
+var character = await apiManager.CharacterApiService.GetCharacterAsync("char-456");
 ```
 
-### WebSocket 사용
-
+#### WebSocket 사용
 ```csharp
 // WebSocket 매니저 사용
 var wsManager = WebSocketManager.Instance;
@@ -92,11 +108,18 @@ await wsManager.SendChatMessageAsync(
 
 ## ⚙️ 설정
 
-### ApiConfig 설정
+### 테스트 환경 설정
 ```csharp
-// ScriptableObject로 생성
+// localhost:7900으로 설정
+var apiConfig = ApiConfig.CreateDevelopmentConfig();
+var wsConfig = WebSocketConfig.CreateDevelopmentConfig();
+```
+
+### 프로덕션 환경 설정
+```csharp
+// 실제 서버로 설정
 var apiConfig = ApiConfig.CreateProductionConfig();
-apiConfig.BaseUrl = "http://122.153.130.223:7900/api/v1/";
+var wsConfig = WebSocketConfig.CreateProductionConfig();
 ```
 
 ### WebSocketConfig 설정
@@ -129,7 +152,7 @@ Debug.Log("WebSocket 시뮬레이션 연결");
 
 ### 시뮬레이션 모드
 ```
-WebSocket 시뮬레이션 연결: ws://...
+WebSocket 시뮬레이션 연결: ws://localhost:7900/ws
 WebSocket 시뮬레이션 메시지: ...
 ```
 **설명:** 실제 WebSocket 연결 대신 시뮬레이션으로 동작합니다.
@@ -138,6 +161,16 @@ WebSocket 시뮬레이션 메시지: ...
 - 실제 서버 연결 없이도 개발 가능
 - 로그를 통해 메시지 흐름 확인
 - 안전한 테스트 환경 제공
+
+### 테스트 실행 방법
+1. **NetworkTestManager** 컴포넌트를 씬에 추가
+2. **Context Menu**에서 테스트 실행:
+   - `1. WebSocket 연결`
+   - `2. HTTP 채팅 요청`
+   - `3. HTTP 캐릭터 정보 요청`
+   - `4. WebSocket 메시지 전송`
+   - `5. WebSocket 연결 해제`
+   - `전체 테스트 실행`
 
 ## 📝 로그
 

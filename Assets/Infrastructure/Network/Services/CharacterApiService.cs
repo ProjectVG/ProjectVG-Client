@@ -1,4 +1,5 @@
 using System.Threading;
+using UnityEngine;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Http;
 using ProjectVG.Infrastructure.Network.DTOs.Character;
@@ -15,6 +16,10 @@ namespace ProjectVG.Infrastructure.Network.Services
         public CharacterApiService()
         {
             _httpClient = HttpApiClient.Instance;
+            if (_httpClient == null)
+            {
+                Debug.LogError("HttpApiClient.Instance가 null입니다. HttpApiClient가 생성되지 않았습니다.");
+            }
         }
 
         /// <summary>
@@ -22,9 +27,15 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// </summary>
         /// <param name="cancellationToken">취소 토큰</param>
         /// <returns>캐릭터 목록</returns>
-        public async UniTask<CharacterInfo[]> GetAllCharactersAsync(CancellationToken cancellationToken = default)
+        public async UniTask<CharacterData[]> GetAllCharactersAsync(CancellationToken cancellationToken = default)
         {
-            return await _httpClient.GetAsync<CharacterInfo[]>("character", cancellationToken: cancellationToken);
+            if (_httpClient == null)
+            {
+                Debug.LogError("HttpApiClient가 null입니다. 초기화를 확인해주세요.");
+                return null;
+            }
+            
+            return await _httpClient.GetAsync<CharacterData[]>("character", cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -33,9 +44,15 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <param name="characterId">캐릭터 ID</param>
         /// <param name="cancellationToken">취소 토큰</param>
         /// <returns>캐릭터 정보</returns>
-        public async UniTask<CharacterInfo> GetCharacterAsync(string characterId, CancellationToken cancellationToken = default)
+        public async UniTask<CharacterData> GetCharacterAsync(string characterId, CancellationToken cancellationToken = default)
         {
-            return await _httpClient.GetAsync<CharacterInfo>($"character/{characterId}", cancellationToken: cancellationToken);
+            if (_httpClient == null)
+            {
+                Debug.LogError("HttpApiClient가 null입니다. 초기화를 확인해주세요.");
+                return null;
+            }
+            
+            return await _httpClient.GetAsync<CharacterData>($"character/{characterId}", cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -44,9 +61,9 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <param name="request">캐릭터 생성 요청</param>
         /// <param name="cancellationToken">취소 토큰</param>
         /// <returns>생성된 캐릭터 정보</returns>
-        public async UniTask<CharacterInfo> CreateCharacterAsync(CreateCharacterRequest request, CancellationToken cancellationToken = default)
+        public async UniTask<CharacterData> CreateCharacterAsync(CreateCharacterRequest request, CancellationToken cancellationToken = default)
         {
-            return await _httpClient.PostAsync<CharacterInfo>("character", request, cancellationToken: cancellationToken);
+            return await _httpClient.PostAsync<CharacterData>("character", request, cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -58,7 +75,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <param name="isActive">활성화 여부</param>
         /// <param name="cancellationToken">취소 토큰</param>
         /// <returns>생성된 캐릭터 정보</returns>
-        public async UniTask<CharacterInfo> CreateCharacterAsync(
+        public async UniTask<CharacterData> CreateCharacterAsync(
             string name, 
             string description, 
             string role, 
@@ -83,9 +100,9 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <param name="request">수정 요청</param>
         /// <param name="cancellationToken">취소 토큰</param>
         /// <returns>수정된 캐릭터 정보</returns>
-        public async UniTask<CharacterInfo> UpdateCharacterAsync(string characterId, UpdateCharacterRequest request, CancellationToken cancellationToken = default)
+        public async UniTask<CharacterData> UpdateCharacterAsync(string characterId, UpdateCharacterRequest request, CancellationToken cancellationToken = default)
         {
-            return await _httpClient.PutAsync<CharacterInfo>($"character/{characterId}", request, cancellationToken: cancellationToken);
+            return await _httpClient.PutAsync<CharacterData>($"character/{characterId}", request, cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -98,7 +115,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <param name="isActive">활성화 여부</param>
         /// <param name="cancellationToken">취소 토큰</param>
         /// <returns>수정된 캐릭터 정보</returns>
-        public async UniTask<CharacterInfo> UpdateCharacterAsync(
+        public async UniTask<CharacterData> UpdateCharacterAsync(
             string characterId,
             string name = null,
             string description = null,

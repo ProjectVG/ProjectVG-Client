@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace ProjectVG.Infrastructure.Network.DTOs.Chat
 {
@@ -8,11 +9,11 @@ namespace ProjectVG.Infrastructure.Network.DTOs.Chat
     [Serializable]
     public class ChatRequest
     {
-        public string sessionId;
-        public string actor;
-        public string message;
-        public string action = "chat";
-        public string character_id;
-        public string user_id;
+        [SerializeField] public string sessionId;
+        [SerializeField] public string actor;
+        [SerializeField] public string message;
+        [SerializeField] public string action = "chat";
+        [SerializeField] public string characterId;
+        [SerializeField] public string userId;
     }
 } 

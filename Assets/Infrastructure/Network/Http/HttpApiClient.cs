@@ -288,11 +288,20 @@ namespace ProjectVG.Infrastructure.Network.Http
 
             try
             {
-                return JsonUtility.FromJson<T>(responseText);
+                // Newtonsoft.Json 사용 (snake_case 지원)
+                return Newtonsoft.Json.JsonConvert.DeserializeObject<T>(responseText);
             }
             catch (Exception ex)
             {
-                throw new ApiException($"응답 파싱 실패: {ex.Message}", request.responseCode, responseText);
+                // Newtonsoft.Json 실패 시 Unity JsonUtility로 폴백
+                try
+                {
+                    return JsonUtility.FromJson<T>(responseText);
+                }
+                catch (Exception fallbackEx)
+                {
+                    throw new ApiException($"응답 파싱 실패: {ex.Message} (폴백도 실패: {fallbackEx.Message})", request.responseCode, responseText);
+                }
             }
         }
 

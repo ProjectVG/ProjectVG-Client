@@ -1,4 +1,5 @@
 using System.Threading;
+using UnityEngine;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Http;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
@@ -15,6 +16,10 @@ namespace ProjectVG.Infrastructure.Network.Services
         public ChatApiService()
         {
             _httpClient = HttpApiClient.Instance;
+            if (_httpClient == null)
+            {
+                Debug.LogError("HttpApiClient.Instance가 null입니다. HttpApiClient가 생성되지 않았습니다.");
+            }
         }
 
         /// <summary>
@@ -25,6 +30,12 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <returns>채팅 응답</returns>
         public async UniTask<ChatResponse> SendChatAsync(ChatRequest request, CancellationToken cancellationToken = default)
         {
+            if (_httpClient == null)
+            {
+                Debug.LogError("HttpApiClient가 null입니다. 초기화를 확인해주세요.");
+                return null;
+            }
+            
             return await _httpClient.PostAsync<ChatResponse>("chat", request, cancellationToken: cancellationToken);
         }
 
@@ -49,10 +60,9 @@ namespace ProjectVG.Infrastructure.Network.Services
             var request = new ChatRequest
             {
                 sessionId = sessionId,
-                actor = actor,
                 message = message,
-                character_id = characterId,
-                user_id = userId
+                characterId = characterId,
+                userId = userId
             };
 
             return await SendChatAsync(request, cancellationToken);

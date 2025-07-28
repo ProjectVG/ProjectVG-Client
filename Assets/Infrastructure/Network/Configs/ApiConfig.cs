@@ -97,6 +97,17 @@ namespace ProjectVG.Infrastructure.Network.Configs
             config.timeout = 10f;
             config.maxRetryCount = 1;
             config.retryDelay = 0.5f;
+            config.clientId = "unity-client-dev";
+            config.clientSecret = "dev-secret-key";
+            config.contentType = "application/json";
+            config.userAgent = "ProjectVG-Unity-Client/1.0";
+            
+            // 엔드포인트 설정
+            config.userEndpoint = "users";
+            config.characterEndpoint = "characters";
+            config.conversationEndpoint = "conversations";
+            config.authEndpoint = "auth";
+            
             return config;
         }
 
