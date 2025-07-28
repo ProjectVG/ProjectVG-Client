@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-namespace ProjectVG.Infrastructure.Network
+namespace ProjectVG.Tests.Runtime
 {
     /// <summary>
     /// 네트워크 테스트를 위한 UI 매니저

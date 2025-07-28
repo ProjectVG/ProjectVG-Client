@@ -29,6 +29,12 @@ namespace ProjectVG.Infrastructure.Network.Configs
         [SerializeField] private string contentType = "application/json";
         [SerializeField] private string userAgent = "ProjectVG-Client/1.0";
 
+        // Constants
+        private const string API_PATH = "api";
+        private const string DEFAULT_CLIENT_ID = "unity-client-dev";
+        private const string DEFAULT_CLIENT_SECRET = "dev-secret-key";
+        private const string DEFAULT_USER_AGENT = "ProjectVG-Unity-Client/1.0";
+
         // Properties
         public string BaseUrl => baseUrl;
         public string ApiVersion => apiVersion;
@@ -46,12 +52,14 @@ namespace ProjectVG.Infrastructure.Network.Configs
         public string ConversationEndpoint => conversationEndpoint;
         public string AuthEndpoint => authEndpoint;
 
+        #region URL Generation Methods
+
         /// <summary>
         /// 전체 API URL 생성
         /// </summary>
         public string GetFullUrl(string endpoint)
         {
-            return $"{baseUrl.TrimEnd('/')}/api/{apiVersion.TrimStart('/').TrimEnd('/')}/{endpoint.TrimStart('/')}";
+            return $"{baseUrl.TrimEnd('/')}/{API_PATH}/{apiVersion.TrimStart('/').TrimEnd('/')}/{endpoint.TrimStart('/')}";
         }
 
         /// <summary>
@@ -86,57 +94,93 @@ namespace ProjectVG.Infrastructure.Network.Configs
             return GetFullUrl($"{authEndpoint}/{path.TrimStart('/')}");
         }
 
+        #endregion
+
+        #region Factory Methods
+
         /// <summary>
-        /// 환경별 설정을 위한 팩토리 메서드
+        /// 개발 환경 설정 생성
         /// </summary>
         public static ApiConfig CreateDevelopmentConfig()
         {
             var config = CreateInstance<ApiConfig>();
-            config.baseUrl = "http://localhost:7900";
-            config.apiVersion = "v1";
-            config.timeout = 10f;
-            config.maxRetryCount = 1;
-            config.retryDelay = 0.5f;
-            config.clientId = "unity-client-dev";
-            config.clientSecret = "dev-secret-key";
-            config.contentType = "application/json";
-            config.userAgent = "ProjectVG-Unity-Client/1.0";
-            
-            // 엔드포인트 설정
-            config.userEndpoint = "users";
-            config.characterEndpoint = "characters";
-            config.conversationEndpoint = "conversations";
-            config.authEndpoint = "auth";
-            
+            ConfigureDevelopmentSettings(config);
             return config;
         }
 
         /// <summary>
-        /// 환경별 설정을 위한 팩토리 메서드
+        /// 프로덕션 환경 설정 생성
         /// </summary>
         public static ApiConfig CreateProductionConfig()
         {
             var config = CreateInstance<ApiConfig>();
+            ConfigureProductionSettings(config);
+            return config;
+        }
+
+        /// <summary>
+        /// 테스트 환경 설정 생성
+        /// </summary>
+        public static ApiConfig CreateTestConfig()
+        {
+            var config = CreateInstance<ApiConfig>();
+            ConfigureTestSettings(config);
+            return config;
+        }
+
+        #endregion
+
+        #region Private Configuration Methods
+
+        private static void ConfigureDevelopmentSettings(ApiConfig config)
+        {
+            config.baseUrl = "http://localhost:7901";
+            config.apiVersion = "v1";
+            config.timeout = 10f;
+            config.maxRetryCount = 1;
+            config.retryDelay = 0.5f;
+            config.clientId = DEFAULT_CLIENT_ID;
+            config.clientSecret = DEFAULT_CLIENT_SECRET;
+            config.contentType = "application/json";
+            config.userAgent = DEFAULT_USER_AGENT;
+            
+            ConfigureDefaultEndpoints(config);
+        }
+
+        private static void ConfigureProductionSettings(ApiConfig config)
+        {
             config.baseUrl = "http://122.153.130.223:7900";
             config.apiVersion = "v1";
             config.timeout = 30f;
             config.maxRetryCount = 3;
             config.retryDelay = 1f;
-            return config;
+            config.contentType = "application/json";
+            config.userAgent = "ProjectVG-Client/1.0";
+            
+            ConfigureDefaultEndpoints(config);
         }
 
-        /// <summary>
-        /// 환경별 설정을 위한 팩토리 메서드
-        /// </summary>
-        public static ApiConfig CreateTestConfig()
+        private static void ConfigureTestSettings(ApiConfig config)
         {
-            var config = CreateInstance<ApiConfig>();
-            config.baseUrl = "http://122.153.130.223:7900";
+            config.baseUrl = "http://122.153.130.223:7901";
             config.apiVersion = "v1";
             config.timeout = 15f;
             config.maxRetryCount = 2;
             config.retryDelay = 0.5f;
-            return config;
+            config.contentType = "application/json";
+            config.userAgent = "ProjectVG-Client/1.0";
+            
+            ConfigureDefaultEndpoints(config);
         }
+
+        private static void ConfigureDefaultEndpoints(ApiConfig config)
+        {
+            config.userEndpoint = "users";
+            config.characterEndpoint = "characters";
+            config.conversationEndpoint = "conversations";
+            config.authEndpoint = "auth";
+        }
+
+        #endregion
     }
 } 

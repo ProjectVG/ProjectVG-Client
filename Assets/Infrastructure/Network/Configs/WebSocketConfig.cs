@@ -1,6 +1,5 @@
 using UnityEngine;
 using System;
-using System.Text;
 
 namespace ProjectVG.Infrastructure.Network.Configs
 {
@@ -11,7 +10,7 @@ namespace ProjectVG.Infrastructure.Network.Configs
     public class WebSocketConfig : ScriptableObject
     {
         [Header("WebSocket Server Configuration")]
-        [SerializeField] private string baseUrl = "ws://MTIyLjE1My4xMzAuMjIzOjc5MDA="; // base64 encoded: 122.153.130.223:7900
+        [SerializeField] private string baseUrl = "http://122.153.130.223:7900";
         [SerializeField] private string wsPath = "ws";
         [SerializeField] private string apiVersion = "v1";
 
@@ -33,7 +32,7 @@ namespace ProjectVG.Infrastructure.Network.Configs
         [SerializeField] private string contentType = "application/json";
 
         // Properties
-        public string BaseUrl => DecodeBase64Url(baseUrl);
+        public string BaseUrl => ConvertToWebSocketUrl(baseUrl);
         public string WsPath => wsPath;
         public string ApiVersion => apiVersion;
         public float Timeout => timeout;
@@ -53,8 +52,8 @@ namespace ProjectVG.Infrastructure.Network.Configs
         /// </summary>
         public string GetWebSocketUrl()
         {
-            var decodedBaseUrl = DecodeBase64Url(baseUrl);
-            return $"{decodedBaseUrl.TrimEnd('/')}/{wsPath.TrimStart('/').TrimEnd('/')}";
+            var wsBaseUrl = ConvertToWebSocketUrl(baseUrl);
+            return $"{wsBaseUrl.TrimEnd('/')}/{wsPath.TrimStart('/').TrimEnd('/')}";
         }
 
         /// <summary>
@@ -62,8 +61,8 @@ namespace ProjectVG.Infrastructure.Network.Configs
         /// </summary>
         public string GetWebSocketUrlWithVersion()
         {
-            var decodedBaseUrl = DecodeBase64Url(baseUrl);
-            return $"{decodedBaseUrl.TrimEnd('/')}/api/{apiVersion.TrimStart('/').TrimEnd('/')}/{wsPath.TrimStart('/').TrimEnd('/')}";
+            var wsBaseUrl = ConvertToWebSocketUrl(baseUrl);
+            return $"{wsBaseUrl.TrimEnd('/')}/api/{apiVersion.TrimStart('/').TrimEnd('/')}/{wsPath.TrimStart('/').TrimEnd('/')}";
         }
 
         /// <summary>
@@ -76,25 +75,24 @@ namespace ProjectVG.Infrastructure.Network.Configs
         }
 
         /// <summary>
-        /// Base64 인코딩된 URL 디코딩
+        /// URL을 WebSocket URL로 변환
         /// </summary>
-        private string DecodeBase64Url(string encodedUrl)
+        private string ConvertToWebSocketUrl(string httpUrl)
         {
             try
             {
-                if (encodedUrl.StartsWith("ws://") || encodedUrl.StartsWith("wss://"))
+                if (httpUrl.StartsWith("http://") || httpUrl.StartsWith("https://"))
                 {
-                    var protocol = encodedUrl.Substring(0, encodedUrl.IndexOf("://") + 3);
-                    var encodedPart = encodedUrl.Substring(encodedUrl.IndexOf("://") + 3);
-                    var decodedPart = Encoding.UTF8.GetString(Convert.FromBase64String(encodedPart));
-                    return protocol + decodedPart;
+                    // HTTP URL을 WebSocket URL로 변환
+                    var wsUrl = httpUrl.Replace("http://", "ws://").Replace("https://", "wss://");
+                    return wsUrl;
                 }
-                return encodedUrl;
+                return httpUrl;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"WebSocket URL 디코딩 실패: {ex.Message}");
-                return "ws://localhost:7900"; // Fallback
+                Debug.LogError($"WebSocket URL 변환 실패: {ex.Message}");
+                return "ws://localhost:7901"; // Fallback
             }
         }
 
@@ -106,7 +104,7 @@ namespace ProjectVG.Infrastructure.Network.Configs
         public static WebSocketConfig CreateDevelopmentConfig()
         {
             var config = CreateInstance<WebSocketConfig>();
-            config.baseUrl = "ws://bG9jYWxob3N0Ojc5MDA="; // base64 encoded: localhost:7900
+            config.baseUrl = "http://localhost:7901"; // HTTP 사용
             config.wsPath = "ws";
             config.apiVersion = "v1";
             config.timeout = 10f;
@@ -127,7 +125,7 @@ namespace ProjectVG.Infrastructure.Network.Configs
         public static WebSocketConfig CreateProductionConfig()
         {
             var config = CreateInstance<WebSocketConfig>();
-            config.baseUrl = "ws://MTIyLjE1My4xMzAuMjIzOjc5MDA="; // base64 encoded: 122.153.130.223:7900
+            config.baseUrl = "http://122.153.130.223:7900"; // HTTP 사용
             config.wsPath = "ws";
             config.apiVersion = "v1";
             config.timeout = 30f;
@@ -148,7 +146,7 @@ namespace ProjectVG.Infrastructure.Network.Configs
         public static WebSocketConfig CreateTestConfig()
         {
             var config = CreateInstance<WebSocketConfig>();
-            config.baseUrl = "ws://MTIyLjE1My4xMzAuMjIzOjc5MDA="; // base64 encoded: 122.153.130.223:7900
+            config.baseUrl = "http://122.153.130.223:7900"; // HTTP 사용
             config.wsPath = "ws";
             config.apiVersion = "v1";
             config.timeout = 15f;

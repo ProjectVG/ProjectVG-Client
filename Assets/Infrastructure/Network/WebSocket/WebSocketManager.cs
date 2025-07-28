@@ -78,9 +78,9 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 
                             private void InitializeNativeWebSocket()
                     {
-                        // 시뮬레이션 WebSocket 구현체 사용
-                        _nativeWebSocket = new UnityWebSocket();
-                        Debug.Log("WebSocket 시뮬레이션 구현체를 사용합니다.");
+                        // 실제 WebSocket 구현체 사용
+                        _nativeWebSocket = new RealWebSocket();
+                        Debug.Log("실제 WebSocket 구현체를 사용합니다.");
                         
                         // 이벤트 연결
                         _nativeWebSocket.OnConnected += OnNativeConnected;
@@ -280,8 +280,10 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 switch (baseMessage.type?.ToLower())
                 {
                     case "session_id":
+                        Debug.Log("세션 ID 메시지 처리 중...");
                         var sessionMessage = JsonUtility.FromJson<SessionIdMessage>(JsonUtility.ToJson(baseMessage));
                         _sessionId = sessionMessage.session_id; // 세션 ID 저장
+                        Debug.Log($"세션 ID 저장됨: {_sessionId}");
                         foreach (var handler in _handlers)
                         {
                             handler.OnSessionIdMessageReceived(sessionMessage);
@@ -407,10 +409,13 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _isConnecting = false;
             _reconnectAttempts = 0;
             
+            Debug.Log("WebSocket 연결 성공 - 핸들러 수: " + _handlers.Count);
+            
             // 이벤트 발생
             OnConnected?.Invoke();
             foreach (var handler in _handlers)
             {
+                Debug.Log($"핸들러에게 연결 이벤트 전달: {handler.GetType().Name}");
                 handler.OnConnected();
             }
         }
@@ -448,13 +453,49 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             try
             {
-                // JSON 메시지 파싱
+                Debug.Log($"원시 메시지 수신: {message}");
+                Debug.Log($"핸들러 수: {_handlers.Count}");
+                
+                // 클라이언트와 동일한 방식으로 세션 ID 메시지 처리
+                if (message.Contains("\"type\":\"session_id\""))
+                {
+                    Debug.Log("세션 ID 메시지 감지됨");
+                    
+                    // JSON에서 session_id 추출
+                    int sessionIdStart = message.IndexOf("\"session_id\":\"") + 14;
+                    int sessionIdEnd = message.IndexOf("\"", sessionIdStart);
+                    if (sessionIdStart > 13 && sessionIdEnd > sessionIdStart)
+                    {
+                        _sessionId = message.Substring(sessionIdStart, sessionIdEnd - sessionIdStart);
+                        Debug.Log($"세션 ID 저장됨: {_sessionId}");
+                        
+                        // 핸들러들에게 세션 ID 메시지 전달
+                        var sessionMessage = new SessionIdMessage { session_id = _sessionId };
+                        foreach (var handler in _handlers)
+                        {
+                            Debug.Log($"핸들러에게 세션 ID 전달: {handler.GetType().Name}");
+                            handler.OnSessionIdMessageReceived(sessionMessage);
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        Debug.LogError("세션 ID 추출 실패 - JSON 형식 확인 필요");
+                    }
+                }
+                else
+                {
+                    Debug.Log("세션 ID 메시지가 아님 - 다른 메시지 타입");
+                }
+                
+                // 기존 방식으로 처리
                 var baseMessage = JsonUtility.FromJson<WebSocketMessage>(message);
                 ProcessReceivedMessage(baseMessage);
             }
             catch (Exception ex)
             {
                 Debug.LogError($"메시지 파싱 실패: {ex.Message}");
+                Debug.LogError($"원시 메시지: {message}");
             }
         }
 

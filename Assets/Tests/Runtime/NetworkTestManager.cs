@@ -5,23 +5,24 @@ using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.Http;
+using ProjectVG.Infrastructure.Network.Configs;
 
-namespace ProjectVG.Infrastructure.Network
+namespace ProjectVG.Tests.Runtime
 {
     /// <summary>
     /// WebSocket + HTTP 통합 테스트 매니저
-    /// WebSocket 연결 → HTTP 요청 → WebSocket으로 결과 수신
+    /// 더미 클라이언트와 동일한 동작: WebSocket 연결 → 세션 ID 수신 → HTTP 요청 → WebSocket으로 결과 수신
     /// </summary>
     public class NetworkTestManager : MonoBehaviour
     {
         [Header("테스트 설정")]
         [SerializeField] private string testSessionId = "test-session-123";
-        [SerializeField] private string testCharacterId = "test-character-456";
-        [SerializeField] private string testUserId = "test-user-789";
+        [SerializeField] private string testCharacterId = "44444444-4444-4444-4444-444444444444"; // 제로
+        [SerializeField] private string testUserId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
         
         [Header("자동 테스트")]
         [SerializeField] private bool autoTest = false;
-        [SerializeField] private float testInterval = 5f;
+        [SerializeField] private float testInterval = 10f; // 테스트 완료 시간을 고려하여 10초로 증가
         
         // UI에서 접근할 수 있도록 public 프로퍼티 추가
         public bool AutoTest
@@ -41,10 +42,18 @@ namespace ProjectVG.Infrastructure.Network
         private DefaultWebSocketHandler _webSocketHandler;
         private CancellationTokenSource _cancellationTokenSource;
         private bool _isTestRunning = false;
+        private string _receivedSessionId = null; // WebSocket에서 받은 세션 ID
+        private bool _chatResponseReceived = false; // 채팅 응답 수신 여부
+        private string _lastChatResponse = null; // 마지막 채팅 응답
 
         private void Awake()
         {
             _cancellationTokenSource = new CancellationTokenSource();
+            
+            // HTTP 연결 허용 설정
+            #if UNITY_EDITOR || UNITY_STANDALONE
+            UnityEngine.Networking.UnityWebRequest.ClearCookieCache();
+            #endif
             
             // 매니저들이 없으면 생성
             EnsureManagersExist();
@@ -122,6 +131,19 @@ namespace ProjectVG.Infrastructure.Network
                     return;
                 }
                 
+                // WebSocket 설정 적용 (localhost:7900 사용)
+                var webSocketConfig = ProjectVG.Infrastructure.Network.Configs.WebSocketConfig.CreateDevelopmentConfig();
+                _webSocketManager.SetWebSocketConfig(webSocketConfig);
+                Debug.Log($"WebSocket 설정 적용: {webSocketConfig.GetWebSocketUrl()}");
+                
+                // API 설정 적용 (localhost:7900 사용)
+                var apiConfig = ProjectVG.Infrastructure.Network.Configs.ApiConfig.CreateDevelopmentConfig();
+                if (HttpApiClient.Instance != null)
+                {
+                    HttpApiClient.Instance.SetApiConfig(apiConfig);
+                    Debug.Log($"API 설정 적용: {apiConfig.GetFullUrl("chat")}");
+                }
+                
                 // API 서비스 매니저 초기화
                 _apiServiceManager = ApiServiceManager.Instance;
                 if (_apiServiceManager == null)
@@ -158,7 +180,7 @@ namespace ProjectVG.Infrastructure.Network
 
         #region 수동 테스트 메서드들
 
-        [ContextMenu("1. WebSocket 연결")]
+        [ContextMenu("1. WebSocket 연결 (더미 클라이언트 방식)")]
         public async void ConnectWebSocket()
         {
             if (_isTestRunning)
@@ -175,12 +197,15 @@ namespace ProjectVG.Infrastructure.Network
 
             try
             {
-                Debug.Log("=== WebSocket 연결 시작 ===");
-                bool connected = await _webSocketManager.ConnectAsync(testSessionId);
+                Debug.Log("=== WebSocket 연결 시작 (더미 클라이언트 방식) ===");
+                _receivedSessionId = null; // 세션 ID 초기화
+                
+                // 더미 클라이언트처럼 세션 ID 없이 연결
+                bool connected = await _webSocketManager.ConnectAsync();
                 
                 if (connected)
                 {
-                    Debug.Log("✅ WebSocket 연결 성공!");
+                    Debug.Log("✅ WebSocket 연결 성공! 세션 ID 대기 중...");
                 }
                 else
                 {
@@ -193,7 +218,7 @@ namespace ProjectVG.Infrastructure.Network
             }
         }
 
-        [ContextMenu("2. HTTP 채팅 요청")]
+        [ContextMenu("2. HTTP 채팅 요청 (더미 클라이언트 방식)")]
         public async void SendChatRequest()
         {
             if (_webSocketManager == null || !_webSocketManager.IsConnected)
@@ -208,17 +233,26 @@ namespace ProjectVG.Infrastructure.Network
                 return;
             }
 
+            // 세션 ID가 아직 수신되지 않았으면 대기
+            if (string.IsNullOrEmpty(_receivedSessionId))
+            {
+                Debug.LogError("세션 ID가 없습니다. WebSocket에서 세션 ID를 먼저 받아야 합니다.");
+                return;
+            }
+
             try
             {
-                Debug.Log("=== HTTP 채팅 요청 시작 ===");
+                Debug.Log("=== HTTP 채팅 요청 시작 (더미 클라이언트 방식) ===");
                 
-                var chatRequest = new DTOs.Chat.ChatRequest
+                var chatRequest = new ProjectVG.Infrastructure.Network.DTOs.Chat.ChatRequest
                 {
                     message = "안녕하세요! 테스트 메시지입니다.",
                     characterId = testCharacterId,
                     userId = testUserId,
-                    sessionId = testSessionId,
-                    actor = "web_user"
+                    sessionId = _receivedSessionId, // WebSocket에서 받은 세션 ID 사용
+                    actor = "web_user",
+                    action = "chat", // 클라이언트와 동일하게 명시적으로 설정
+                    requestedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
                 };
 
                 var response = await _apiServiceManager.Chat.SendChatAsync(chatRequest);
@@ -226,6 +260,9 @@ namespace ProjectVG.Infrastructure.Network
                 if (response != null && response.success)
                 {
                     Debug.Log($"✅ HTTP 채팅 요청 성공! 응답: {response.message}");
+                    Debug.Log($"   - 세션 ID: {_receivedSessionId}");
+                    Debug.Log($"   - 캐릭터 ID: {testCharacterId}");
+                    Debug.Log($"   - 사용자 ID: {testUserId}");
                 }
                 else
                 {
@@ -308,11 +345,101 @@ namespace ProjectVG.Infrastructure.Network
             {
                 Debug.Log("=== WebSocket 연결 해제 시작 ===");
                 await _webSocketManager.DisconnectAsync();
+                _receivedSessionId = null; // 세션 ID 초기화
                 Debug.Log("✅ WebSocket 연결 해제 완료!");
             }
             catch (Exception ex)
             {
                 Debug.LogError($"WebSocket 연결 해제 중 오류: {ex.Message}");
+            }
+        }
+
+        [ContextMenu("더미 클라이언트 방식 전체 테스트")]
+        public async void RunDummyClientTest()
+        {
+            if (_isTestRunning)
+            {
+                Debug.LogWarning("테스트가 이미 실행 중입니다.");
+                return;
+            }
+
+            _isTestRunning = true;
+            
+            try
+            {
+                Debug.Log("🚀 === 더미 클라이언트 방식 전체 테스트 시작 ===");
+                
+                // 0. 기존 연결이 있으면 해제
+                if (_webSocketManager.IsConnected)
+                {
+                    Debug.Log("0️⃣ 기존 연결 해제 중...");
+                    await _webSocketManager.DisconnectAsync();
+                    await UniTask.Delay(1000); // 연결 해제 완료 대기
+                }
+                
+                // 1. WebSocket 연결 (세션 ID 없이)
+                Debug.Log("1️⃣ WebSocket 연결 중...");
+                bool connected = await _webSocketManager.ConnectAsync();
+                if (!connected)
+                {
+                    Debug.LogError("WebSocket 연결 실패로 테스트 중단");
+                    return;
+                }
+                
+                // 2. 세션 ID 수신 대기 (최대 10초)
+                Debug.Log("2️⃣ 세션 ID 수신 대기 중...");
+                int waitCount = 0;
+                while (string.IsNullOrEmpty(_receivedSessionId) && waitCount < 100)
+                {
+                    await UniTask.Delay(100);
+                    waitCount++;
+                    if (waitCount % 10 == 0) // 1초마다 로그
+                    {
+                        Debug.Log($"2️⃣ 세션 ID 대기 중... ({waitCount/10}초 경과)");
+                    }
+                }
+                
+                if (string.IsNullOrEmpty(_receivedSessionId))
+                {
+                    Debug.LogError("세션 ID를 받지 못했습니다. (10초 타임아웃)");
+                    Debug.LogWarning("서버에서 세션 ID 메시지를 보내지 않았거나, 메시지 형식이 다를 수 있습니다.");
+                    return;
+                }
+                
+                Debug.Log($"✅ 세션 ID 수신: {_receivedSessionId}");
+                
+                await UniTask.Delay(1000); // 안정화 대기
+                
+                // 3. HTTP 채팅 요청 (세션 ID 포함)
+                Debug.Log("3️⃣ HTTP 채팅 요청 중...");
+                await SendChatRequestInternal();
+                
+                // 채팅 응답을 기다림
+                await WaitForChatResponse(15); // 15초 타임아웃
+                
+                // 4. HTTP 캐릭터 정보 요청
+                Debug.Log("4️⃣ HTTP 캐릭터 정보 요청 중...");
+                await GetCharacterInfoInternal();
+                
+                await UniTask.Delay(1000);
+                
+                // 5. WebSocket 연결 해제
+                Debug.Log("5️⃣ WebSocket 연결 해제 중...");
+                await _webSocketManager.DisconnectAsync();
+                _receivedSessionId = null;
+                
+                // 연결 해제 후 충분한 대기 시간
+                await UniTask.Delay(2000);
+                
+                Debug.Log("✅ === 더미 클라이언트 방식 전체 테스트 완료 ===");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"더미 클라이언트 방식 전체 테스트 중 오류: {ex.Message}");
+            }
+            finally
+            {
+                _isTestRunning = false;
             }
         }
 
@@ -402,7 +529,7 @@ namespace ProjectVG.Infrastructure.Network
             {
                 try
                 {
-                    await RunFullTestInternal();
+                    await RunDummyClientTestInternal();
                     await UniTask.Delay(TimeSpan.FromSeconds(testInterval), cancellationToken: _cancellationTokenSource.Token);
                 }
                 catch (OperationCanceledException)
@@ -421,7 +548,7 @@ namespace ProjectVG.Infrastructure.Network
             Debug.Log("🔄 자동 테스트 종료");
         }
 
-        private async UniTask RunFullTestInternal()
+        private async UniTask RunDummyClientTestInternal()
         {
             // 매니저 null 체크
             if (_webSocketManager == null)
@@ -438,30 +565,69 @@ namespace ProjectVG.Infrastructure.Network
 
             try
             {
-                // 1. WebSocket 연결
+                // 0. 기존 연결이 있으면 해제
+                if (_webSocketManager.IsConnected)
+                {
+                    Debug.Log("자동 테스트 - 기존 연결 해제 중...");
+                    await _webSocketManager.DisconnectAsync();
+                    await UniTask.Delay(1000);
+                }
+                
+                // 1. WebSocket 연결 (세션 ID 없이)
                 Debug.Log("자동 테스트 - WebSocket 연결 중...");
-                await _webSocketManager.ConnectAsync(testSessionId);
+                bool connected = await _webSocketManager.ConnectAsync();
+                if (!connected)
+                {
+                    Debug.LogError("자동 테스트 - WebSocket 연결 실패");
+                    return;
+                }
+                
+                // 2. 세션 ID 수신 대기
+                Debug.Log("자동 테스트 - 세션 ID 수신 대기 중...");
+                int waitCount = 0;
+                while (string.IsNullOrEmpty(_receivedSessionId) && waitCount < 100) // 10초로 증가
+                {
+                    await UniTask.Delay(100);
+                    waitCount++;
+                    if (waitCount % 10 == 0) // 1초마다 로그
+                    {
+                        Debug.Log($"자동 테스트 - 세션 ID 대기 중... ({waitCount/10}초 경과)");
+                    }
+                }
+                
+                if (string.IsNullOrEmpty(_receivedSessionId))
+                {
+                    Debug.LogError("자동 테스트 - 세션 ID를 받지 못했습니다. (10초 타임아웃)");
+                    Debug.LogWarning("서버에서 세션 ID 메시지를 보내지 않았거나, 메시지 형식이 다를 수 있습니다.");
+                    return;
+                }
+                
+                Debug.Log($"자동 테스트 - 세션 ID 수신: {_receivedSessionId}");
                 await UniTask.Delay(500);
                 
-                // 2. HTTP 요청들
+                // 3. HTTP 채팅 요청 (세션 ID 포함)
                 Debug.Log("자동 테스트 - HTTP 채팅 요청 중...");
                 await SendChatRequestInternal();
-                await UniTask.Delay(500);
+                Debug.Log("자동 테스트 - HTTP 요청 완료, 채팅 응답 대기 중...");
                 
+                // 채팅 응답을 기다림
+                await WaitForChatResponse(15); // 15초 타임아웃
+                
+                // 4. HTTP 캐릭터 정보 요청
                 Debug.Log("자동 테스트 - HTTP 캐릭터 정보 요청 중...");
                 await GetCharacterInfoInternal();
                 await UniTask.Delay(500);
                 
-                // 3. WebSocket 메시지 전송
-                Debug.Log("자동 테스트 - WebSocket 메시지 전송 중...");
-                await SendWebSocketMessageInternal();
-                await UniTask.Delay(500);
-                
-                // 4. 연결 해제
-                Debug.Log("자동 테스트 - WebSocket 연결 해제 중...");
+                // 5. 연결 해제 (더 오래 기다린 후)
+                Debug.Log("자동 테스트 - WebSocket 응답 대기 완료, 연결 해제 중...");
+                await UniTask.Delay(2000); // 추가 대기 시간
                 await _webSocketManager.DisconnectAsync();
+                _receivedSessionId = null;
                 
-                Debug.Log("자동 테스트 - 전체 테스트 완료");
+                // 연결 해제 후 충분한 대기 시간
+                await UniTask.Delay(2000);
+                
+                Debug.Log("자동 테스트 - 더미 클라이언트 방식 테스트 완료");
             }
             catch (Exception ex)
             {
@@ -478,16 +644,69 @@ namespace ProjectVG.Infrastructure.Network
                 return;
             }
 
-            var chatRequest = new DTOs.Chat.ChatRequest
+            // 세션 ID가 없으면 HTTP 요청을 보내지 않음
+            if (string.IsNullOrEmpty(_receivedSessionId))
+            {
+                Debug.LogError("세션 ID가 없습니다. WebSocket에서 세션 ID를 먼저 받아야 합니다.");
+                return;
+            }
+
+            var chatRequest = new ProjectVG.Infrastructure.Network.DTOs.Chat.ChatRequest
             {
                 message = $"자동 테스트 메시지 - {DateTime.Now:HH:mm:ss}",
                 characterId = testCharacterId,
                 userId = testUserId,
-                sessionId = testSessionId,
-                actor = "web_user"
+                sessionId = _receivedSessionId, // 서버에서 받은 세션 ID 사용
+                actor = "web_user",
+                action = "chat", // 클라이언트와 동일하게 명시적으로 설정
+                requestedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
             };
 
-            await _apiServiceManager.Chat.SendChatAsync(chatRequest);
+            Debug.Log($"HTTP 채팅 요청 전송: {JsonUtility.ToJson(chatRequest)}");
+            
+            // 채팅 응답 수신 상태 초기화
+            _chatResponseReceived = false;
+            _lastChatResponse = null;
+            
+            try
+            {
+                var response = await _apiServiceManager.Chat.SendChatAsync(chatRequest);
+                Debug.Log($"HTTP 채팅 요청 성공: {JsonUtility.ToJson(response)}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"HTTP 채팅 요청 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 채팅 응답을 기다리는 메서드
+        /// </summary>
+        private async UniTask WaitForChatResponse(int timeoutSeconds = 15)
+        {
+            Debug.Log($"채팅 응답 대기 시작 (타임아웃: {timeoutSeconds}초)");
+            
+            var startTime = DateTime.Now;
+            while (!_chatResponseReceived && (DateTime.Now - startTime).TotalSeconds < timeoutSeconds)
+            {
+                await UniTask.Delay(100);
+                
+                // WebSocket 연결 상태 확인
+                if (_webSocketManager != null && !_webSocketManager.IsConnected)
+                {
+                    Debug.LogWarning("WebSocket 연결이 끊어졌습니다. 응답 대기 중단");
+                    break;
+                }
+            }
+            
+            if (_chatResponseReceived)
+            {
+                Debug.Log($"✅ 채팅 응답 수신 완료: {_lastChatResponse}");
+            }
+            else
+            {
+                Debug.LogWarning($"⚠️ 채팅 응답 타임아웃 ({timeoutSeconds}초)");
+            }
         }
 
         private async UniTask GetCharacterInfoInternal()
@@ -539,19 +758,23 @@ namespace ProjectVG.Infrastructure.Network
             Debug.LogError($"❌ WebSocket 오류: {error}");
         }
 
-        private void OnChatMessageReceived(DTOs.WebSocket.ChatMessage message)
+        private void OnChatMessageReceived(ProjectVG.Infrastructure.Network.DTOs.WebSocket.ChatMessage message)
         {
             Debug.Log($"💬 WebSocket 채팅 메시지 수신: {message.message}");
+            _chatResponseReceived = true;
+            _lastChatResponse = message.message;
         }
 
-        private void OnSystemMessageReceived(DTOs.WebSocket.SystemMessage message)
+        private void OnSystemMessageReceived(ProjectVG.Infrastructure.Network.DTOs.WebSocket.SystemMessage message)
         {
             Debug.Log($"🔧 WebSocket 시스템 메시지 수신: {message.description}");
         }
 
-        private void OnSessionIdMessageReceived(DTOs.WebSocket.SessionIdMessage message)
+        private void OnSessionIdMessageReceived(ProjectVG.Infrastructure.Network.DTOs.WebSocket.SessionIdMessage message)
         {
-            Debug.Log($"🆔 WebSocket 세션 ID 수신: {message.session_id}");
+            _receivedSessionId = message.session_id;
+            Debug.Log($"🆔 WebSocket 세션 ID 수신: {_receivedSessionId}");
+            Debug.Log($"✅ 세션 ID가 성공적으로 저장되었습니다!");
         }
 
         #endregion
