@@ -25,7 +25,6 @@ classDiagram
         -ChatUI _chatUI
         -AudioManager _audioManager
         -WebSocketManager _webSocketManager
-        -ChatSession _currentSession
         -string _sessionId
         +bool IsConnected
         +bool IsInitialized
@@ -85,14 +84,13 @@ classDiagram
     class AudioManager {
         -AudioSource _audioDialogue
         -AudioSource _audioBGM
-        -AudioClip _currentVoiceClip
+        -VoiceData? _currentVoiceData
         +bool IsPlaying
         +float Volume
-        +PlayVoiceFromBase64(string base64Data, string format)
+        +PlayVoice(VoiceData voiceData)
         +StopVoice()
         +SetVolume(float volume)
         +LoadAudioClip(string url)
-        -ConvertBase64ToAudioClip(string base64Data, string format)
         -OnAudioFinished()
     }
 
@@ -136,31 +134,7 @@ classDiagram
 
 
 
-    class ChatSession {
-        +string SessionId
-        +string CharacterId
-        +string UserId
-        +DateTime StartTime
-        +List~ChatMessage~ MessageHistory
-        +AddUserMessage(string content)
-        +AddCharacterMessage(ChatMessage message)
-        +GetLastMessage() ChatMessage
-        +GetMessageCount() int
-        +ClearHistory()
-    }
 
-    class ChatMessage {
-        +string Id
-        +string Content
-        +MessageType Type
-        +DateTime Timestamp
-        +string SenderId
-        +AudioClip VoiceClip
-        +bool IsUserMessage
-        +string VoiceUrl
-        +CreateUserMessage(string content)
-        +CreateCharacterMessage(ChatMessage message)
-    }
 
     %% Enums
     class MessageType {
@@ -185,14 +159,14 @@ classDiagram
     ChatManager --> ChatUI : manages
     ChatManager --> AudioManager : controls
     ChatManager --> WebSocketManager : uses
-    ChatManager --> ChatSession : maintains
+
     ChatManager --> IChatEventHandler : implements
 
     WebSocketManager --> ChatResponse : processes
     WebSocketManager --> ChatManager : notifies via events
     ChatResponse --> ChatMessage : converts to
 
-    ChatSession --> ChatMessage : contains
+
     ChatMessage --> MessageType : has
     ChatResponse --> ChatMessage : converts to
 ```
@@ -206,8 +180,8 @@ Assets/
 ├── Domain/Chat/
 │   ├── Script/
 │   │   ├── ChatManager.cs                    # 메인 매니저
-│   │   ├── ChatSession.cs                    # 세션 관리
 │   │   ├── ChatMessage.cs                    # 메시지 모델
+│   │   ├── VoiceData.cs                      # 음성 데이터 구조
 │   │   ├── IChatEventHandler.cs              # 이벤트 인터페이스
 │   │   └── Enums/
 │   │       └── MessageType.cs                # 메시지 타입 열거형
@@ -215,8 +189,6 @@ Assets/
 │   │   ├── ChatUI.cs                         # UI 컨트롤러
 │   │   ├── DialoguePanel.prefab              # 대화창 프리팹
 │   │   └── InputPanel.prefab                 # 입력창 프리팹
-│   └── Model/
-│       └── ChatData.cs                       # 데이터 모델
 ├── Core/Audio/
 │   ├── AudioManager.cs                       # 오디오 매니저
 │   └── VoicePlayer.cs                        # 음성 재생 전용
@@ -231,11 +203,7 @@ Assets/
 │   │       └── MobileWebSocket.cs            # 모바일 웹소켓
 │   └── DTOs/Chat/
 │       ├── ChatRequest.cs                    # HTTP 요청 DTO
-│       ├── ChatResponse.cs                   # HTTP 응답 DTO
-│       └── IntegratedChatMessage.cs          # 통합 메시지 모델
-├── Domain/Chat/Script/
-│   ├── ChatMessage.cs                        # 내부 사용 채팅 메시지
-│   └── VoiceData.cs                          # 음성 데이터 구조
+│       └── ChatResponse.cs                   # HTTP 응답 DTO
 └── UI/Panels/
     └── ChatPanel.prefab                     # 채팅 패널 프리팹
 ```
@@ -248,10 +216,10 @@ Assets/
 - **역할**: 전체 대화 흐름 조율 (유저 ↔ 서버)
 - **책임**: 
   - 유저 입력 처리 및 전송
-      - 서버 응답 수신 및 처리 (ChatResponse → ChatMessage 변환)
+  - 서버 응답 수신 및 처리 (ChatResponse → ChatMessage 변환)
   - 세션ID 관리 (ProcessSessionIdMessage)
   - UI 상태 관리
-  - 오디오 재생 제어
+  - 오디오 재생 제어 (VoiceData 기반)
   - 세션 관리
 
 ### WebSocketManager
@@ -274,9 +242,9 @@ Assets/
   - 타이핑 인디케이터
 
 ### AudioManager
-- **역할**: Base64 오디오 데이터 재생
+- **역할**: VoiceData 기반 오디오 재생
 - **책임**:
-  - Base64 → AudioClip 변환
+  - VoiceData → AudioClip 재생
   - 음성 재생 제어
   - 볼륨 관리
   - 재생 상태 모니터링
@@ -289,6 +257,7 @@ Assets/
 ```csharp
 namespace ProjectVG.Infrastructure.Network.DTOs.Chat
 {
+    [Serializable]
     public class ChatResponse
     {
         [JsonProperty("type")]
@@ -317,19 +286,6 @@ namespace ProjectVG.Infrastructure.Network.DTOs.Chat
         
         [JsonProperty("metadata")]
         public Dictionary<string, object>? Metadata { get; set; }
-        
-        // 오디오 데이터를 Base64로 변환하는 메서드
-        public void SetAudioData(byte[]? audioBytes)
-        {
-            if (audioBytes != null && audioBytes.Length > 0)
-            {
-                AudioData = Convert.ToBase64String(audioBytes);
-            }
-            else
-            {
-                AudioData = null;
-            }
-        }
     }
 }
 ```
@@ -338,16 +294,46 @@ namespace ProjectVG.Infrastructure.Network.DTOs.Chat
 ```csharp
 namespace ProjectVG.Domain.Chat
 {
+    [Serializable]
     public class VoiceData
     {
         public AudioClip AudioClip { get; set; }
         public float Length { get; set; }
         public string Format { get; set; } = "wav";
         
+        public VoiceData(AudioClip audioClip, float length, string format = "wav")
+        {
+            AudioClip = audioClip;
+            Length = length;
+            Format = format;
+        }
+        
+        public VoiceData()
+        {
+        }
+        
         // Base64 문자열에서 VoiceData 생성
         public static VoiceData FromBase64(string base64Data, string format = "wav")
         {
-            // Base64를 AudioClip으로 변환하는 로직
+            if (string.IsNullOrEmpty(base64Data))
+                return null;
+                
+            try
+            {
+                byte[] audioBytes = Convert.FromBase64String(base64Data);
+                AudioClip audioClip = ConvertBytesToAudioClip(audioBytes, format);
+                
+                if (audioClip != null)
+                {
+                    return new VoiceData(audioClip, audioClip.length, format);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Base64에서 AudioClip 변환 실패: {ex.Message}");
+            }
+            
+            return null;
         }
         
         // AudioClip이 있는지 확인
@@ -363,6 +349,7 @@ namespace ProjectVG.Domain.Chat
 ```csharp
 namespace ProjectVG.Domain.Chat
 {
+    [Serializable]
     public class ChatMessage
     {
         public string SessionId { get; set; } = string.Empty;
@@ -397,17 +384,8 @@ namespace ProjectVG.Domain.Chat
         // 텍스트 데이터가 있는지 확인
         public bool HasTextData() => !string.IsNullOrEmpty(Text);
         
-        // 음성 재생 가능한지 확인
-        public bool IsVoicePlayable() => HasVoiceData();
-        
         // AudioClip 가져오기
         public AudioClip? GetAudioClip() => VoiceData?.AudioClip;
-        
-        // 음성 길이 가져오기
-        public float GetVoiceLength() => VoiceData?.Length ?? 0f;
-        
-        // 음성 포맷 가져오기
-        public string GetVoiceFormat() => VoiceData?.Format ?? string.Empty;
     }
 }
 ```
@@ -446,7 +424,7 @@ sequenceDiagram
     WebSocketManager->>ChatManager: OnChatMessageReceived(ChatMessage)
     ChatManager->>ChatManager: OnChatMessageReceived(ChatMessage)
     ChatManager->>ChatUI: ShowCharacterMessage()
-    ChatManager->>AudioManager: PlayVoiceFromBase64() (오디오 있는 경우)
+    ChatManager->>AudioManager: PlayVoice(VoiceData) (오디오 있는 경우)
     AudioManager-->>ChatManager: 재생 완료
 ```
 
@@ -469,22 +447,23 @@ sequenceDiagram
 4. **이벤트 발생**: OnChatMessageReceived(ChatMessage) 이벤트 발생
 5. **ChatManager 처리**: ChatManager.OnChatMessageReceived(ChatMessage) 호출
 6. **UI 업데이트**: ChatUI.ShowCharacterMessage() 호출
-7. **오디오 재생**: AudioManager.PlayVoiceFromBase64() 호출 (있는 경우)
+7. **오디오 재생**: AudioManager.PlayVoice(VoiceData) 호출 (있는 경우)
 
 ## 구현 우선순위
 
 1. **Phase 1**: 기본 구조 및 모델
-   - IntegratedChatMessage 모델 (Application/Models/Chat/)
+   - ChatMessage 모델 (Domain/Chat/Script/)
+   - VoiceData 모델 (Domain/Chat/Script/)
    - ChatManager 기본 구조 (세션ID 처리 포함)
    - ChatUI 기본 UI (유저/캐릭터 구별)
 
 2. **Phase 2**: 웹소켓 통신
    - WebSocketManager 구현 (ProcessSessionIdMessage, ProcessChatMessage)
-   - ChatData 모델 정의
+   - ChatResponse DTO 정의
    - 기본 메시지 송수신
 
 3. **Phase 3**: 오디오 시스템
-   - AudioManager Base64 처리
+   - AudioManager VoiceData 처리
    - 음성 재생 기능
    - 오디오 포맷 지원
 
