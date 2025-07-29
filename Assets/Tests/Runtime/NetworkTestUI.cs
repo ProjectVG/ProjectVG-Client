@@ -6,6 +6,7 @@ namespace ProjectVG.Tests.Runtime
 {
     /// <summary>
     /// 네트워크 테스트를 위한 UI 매니저
+    /// 더미 클라이언트 방식 테스트를 지원합니다.
     /// </summary>
     public class NetworkTestUI : MonoBehaviour
     {
@@ -16,6 +17,7 @@ namespace ProjectVG.Tests.Runtime
         [SerializeField] private Button characterInfoButton;
         [SerializeField] private Button webSocketMessageButton;
         [SerializeField] private Button fullTestButton;
+        [SerializeField] private Button dummyClientTestButton;
         [SerializeField] private Button autoTestButton;
         
         [Header("Status Display")]
@@ -24,10 +26,14 @@ namespace ProjectVG.Tests.Runtime
         [SerializeField] private ScrollRect logScrollRect;
         
         [Header("Input Fields")]
-        [SerializeField] private TMP_InputField sessionIdInput;
         [SerializeField] private TMP_InputField characterIdInput;
         [SerializeField] private TMP_InputField userIdInput;
         [SerializeField] private TMP_InputField messageInput;
+        
+        [Header("Test Settings")]
+        [SerializeField] private Toggle autoTestToggle;
+        [SerializeField] private Slider testIntervalSlider;
+        [SerializeField] private TextMeshProUGUI intervalText;
         
         private NetworkTestManager _testManager;
         private bool _isAutoTestRunning = false;
@@ -66,21 +72,37 @@ namespace ProjectVG.Tests.Runtime
             if (fullTestButton != null)
                 fullTestButton.onClick.AddListener(OnFullTestButtonClicked);
             
+            if (dummyClientTestButton != null)
+                dummyClientTestButton.onClick.AddListener(OnDummyClientTestButtonClicked);
+            
             if (autoTestButton != null)
                 autoTestButton.onClick.AddListener(OnAutoTestButtonClicked);
 
             // 초기값 설정
-            if (sessionIdInput != null)
-                sessionIdInput.text = "test-session-123";
-            
             if (characterIdInput != null)
-                characterIdInput.text = "test-character-456";
+                characterIdInput.text = "44444444-4444-4444-4444-444444444444"; // 제로
             
             if (userIdInput != null)
-                userIdInput.text = "test-user-789";
+                userIdInput.text = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
             
             if (messageInput != null)
                 messageInput.text = "안녕하세요! 테스트 메시지입니다.";
+
+            // 자동 테스트 설정
+            if (autoTestToggle != null)
+            {
+                autoTestToggle.isOn = _testManager.AutoTest;
+                autoTestToggle.onValueChanged.AddListener(OnAutoTestToggleChanged);
+            }
+            
+            if (testIntervalSlider != null)
+            {
+                testIntervalSlider.minValue = 5f;
+                testIntervalSlider.maxValue = 30f;
+                testIntervalSlider.value = _testManager.TestInterval;
+                testIntervalSlider.onValueChanged.AddListener(OnTestIntervalChanged);
+                UpdateIntervalText();
+            }
 
             // 초기 버튼 상태 설정
             UpdateButtonStates(false);
@@ -105,6 +127,9 @@ namespace ProjectVG.Tests.Runtime
             
             if (fullTestButton != null)
                 fullTestButton.interactable = !_isAutoTestRunning;
+            
+            if (dummyClientTestButton != null)
+                dummyClientTestButton.interactable = !_isAutoTestRunning;
             
             if (autoTestButton != null)
             {
@@ -137,11 +162,19 @@ namespace ProjectVG.Tests.Runtime
             }
         }
 
+        private void UpdateIntervalText()
+        {
+            if (intervalText != null && testIntervalSlider != null)
+            {
+                intervalText.text = $"테스트 간격: {testIntervalSlider.value:F1}초";
+            }
+        }
+
         #region Button Event Handlers
 
         private void OnConnectButtonClicked()
         {
-            AddLog("WebSocket 연결 시도...");
+            AddLog("WebSocket 연결 시도 (더미 클라이언트 방식)...");
             UpdateStatus("연결 중...");
             _testManager.ConnectWebSocket();
         }
@@ -155,7 +188,7 @@ namespace ProjectVG.Tests.Runtime
 
         private void OnChatRequestButtonClicked()
         {
-            AddLog("HTTP 채팅 요청 전송...");
+            AddLog("HTTP 채팅 요청 전송 (더미 클라이언트 방식)...");
             UpdateStatus("채팅 요청 중...");
             _testManager.SendChatRequest();
         }
@@ -182,12 +215,19 @@ namespace ProjectVG.Tests.Runtime
             _testManager.RunFullTest();
         }
 
+        private void OnDummyClientTestButtonClicked()
+        {
+            AddLog("더미 클라이언트 방식 전체 테스트 시작...");
+            UpdateStatus("더미 클라이언트 테스트 실행 중...");
+            _testManager.RunDummyClientTest();
+        }
+
         private void OnAutoTestButtonClicked()
         {
             if (!_isAutoTestRunning)
             {
                 _isAutoTestRunning = true;
-                AddLog("자동 테스트 시작...");
+                AddLog("자동 테스트 시작 (더미 클라이언트 방식)...");
                 UpdateStatus("자동 테스트 실행 중...");
                 UpdateButtonStates(true);
                 
@@ -205,6 +245,19 @@ namespace ProjectVG.Tests.Runtime
                 // 자동 테스트 중지
                 _testManager.AutoTest = false;
             }
+        }
+
+        private void OnAutoTestToggleChanged(bool isOn)
+        {
+            _testManager.AutoTest = isOn;
+            AddLog($"자동 테스트 설정: {(isOn ? "활성화" : "비활성화")}");
+        }
+
+        private void OnTestIntervalChanged(float value)
+        {
+            _testManager.TestInterval = value;
+            UpdateIntervalText();
+            AddLog($"테스트 간격 변경: {value:F1}초");
         }
 
         #endregion
@@ -236,11 +289,6 @@ namespace ProjectVG.Tests.Runtime
             AddLog($"💬 채팅 메시지 수신: {message}");
         }
 
-        public void OnSystemMessageReceived(string message)
-        {
-            AddLog($"🔧 시스템 메시지 수신: {message}");
-        }
-
         public void OnSessionIdMessageReceived(string sessionId)
         {
             AddLog($"🆔 세션 ID 수신: {sessionId}");
@@ -254,6 +302,18 @@ namespace ProjectVG.Tests.Runtime
         public void OnHttpRequestFailed(string operation, string error)
         {
             AddLog($"❌ HTTP {operation} 실패: {error}");
+        }
+
+        public void OnReconnectAttempt(int attempt, int maxAttempts)
+        {
+            AddLog($"🔄 재연결 시도 {attempt}/{maxAttempts}");
+            UpdateStatus($"재연결 시도 중... ({attempt}/{maxAttempts})");
+        }
+
+        public void OnReconnectFailed()
+        {
+            AddLog("❌ 최대 재연결 시도 횟수 초과");
+            UpdateStatus("재연결 실패");
         }
 
         #endregion
@@ -279,8 +339,17 @@ namespace ProjectVG.Tests.Runtime
             if (fullTestButton != null)
                 fullTestButton.onClick.RemoveListener(OnFullTestButtonClicked);
             
+            if (dummyClientTestButton != null)
+                dummyClientTestButton.onClick.RemoveListener(OnDummyClientTestButtonClicked);
+            
             if (autoTestButton != null)
                 autoTestButton.onClick.RemoveListener(OnAutoTestButtonClicked);
+            
+            if (autoTestToggle != null)
+                autoTestToggle.onValueChanged.RemoveListener(OnAutoTestToggleChanged);
+            
+            if (testIntervalSlider != null)
+                testIntervalSlider.onValueChanged.RemoveListener(OnTestIntervalChanged);
         }
     }
 } 

@@ -20,7 +20,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
         public event Action<string> OnError;
 #pragma warning disable CS0067
         public event Action<string> OnMessageReceived;
-        public event Action<byte[]> OnBinaryDataReceived;
 #pragma warning restore CS0067
 
         private UnityWebRequest _webRequest;
@@ -125,26 +124,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
             catch (Exception ex)
             {
                 Debug.LogError($"WebGL WebSocket 메시지 전송 실패: {ex.Message}");
-                return false;
-            }
-        }
-
-        public async UniTask<bool> SendBinaryAsync(byte[] data, CancellationToken cancellationToken = default)
-        {
-            if (!IsConnected)
-            {
-                Debug.LogWarning("WebGL WebSocket이 연결되지 않았습니다.");
-                return false;
-            }
-
-            try
-            {
-                await UniTask.CompletedTask; 
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"WebGL WebSocket 바이너리 전송 실패: {ex.Message}");
                 return false;
             }
         }

@@ -18,7 +18,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         event Action OnDisconnected;
         event Action<string> OnError;
         event Action<string> OnMessageReceived;
-        event Action<byte[]> OnBinaryDataReceived;
         
         // 연결 관리
         UniTask<bool> ConnectAsync(string url, CancellationToken cancellationToken = default);
@@ -26,6 +25,5 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         
         // 메시지 전송
         UniTask<bool> SendMessageAsync(string message, CancellationToken cancellationToken = default);
-        UniTask<bool> SendBinaryAsync(byte[] data, CancellationToken cancellationToken = default);
     }
 } 

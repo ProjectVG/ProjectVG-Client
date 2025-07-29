@@ -6,25 +6,24 @@ using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Network.Http;
-using ProjectVG.Infrastructure.Network.DTOs.WebSocket;
+using ProjectVG.Infrastructure.Network.DTOs.Chat;
 
 namespace ProjectVG.Tests.Runtime
 {
     /// <summary>
     /// WebSocket + HTTP 통합 테스트 매니저
-    /// WebSocket 연결 → 세션 ID 수신 → HTTP 요청 → WebSocket으로 결과 수신
-    /// JSON과 바이너리 메시지를 모두 처리합니다.
+    /// 더미 클라이언트와 동일한 방식으로 테스트합니다.
     /// </summary>
     public class NetworkTestManager : MonoBehaviour
     {
         [Header("테스트 설정")]
-        [SerializeField] private string testSessionId = "test-session-123";
         [SerializeField] private string testCharacterId = "44444444-4444-4444-4444-444444444444"; // 제로
         [SerializeField] private string testUserId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+        [SerializeField] private string testMessage = "안녕하세요! 테스트 메시지입니다.";
         
         [Header("자동 테스트")]
         [SerializeField] private bool autoTest = false;
-        [SerializeField] private float testInterval = 10f; // 테스트 완료 시간을 고려하여 10초로 증가
+        [SerializeField] private float testInterval = 15f; // 더 긴 간격으로 변경
         
         // UI에서 접근할 수 있도록 public 프로퍼티 추가
         public bool AutoTest
@@ -41,15 +40,14 @@ namespace ProjectVG.Tests.Runtime
         
         private WebSocketManager _webSocketManager;
         private ApiServiceManager _apiServiceManager;
-        private DefaultWebSocketHandler _webSocketHandler;
         private CancellationTokenSource _cancellationTokenSource;
         private bool _isTestRunning = false;
-        private string _receivedSessionId = null; // WebSocket에서 받은 세션 ID
-        private bool _chatResponseReceived = false; // 채팅 응답 수신 여부
-        private string _lastChatResponse = null; // 마지막 채팅 응답
-        private bool _integratedMessageReceived = false; // 통합 메시지 수신 여부
-        private bool _audioDataReceived = false; // 오디오 데이터 수신 여부
-
+        private string _receivedSessionId = null;
+        private bool _chatResponseReceived = false;
+        private string _lastChatResponse = null;
+        private int _reconnectAttempts = 0;
+        private const int MAX_RECONNECT_ATTEMPTS = 3;
+        private bool _isIntentionalDisconnect = false; // 의도적인 연결 해제 여부
 
         private void Awake()
         {
@@ -129,7 +127,7 @@ namespace ProjectVG.Tests.Runtime
             try
             {
                 // NetworkConfig 초기화 (앱 시작 시 환경 설정)
-                NetworkConfig.SetDevelopmentEnvironment(); // 또는 SetTestEnvironment(), SetProductionEnvironment()
+                NetworkConfig.SetDevelopmentEnvironment();
                 
                 // WebSocket 매니저 초기화
                 _webSocketManager = WebSocketManager.Instance;
@@ -156,27 +154,12 @@ namespace ProjectVG.Tests.Runtime
                     return;
                 }
                 
-                // WebSocket 핸들러 생성 및 등록
-                _webSocketHandler = gameObject.AddComponent<DefaultWebSocketHandler>();
-                if (_webSocketHandler == null)
-                {
-                    Debug.LogError("DefaultWebSocketHandler 생성에 실패했습니다.");
-                    return;
-                }
-                
-                _webSocketManager.RegisterHandler(_webSocketHandler);
-                
-                // 이벤트 구독
-                _webSocketHandler.OnConnectedEvent += OnWebSocketConnected;
-                _webSocketHandler.OnDisconnectedEvent += OnWebSocketDisconnected;
-                _webSocketHandler.OnErrorEvent += OnWebSocketError;
-                _webSocketHandler.OnChatMessageReceivedEvent += OnChatMessageReceived;
-                _webSocketHandler.OnSystemMessageReceivedEvent += OnSystemMessageReceived;
-                _webSocketHandler.OnSessionIdMessageReceivedEvent += OnSessionIdMessageReceived;
-                _webSocketHandler.OnAudioDataReceivedEvent += OnAudioDataReceived;
-                _webSocketHandler.OnIntegratedMessageReceivedEvent += OnIntegratedMessageReceived;
-                
-
+                // WebSocket 이벤트 구독
+                _webSocketManager.OnConnected += OnWebSocketConnected;
+                _webSocketManager.OnDisconnected += OnWebSocketDisconnected;
+                _webSocketManager.OnError += OnWebSocketError;
+                _webSocketManager.OnSessionIdReceived += OnSessionIdReceived;
+                _webSocketManager.OnChatMessageReceived += OnChatMessageReceived;
                 
                 Debug.Log("NetworkTestManager 초기화 완료");
                 NetworkConfig.LogCurrentSettings();
@@ -188,8 +171,6 @@ namespace ProjectVG.Tests.Runtime
         }
 
         #region 수동 테스트 메서드들
-
-
 
         [ContextMenu("1. WebSocket 연결 (더미 클라이언트 방식)")]
         public async void ConnectWebSocket()
@@ -215,6 +196,8 @@ namespace ProjectVG.Tests.Runtime
                 Debug.Log($"WebSocket 서버: {NetworkConfig.GetWebSocketUrl()}");
                 
                 _receivedSessionId = null; // 세션 ID 초기화
+                _reconnectAttempts = 0;
+                _isIntentionalDisconnect = false; // 의도적 해제 플래그 초기화
                 
                 // 더미 클라이언트처럼 세션 ID 없이 연결
                 bool connected = await _webSocketManager.ConnectAsync();
@@ -222,7 +205,6 @@ namespace ProjectVG.Tests.Runtime
                 if (connected)
                 {
                     Debug.Log("✅ WebSocket 연결 성공! 세션 ID 대기 중...");
-                    Debug.Log($"현재 메시지 처리기: {NetworkConfig.WebSocketMessageType}");
                 }
                 else
                 {
@@ -266,11 +248,9 @@ namespace ProjectVG.Tests.Runtime
                 Debug.Log($"API 서버: {NetworkConfig.GetFullApiUrl("chat")}");
                 Debug.Log($"세션 ID: {_receivedSessionId}");
                 
-
-                
-                var chatRequest = new ProjectVG.Infrastructure.Network.DTOs.Chat.ChatRequest
+                var chatRequest = new ChatRequest
                 {
-                    message = "안녕하세요! 테스트 메시지입니다.",
+                    message = testMessage,
                     characterId = testCharacterId,
                     userId = testUserId,
                     sessionId = _receivedSessionId, // WebSocket에서 받은 세션 ID 사용
@@ -342,9 +322,7 @@ namespace ProjectVG.Tests.Runtime
                 Debug.Log("=== WebSocket 메시지 전송 시작 ===");
                 
                 bool sent = await _webSocketManager.SendChatMessageAsync(
-                    message: "WebSocket으로 직접 전송하는 테스트 메시지",
-                    characterId: testCharacterId,
-                    userId: testUserId
+                    message: "WebSocket으로 직접 전송하는 테스트 메시지"
                 );
                 
                 if (sent)
@@ -368,6 +346,7 @@ namespace ProjectVG.Tests.Runtime
             try
             {
                 Debug.Log("=== WebSocket 연결 해제 시작 ===");
+                _isIntentionalDisconnect = true; // 의도적 해제 플래그 설정
                 await _webSocketManager.DisconnectAsync();
                 _receivedSessionId = null; // 세션 ID 초기화
                 Debug.Log("✅ WebSocket 연결 해제 완료!");
@@ -375,45 +354,6 @@ namespace ProjectVG.Tests.Runtime
             catch (Exception ex)
             {
                 Debug.LogError($"WebSocket 연결 해제 중 오류: {ex.Message}");
-            }
-        }
-
-        [ContextMenu("6. 통합 메시지 처리 테스트")]
-        public async void TestIntegratedMessageHandling()
-        {
-            if (!_webSocketManager.IsConnected)
-            {
-                Debug.LogWarning("WebSocket이 연결되지 않았습니다. 먼저 연결해주세요.");
-                return;
-            }
-
-            try
-            {
-                Debug.Log("=== 통합 메시지 처리 테스트 시작 ===");
-                
-                // 응답 상태 초기화
-                _chatResponseReceived = false;
-                _integratedMessageReceived = false;
-                _audioDataReceived = false;
-                _lastChatResponse = null;
-                
-                // HTTP 채팅 요청으로 통합 메시지 유도
-                if (!string.IsNullOrEmpty(_receivedSessionId))
-                {
-                    Debug.Log("HTTP 채팅 요청으로 통합 메시지 유도 중...");
-                    await SendChatRequestInternal();
-                    
-                    // 통합 메시지 수신 대기
-                    await WaitForIntegratedMessage(15);
-                }
-                else
-                {
-                    Debug.LogWarning("세션 ID가 없습니다. 먼저 WebSocket 연결을 통해 세션 ID를 받아주세요.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"통합 메시지 처리 테스트 중 오류: {ex.Message}");
             }
         }
 
@@ -441,6 +381,7 @@ namespace ProjectVG.Tests.Runtime
                 if (_webSocketManager.IsConnected)
                 {
                     Debug.Log("0️⃣ 기존 연결 해제 중...");
+                    _isIntentionalDisconnect = true; // 의도적 해제 플래그 설정
                     await _webSocketManager.DisconnectAsync();
                     await UniTask.Delay(1000); // 연결 해제 완료 대기
                 }
@@ -457,7 +398,7 @@ namespace ProjectVG.Tests.Runtime
                 // 2. 세션 ID 수신 대기 (최대 10초)
                 Debug.Log("2️⃣ 세션 ID 수신 대기 중...");
                 int waitCount = 0;
-                while (string.IsNullOrEmpty(_receivedSessionId) && waitCount < 100)
+                while (string.IsNullOrEmpty(_receivedSessionId) && waitCount < 100) // 10초로 증가
                 {
                     await UniTask.Delay(100);
                     waitCount++;
@@ -493,6 +434,7 @@ namespace ProjectVG.Tests.Runtime
                 
                 // 5. WebSocket 연결 해제
                 Debug.Log("5️⃣ WebSocket 연결 해제 중...");
+                _isIntentionalDisconnect = true; // 의도적 해제 플래그 설정
                 await _webSocketManager.DisconnectAsync();
                 _receivedSessionId = null;
                 
@@ -533,35 +475,57 @@ namespace ProjectVG.Tests.Runtime
                 
                 // 1. WebSocket 연결
                 Debug.Log("1️⃣ WebSocket 연결 중...");
-                bool connected = await _webSocketManager.ConnectAsync(testSessionId);
+                bool connected = await _webSocketManager.ConnectAsync();
                 if (!connected)
                 {
                     Debug.LogError("WebSocket 연결 실패로 테스트 중단");
                     return;
                 }
                 
-                await UniTask.Delay(1000); // 연결 안정화 대기
+                // 2. 세션 ID 수신 대기 (최대 10초)
+                Debug.Log("2️⃣ 세션 ID 수신 대기 중...");
+                int waitCount = 0;
+                while (string.IsNullOrEmpty(_receivedSessionId) && waitCount < 100)
+                {
+                    await UniTask.Delay(100);
+                    waitCount++;
+                    if (waitCount % 10 == 0) // 1초마다 로그
+                    {
+                        Debug.Log($"2️⃣ 세션 ID 대기 중... ({waitCount/10}초 경과)");
+                    }
+                }
                 
-                // 2. HTTP 채팅 요청
-                Debug.Log("2️⃣ HTTP 채팅 요청 중...");
+                if (string.IsNullOrEmpty(_receivedSessionId))
+                {
+                    Debug.LogError("세션 ID를 받지 못했습니다. (10초 타임아웃)");
+                    return;
+                }
+                
+                Debug.Log($"✅ 세션 ID 수신: {_receivedSessionId}");
+                await UniTask.Delay(1000); // 안정화 대기
+                
+                // 3. HTTP 채팅 요청
+                Debug.Log("3️⃣ HTTP 채팅 요청 중...");
                 await SendChatRequestInternal();
                 
-                await UniTask.Delay(1000);
+                // 채팅 응답을 기다림
+                await WaitForChatResponse(15); // 15초 타임아웃
                 
-                // 3. HTTP 캐릭터 정보 요청
-                Debug.Log("3️⃣ HTTP 캐릭터 정보 요청 중...");
+                // 4. HTTP 캐릭터 정보 요청
+                Debug.Log("4️⃣ HTTP 캐릭터 정보 요청 중...");
                 await GetCharacterInfoInternal();
                 
                 await UniTask.Delay(1000);
                 
-                // 4. WebSocket 메시지 전송
-                Debug.Log("4️⃣ WebSocket 메시지 전송 중...");
+                // 5. WebSocket 메시지 전송
+                Debug.Log("5️⃣ WebSocket 메시지 전송 중...");
                 await SendWebSocketMessageInternal();
                 
                 await UniTask.Delay(1000);
                 
-                // 5. WebSocket 연결 해제
-                Debug.Log("5️⃣ WebSocket 연결 해제 중...");
+                // 6. WebSocket 연결 해제
+                Debug.Log("6️⃣ WebSocket 연결 해제 중...");
+                _isIntentionalDisconnect = true; // 의도적 해제 플래그 설정
                 await _webSocketManager.DisconnectAsync();
                 
                 Debug.Log("✅ === 전체 테스트 완료 ===");
@@ -657,6 +621,7 @@ namespace ProjectVG.Tests.Runtime
                 if (_webSocketManager.IsConnected)
                 {
                     Debug.Log("자동 테스트 - 기존 연결 해제 중...");
+                    _isIntentionalDisconnect = true; // 의도적 해제 플래그 설정
                     await _webSocketManager.DisconnectAsync();
                     await UniTask.Delay(1000);
                 }
@@ -677,7 +642,7 @@ namespace ProjectVG.Tests.Runtime
                 {
                     await UniTask.Delay(100);
                     waitCount++;
-                    if (waitCount % 10 == 0) // 1초마다 로그
+                    if (waitCount % 10 == 0)
                     {
                         Debug.Log($"자동 테스트 - 세션 ID 대기 중... ({waitCount/10}초 경과)");
                     }
@@ -708,6 +673,7 @@ namespace ProjectVG.Tests.Runtime
                 
                 // 5. 연결 해제 (더 오래 기다린 후)
                 Debug.Log("자동 테스트 - WebSocket 응답 대기 완료, 연결 해제 중...");
+                _isIntentionalDisconnect = true; // 의도적 해제 플래그 설정
                 await UniTask.Delay(2000); // 추가 대기 시간
                 await _webSocketManager.DisconnectAsync();
                 _receivedSessionId = null;
@@ -739,7 +705,7 @@ namespace ProjectVG.Tests.Runtime
                 return;
             }
 
-            var chatRequest = new ProjectVG.Infrastructure.Network.DTOs.Chat.ChatRequest
+            var chatRequest = new ChatRequest
             {
                 message = $"자동 테스트 메시지 - {DateTime.Now:HH:mm:ss}",
                 characterId = testCharacterId,
@@ -797,36 +763,6 @@ namespace ProjectVG.Tests.Runtime
             }
         }
 
-        /// <summary>
-        /// 통합 메시지를 기다리는 메서드
-        /// </summary>
-        private async UniTask WaitForIntegratedMessage(int timeoutSeconds = 15)
-        {
-            Debug.Log($"통합 메시지 대기 시작 (타임아웃: {timeoutSeconds}초)");
-            
-            var startTime = DateTime.Now;
-            while (!_integratedMessageReceived && (DateTime.Now - startTime).TotalSeconds < timeoutSeconds)
-            {
-                await UniTask.Delay(100);
-                
-                // WebSocket 연결 상태 확인
-                if (_webSocketManager != null && !_webSocketManager.IsConnected)
-                {
-                    Debug.LogWarning("WebSocket 연결이 끊어졌습니다. 응답 대기 중단");
-                    break;
-                }
-            }
-            
-            if (_integratedMessageReceived)
-            {
-                Debug.Log($"✅ 통합 메시지 수신 완료");
-            }
-            else
-            {
-                Debug.LogWarning($"⚠️ 통합 메시지 타임아웃 ({timeoutSeconds}초)");
-            }
-        }
-
         private async UniTask GetCharacterInfoInternal()
         {
             if (_apiServiceManager?.Character == null)
@@ -851,9 +787,7 @@ namespace ProjectVG.Tests.Runtime
             }
 
             await _webSocketManager.SendChatMessageAsync(
-                message: $"자동 WebSocket 메시지 - {DateTime.Now:HH:mm:ss}",
-                characterId: testCharacterId,
-                userId: testUserId
+                message: $"자동 WebSocket 메시지 - {DateTime.Now:HH:mm:ss}"
             );
         }
 
@@ -864,11 +798,29 @@ namespace ProjectVG.Tests.Runtime
         private void OnWebSocketConnected()
         {
             Debug.Log("🎉 WebSocket 연결됨!");
+            _reconnectAttempts = 0; // 연결 성공 시 재연결 시도 횟수 초기화
         }
 
         private void OnWebSocketDisconnected()
         {
             Debug.Log("🔌 WebSocket 연결 해제됨!");
+            
+            // 의도적인 연결 해제가 아닌 경우에만 자동 재연결 시도
+            if (!_isIntentionalDisconnect && _reconnectAttempts < MAX_RECONNECT_ATTEMPTS)
+            {
+                _reconnectAttempts++;
+                Debug.Log($"재연결 시도 {_reconnectAttempts}/{MAX_RECONNECT_ATTEMPTS}");
+                ConnectWebSocket();
+            }
+            else if (_isIntentionalDisconnect)
+            {
+                Debug.Log("의도적인 연결 해제로 재연결을 시도하지 않습니다.");
+                _isIntentionalDisconnect = false; // 플래그 초기화
+            }
+            else
+            {
+                Debug.LogError("최대 재연결 시도 횟수 초과");
+            }
         }
 
         private void OnWebSocketError(string error)
@@ -876,56 +828,19 @@ namespace ProjectVG.Tests.Runtime
             Debug.LogError($"❌ WebSocket 오류: {error}");
         }
 
-        private void OnChatMessageReceived(ProjectVG.Infrastructure.Network.DTOs.WebSocket.ChatMessage message)
+        private void OnSessionIdReceived(string sessionId)
         {
-            Debug.Log($"💬 WebSocket 채팅 메시지 수신: {message.message}");
-            _chatResponseReceived = true;
-            _lastChatResponse = message.message;
-        }
-
-        private void OnSystemMessageReceived(ProjectVG.Infrastructure.Network.DTOs.WebSocket.SystemMessage message)
-        {
-            Debug.Log($"🔧 WebSocket 시스템 메시지 수신: {message.description}");
-        }
-
-        private void OnSessionIdMessageReceived(ProjectVG.Infrastructure.Network.DTOs.WebSocket.SessionIdMessage message)
-        {
-            _receivedSessionId = message.session_id;
+            _receivedSessionId = sessionId;
             Debug.Log($"🆔 WebSocket 세션 ID 수신: {_receivedSessionId}");
             Debug.Log($"✅ 세션 ID가 성공적으로 저장되었습니다!");
         }
 
-        private void OnAudioDataReceived(byte[] audioData)
+        private void OnChatMessageReceived(string message)
         {
-            Debug.Log($"🎵 WebSocket 오디오 데이터 수신: {audioData.Length} bytes");
-            _audioDataReceived = true;
+            Debug.Log($"💬 WebSocket 채팅 메시지 수신: {message}");
+            _chatResponseReceived = true;
+            _lastChatResponse = message;
         }
-
-        private void OnIntegratedMessageReceived(IntegratedMessage message)
-        {
-            Debug.Log($"🔄 WebSocket 통합 메시지 수신:");
-            Debug.Log($"   - 세션 ID: {message.sessionId}");
-            Debug.Log($"   - 텍스트: {message.text?.Length ?? 0}자");
-            Debug.Log($"   - 오디오: {message.audioData?.Length ?? 0}바이트");
-            Debug.Log($"   - 지속시간: {message.audioDuration:F2}초");
-            
-            _integratedMessageReceived = true;
-            
-            // 텍스트가 있으면 채팅 메시지로도 처리
-            if (!string.IsNullOrEmpty(message.text))
-            {
-                _chatResponseReceived = true;
-                _lastChatResponse = message.text;
-            }
-            
-            // 오디오가 있으면 오디오 데이터로도 처리
-            if (message.audioData != null && message.audioData.Length > 0)
-            {
-                _audioDataReceived = true;
-            }
-        }
-
-
 
         #endregion
     }

@@ -3,7 +3,6 @@ using UnityEngine;
 using UnityEngine.Networking;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Configs;
-using ProjectVG.Infrastructure.Network.DTOs.WebSocket;
 
 namespace ProjectVG.Infrastructure.Network.Configs
 {

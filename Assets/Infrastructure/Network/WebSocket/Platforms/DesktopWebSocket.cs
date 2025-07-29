@@ -11,6 +11,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
     /// <summary>
     /// 데스크톱 플랫폼용 WebSocket 구현체
     /// System.Net.WebSockets.ClientWebSocket을 사용합니다.
+    /// JSON 메시지만 처리합니다.
     /// </summary>
     public class DesktopWebSocket : INativeWebSocket
     {
@@ -21,7 +22,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
         public event Action OnDisconnected;
         public event Action<string> OnError;
         public event Action<string> OnMessageReceived;
-        public event Action<byte[]> OnBinaryDataReceived;
 
         private ClientWebSocket _webSocket;
         private CancellationTokenSource _cancellationTokenSource;
@@ -116,26 +116,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
             }
         }
 
-        public async UniTask<bool> SendBinaryAsync(byte[] data, CancellationToken cancellationToken = default)
-        {
-            if (!IsConnected || _webSocket.State != WebSocketState.Open)
-            {
-                Debug.LogWarning("Desktop WebSocket이 연결되지 않았습니다.");
-                return false;
-            }
-
-            try
-            {
-                await _webSocket.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, cancellationToken);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Desktop WebSocket 바이너리 전송 실패: {ex.Message}");
-                return false;
-            }
-        }
-
         private async Task ReceiveLoopAsync()
         {
             var buffer = new byte[4096];
@@ -158,9 +138,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                     }
                     else if (result.MessageType == WebSocketMessageType.Binary)
                     {
-                        var data = new byte[result.Count];
-                        Array.Copy(buffer, data, result.Count);
-                        OnBinaryDataReceived?.Invoke(data);
+                        // 바이너리 메시지는 무시 (JSON만 처리)
+                        Debug.LogWarning("Desktop WebSocket: 바이너리 메시지 수신됨 (무시됨)");
                     }
                 }
             }

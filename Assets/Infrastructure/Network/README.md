@@ -1,6 +1,7 @@
 # ProjectVG Network Module
 
 Unity 클라이언트와 서버 간의 통신을 위한 네트워크 모듈입니다.
+강제된 JSON 형식 `{type: "xxx", data: {...}}`을 사용합니다.
 
 ## 📦 설치
 
@@ -27,8 +28,7 @@ Assets/Infrastructure/Network/
 ├── DTOs/                      # 데이터 전송 객체들
 │   ├── BaseApiResponse.cs     # 기본 API 응답
 │   ├── Chat/                 # 채팅 관련 DTO
-│   ├── Character/            # 캐릭터 관련 DTO
-│   └── WebSocket/            # WebSocket 메시지 DTO
+│   └── Character/            # 캐릭터 관련 DTO
 ├── Http/                     # HTTP 클라이언트
 │   └── HttpApiClient.cs      # HTTP API 클라이언트
 ├── Services/                 # API 서비스들
@@ -36,10 +36,9 @@ Assets/Infrastructure/Network/
 │   ├── ChatApiService.cs     # 채팅 API 서비스
 │   └── CharacterApiService.cs # 캐릭터 API 서비스
 └── WebSocket/                # WebSocket 관련
-    ├── WebSocketManager.cs       # WebSocket 매니저
+    ├── WebSocketManager.cs       # WebSocket 매니저 (단순화됨)
     ├── WebSocketFactory.cs       # 플랫폼별 WebSocket 팩토리
-    ├── IWebSocketHandler.cs      # WebSocket 핸들러 인터페이스
-    ├── DefaultWebSocketHandler.cs # 기본 핸들러
+    ├── INativeWebSocket.cs       # 플랫폼별 WebSocket 인터페이스
     └── Platforms/            # 플랫폼별 WebSocket 구현
         ├── DesktopWebSocket.cs    # 데스크톱용 (.NET ClientWebSocket)
         ├── WebGLWebSocket.cs      # WebGL용 (UnityWebRequest)
@@ -85,7 +84,81 @@ var wsUrlWithVersion = NetworkConfig.GetWebSocketUrlWithVersion();
 var wsUrlWithSession = NetworkConfig.GetWebSocketUrlWithSession("session-123");
 ```
 
-### 2. 전체 흐름 테스트 (권장)
+### 2. WebSocket 사용 (단순화됨)
+
+#### 기본 사용법
+```csharp
+// WebSocket 매니저 사용
+var wsManager = WebSocketManager.Instance;
+
+// 이벤트 구독
+wsManager.OnConnected += () => Debug.Log("연결됨");
+wsManager.OnDisconnected += () => Debug.Log("연결 해제됨");
+wsManager.OnError += (error) => Debug.LogError($"오류: {error}");
+wsManager.OnSessionIdReceived += (sessionId) => Debug.Log($"세션 ID: {sessionId}");
+wsManager.OnChatMessageReceived += (message) => Debug.Log($"채팅: {message}");
+
+// 연결
+await wsManager.ConnectAsync();
+
+// 메시지 전송
+await wsManager.SendChatMessageAsync("안녕하세요!");
+
+// 연결 해제
+await wsManager.DisconnectAsync();
+```
+
+#### 강제된 JSON 형식 사용
+```csharp
+// 메시지 전송 (강제된 형식)
+await wsManager.SendMessageAsync("chat", new ChatData
+{
+    message = "안녕하세요!",
+    sessionId = "session-123",
+    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+});
+
+// 서버에서 받는 메시지 형식
+// {
+//   "type": "session_id",
+//   "data": {
+//     "session_id": "session_123456789"
+//   }
+// }
+// 
+// {
+//   "type": "chat", 
+//   "data": {
+//     "message": "안녕하세요!",
+//     "sessionId": "session-123",
+//     "timestamp": 1703123456789
+//   }
+// }
+```
+
+### 3. HTTP API 사용
+
+#### API 서비스 매니저 사용
+```csharp
+// API 서비스 매니저 사용
+var apiManager = ApiServiceManager.Instance;
+
+// 채팅 API 사용
+var chatResponse = await apiManager.Chat.SendChatAsync(
+    new ChatRequest
+    {
+        message = "안녕하세요!",
+        characterId = "char-456",
+        userId = "user-789",
+        sessionId = "session-123"
+    }
+);
+
+// 캐릭터 API 사용
+var character = await apiManager.Character.GetCharacterAsync("char-456");
+```
+
+### 4. 전체 흐름 테스트 (권장)
 ```csharp
 // NetworkTestManager 사용
 var testManager = FindObjectOfType<NetworkTestManager>();
@@ -98,48 +171,6 @@ await testManager.SendChatRequest();
 
 // 3. WebSocket으로 결과 수신 (자동)
 // 서버가 비동기 작업 완료 후 WebSocket으로 결과 전송
-```
-
-### 3. 개별 모듈 사용
-
-#### HTTP API 사용
-```csharp
-// API 서비스 매니저 사용
-var apiManager = ApiServiceManager.Instance;
-
-// 채팅 API 사용
-var chatResponse = await apiManager.ChatApiService.SendChatAsync(
-    new ChatRequest
-    {
-        message = "안녕하세요!",
-        characterId = "char-456",
-        userId = "user-789",
-        sessionId = "session-123"
-    }
-);
-
-// 캐릭터 API 사용
-var character = await apiManager.CharacterApiService.GetCharacterAsync("char-456");
-```
-
-#### WebSocket 사용
-```csharp
-// WebSocket 매니저 사용
-var wsManager = WebSocketManager.Instance;
-
-// 핸들러 등록
-var handler = gameObject.AddComponent<DefaultWebSocketHandler>();
-wsManager.RegisterHandler(handler);
-
-// 연결
-await wsManager.ConnectAsync("session-123");
-
-// 메시지 전송
-await wsManager.SendChatMessageAsync(
-    message: "안녕하세요!",
-    characterId: "char-456",
-    userId: "user-789"
-);
 ```
 
 ## ⚙️ 설정
@@ -178,16 +209,19 @@ await wsManager.SendChatMessageAsync(
 - System.Net.WebSockets.ClientWebSocket 사용
 - Windows/Mac/Linux 지원
 - 최고 성능
+- JSON 메시지만 처리
 
 ### 2. WebGLWebSocket (브라우저)
 - UnityWebRequest.WebSocket 사용
 - WebGL 플랫폼 지원
 - 브라우저 제약사항 대응
+- JSON 메시지만 처리
 
 ### 3. MobileWebSocket (모바일)
 - 네이티브 WebSocket 라이브러리 사용
 - iOS/Android 지원
 - 네이티브 성능
+- JSON 메시지만 처리
 
 ### 4. WebSocketFactory
 - 플랫폼별 WebSocket 구현 생성
@@ -223,4 +257,13 @@ WebSocket 연결 성공
 모든 로그는 한국어로 출력됩니다:
 - `Debug.Log("WebSocket 연결 성공")`
 - `Debug.LogError("연결 실패")`
-- `Debug.LogWarning("재연결 시도")` 
+- `Debug.LogWarning("재연결 시도")`
+
+## 🔄 변경 사항
+
+### 주요 변경사항 (v2.0)
+1. **바이너리 방식 완전 제거**: JSON 메시지만 처리
+2. **강제된 JSON 형식**: `{type: "xxx", data: {...}}` 형식 사용
+3. **MessageRouter 제거**: WebSocketManager에서 직접 처리
+4. **단순화된 구조**: 불필요한 복잡성 제거
+5. **확장 가능한 설계**: 추후 기능 추가 용이 

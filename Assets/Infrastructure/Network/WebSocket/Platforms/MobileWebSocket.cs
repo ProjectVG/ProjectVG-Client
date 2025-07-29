@@ -19,7 +19,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
         public event Action<string> OnError;
 #pragma warning disable CS0067
         public event Action<string> OnMessageReceived;
-        public event Action<byte[]> OnBinaryDataReceived;
 #pragma warning restore CS0067
 
         private CancellationTokenSource _cancellationTokenSource;
@@ -82,7 +81,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                 
                 // TODO : 네이티브 WebSocket 연결 해제
                 // TODO : 실제 구현 시 네이티브 플러그인 호출
-                await UniTask.CompletedTask; // 비동기 작업 시뮬레이션
+                await UniTask.CompletedTask;
                 
                 OnDisconnected?.Invoke();
             }
@@ -104,34 +103,12 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
             {
                 // TODO : 네이티브 WebSocket 메시지 전송
                 // TODO : 실제 구현 시 네이티브 플러그인 호출
-                await UniTask.CompletedTask; // 비동기 작업 시뮬레이션
+                await UniTask.CompletedTask;
                 return true;
             }
             catch (Exception ex)
             {
                 Debug.LogError($"모바일 WebSocket 메시지 전송 실패: {ex.Message}");
-                return false;
-            }
-        }
-
-        public async UniTask<bool> SendBinaryAsync(byte[] data, CancellationToken cancellationToken = default)
-        {
-            if (!IsConnected)
-            {
-                Debug.LogWarning("모바일 WebSocket이 연결되지 않았습니다.");
-                return false;
-            }
-
-            try
-            {
-                // TODO : 네이티브 WebSocket 바이너리 전송
-                // TODO : 실제 구현 시 네이티브 플러그인 호출
-                await UniTask.CompletedTask; // 비동기 작업 시뮬레이션
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"모바일 WebSocket 바이너리 전송 실패: {ex.Message}");
                 return false;
             }
         }
