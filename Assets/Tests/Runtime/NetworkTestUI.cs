@@ -34,7 +34,7 @@ namespace ProjectVG.Tests.Runtime
 
         private void Start()
         {
-            _testManager = FindObjectOfType<NetworkTestManager>();
+            _testManager = FindFirstObjectByType<NetworkTestManager>();
             if (_testManager == null)
             {
                 Debug.LogError("NetworkTestManager를 찾을 수 없습니다!");

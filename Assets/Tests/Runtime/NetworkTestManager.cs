@@ -123,6 +123,9 @@ namespace ProjectVG.Tests.Runtime
         {
             try
             {
+                // NetworkConfig 초기화 (앱 시작 시 환경 설정)
+                NetworkConfig.SetDevelopmentEnvironment(); // 또는 SetTestEnvironment(), SetProductionEnvironment()
+                
                 // WebSocket 매니저 초기화
                 _webSocketManager = WebSocketManager.Instance;
                 if (_webSocketManager == null)
@@ -131,17 +134,13 @@ namespace ProjectVG.Tests.Runtime
                     return;
                 }
                 
-                // WebSocket 설정 적용 (localhost:7900 사용)
-                var webSocketConfig = ProjectVG.Infrastructure.Network.Configs.WebSocketConfig.CreateDevelopmentConfig();
-                _webSocketManager.SetWebSocketConfig(webSocketConfig);
-                Debug.Log($"WebSocket 설정 적용: {webSocketConfig.GetWebSocketUrl()}");
+                Debug.Log($"WebSocket 설정 적용: {NetworkConfig.GetWebSocketUrl()}");
+                Debug.Log($"현재 환경: {NetworkConfig.CurrentEnvironment}");
                 
-                // API 설정 적용 (localhost:7900 사용)
-                var apiConfig = ProjectVG.Infrastructure.Network.Configs.ApiConfig.CreateDevelopmentConfig();
+                // HTTP API 클라이언트 설정
                 if (HttpApiClient.Instance != null)
                 {
-                    HttpApiClient.Instance.SetApiConfig(apiConfig);
-                    Debug.Log($"API 설정 적용: {apiConfig.GetFullUrl("chat")}");
+                    Debug.Log($"API 설정 적용: {NetworkConfig.GetFullApiUrl("chat")}");
                 }
                 
                 // API 서비스 매니저 초기화
@@ -171,6 +170,7 @@ namespace ProjectVG.Tests.Runtime
                 _webSocketHandler.OnSessionIdMessageReceivedEvent += OnSessionIdMessageReceived;
                 
                 Debug.Log("NetworkTestManager 초기화 완료");
+                NetworkConfig.LogCurrentSettings();
             }
             catch (Exception ex)
             {
@@ -198,6 +198,11 @@ namespace ProjectVG.Tests.Runtime
             try
             {
                 Debug.Log("=== WebSocket 연결 시작 (더미 클라이언트 방식) ===");
+                
+                // 현재 설정 정보 출력
+                            Debug.Log($"현재 환경: {NetworkConfig.CurrentEnvironment}");
+            Debug.Log($"WebSocket 서버: {NetworkConfig.GetWebSocketUrl()}");
+                
                 _receivedSessionId = null; // 세션 ID 초기화
                 
                 // 더미 클라이언트처럼 세션 ID 없이 연결
@@ -243,6 +248,11 @@ namespace ProjectVG.Tests.Runtime
             try
             {
                 Debug.Log("=== HTTP 채팅 요청 시작 (더미 클라이언트 방식) ===");
+                
+                // 현재 설정 정보 출력
+                            Debug.Log($"현재 환경: {NetworkConfig.CurrentEnvironment}");
+            Debug.Log($"API 서버: {NetworkConfig.GetFullApiUrl("chat")}");
+                Debug.Log($"세션 ID: {_receivedSessionId}");
                 
                 var chatRequest = new ProjectVG.Infrastructure.Network.DTOs.Chat.ChatRequest
                 {
@@ -369,6 +379,11 @@ namespace ProjectVG.Tests.Runtime
             {
                 Debug.Log("🚀 === 더미 클라이언트 방식 전체 테스트 시작 ===");
                 
+                // 현재 설정 정보 출력
+                Debug.Log($"테스트 환경: {NetworkConfig.CurrentEnvironment}");
+                Debug.Log($"API 서버: {NetworkConfig.GetFullApiUrl("")}");
+                Debug.Log($"WebSocket 서버: {NetworkConfig.GetWebSocketUrl()}");
+                
                 // 0. 기존 연결이 있으면 해제
                 if (_webSocketManager.IsConnected)
                 {
@@ -458,6 +473,11 @@ namespace ProjectVG.Tests.Runtime
             {
                 Debug.Log("🚀 === 전체 테스트 시작 ===");
                 
+                // 현재 설정 정보 출력
+                Debug.Log($"테스트 환경: {NetworkConfig.CurrentEnvironment}");
+                Debug.Log($"API 서버: {NetworkConfig.GetFullApiUrl("")}");
+                Debug.Log($"WebSocket 서버: {NetworkConfig.GetWebSocketUrl()}");
+                
                 // 1. WebSocket 연결
                 Debug.Log("1️⃣ WebSocket 연결 중...");
                 bool connected = await _webSocketManager.ConnectAsync(testSessionId);
@@ -503,6 +523,13 @@ namespace ProjectVG.Tests.Runtime
             }
         }
 
+        [ContextMenu("현재 네트워크 설정 정보 출력")]
+        public void LogCurrentNetworkConfig()
+        {
+            Debug.Log("=== 현재 네트워크 설정 정보 ===");
+            NetworkConfig.LogCurrentSettings();
+        }
+
         #endregion
 
         #region 자동 테스트
@@ -524,6 +551,11 @@ namespace ProjectVG.Tests.Runtime
                 Debug.LogError("HttpApiClient가 초기화되지 않았습니다. 자동 테스트를 중단합니다.");
                 return;
             }
+            
+            // 현재 설정 정보 출력
+            Debug.Log($"자동 테스트 환경: {NetworkConfig.CurrentEnvironment}");
+            Debug.Log($"API 서버: {NetworkConfig.GetFullApiUrl("")}");
+            Debug.Log($"WebSocket 서버: {NetworkConfig.GetWebSocketUrl()}");
             
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
             {
@@ -565,6 +597,9 @@ namespace ProjectVG.Tests.Runtime
 
             try
             {
+                // 현재 설정 정보 출력
+                Debug.Log($"자동 테스트 환경: {NetworkConfig.CurrentEnvironment}");
+                
                 // 0. 기존 연결이 있으면 해제
                 if (_webSocketManager.IsConnected)
                 {

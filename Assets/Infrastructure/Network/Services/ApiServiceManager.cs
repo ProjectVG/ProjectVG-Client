@@ -15,7 +15,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             {
                 if (_instance == null)
                 {
-                    _instance = FindObjectOfType<ApiServiceManager>();
+                    _instance = FindFirstObjectByType<ApiServiceManager>();
                     if (_instance == null)
                     {
                         GameObject go = new GameObject("ApiServiceManager");

@@ -17,17 +17,8 @@ namespace ProjectVG.Infrastructure.Network.Http
     public class HttpApiClient : MonoBehaviour
     {
         [Header("API Configuration")]
-        [SerializeField] private ApiConfig apiConfig;
-        [SerializeField] private float timeout = 60f;
-        [SerializeField] private int maxRetryCount = 3;
-        [SerializeField] private float retryDelay = 1f;
+        // NetworkConfig를 사용하여 설정을 관리합니다.
 
-        [Header("Headers")]
-        [SerializeField] private string contentType = "application/json";
-        [SerializeField] private string userAgent = "ProjectVG-Client/1.0";
-
-        private const string DEFAULT_BASE_URL = "http://122.153.130.223:7900";
-        private const string DEFAULT_API_VERSION = "v1";
         private const string ACCEPT_HEADER = "application/json";
         private const string AUTHORIZATION_HEADER = "Authorization";
         private const string BEARER_PREFIX = "Bearer ";
@@ -53,11 +44,7 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         #region Public API
 
-        public void SetApiConfig(ApiConfig config)
-        {
-            apiConfig = config;
-            InitializeClient();
-        }
+
 
         public void AddDefaultHeader(string key, string value)
         {
@@ -128,43 +115,26 @@ namespace ProjectVG.Infrastructure.Network.Http
         private void InitializeClient()
         {
             cancellationTokenSource = new CancellationTokenSource();
-            
-            if (apiConfig == null)
-            {
-                Debug.LogWarning("ApiConfig가 설정되지 않았습니다. 기본값을 사용합니다.");
-                SetupDefaultHeaders();
-                return;
-            }
-            
-            ApplyApiConfig();
+            ApplyNetworkConfig();
             SetupDefaultHeaders();
         }
 
-        private void ApplyApiConfig()
+        private void ApplyNetworkConfig()
         {
-            timeout = apiConfig.Timeout;
-            maxRetryCount = apiConfig.MaxRetryCount;
-            retryDelay = apiConfig.RetryDelay;
-            contentType = apiConfig.ContentType;
-            userAgent = apiConfig.UserAgent;
+            Debug.Log($"NetworkConfig 적용: {NetworkConfig.CurrentEnvironment} 환경");
         }
 
         private void SetupDefaultHeaders()
         {
             defaultHeaders.Clear();
-            defaultHeaders["Content-Type"] = contentType;
-            defaultHeaders["User-Agent"] = userAgent;
+            defaultHeaders["Content-Type"] = NetworkConfig.ContentType;
+            defaultHeaders["User-Agent"] = NetworkConfig.UserAgent;
             defaultHeaders["Accept"] = ACCEPT_HEADER;
         }
 
         private string GetFullUrl(string endpoint)
         {
-            if (apiConfig != null)
-            {
-                return apiConfig.GetFullUrl(endpoint);
-            }
-            
-            return $"{DEFAULT_BASE_URL}/api/{DEFAULT_API_VERSION}/{endpoint.TrimStart('/')}";
+            return NetworkConfig.GetFullApiUrl(endpoint);
         }
 
         private string SerializeData(object data)
@@ -191,13 +161,13 @@ namespace ProjectVG.Infrastructure.Network.Http
                 Debug.Log($"HTTP 요청 데이터: {jsonData}");
             }
 
-            for (int attempt = 0; attempt <= maxRetryCount; attempt++)
+            for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
             {
                 try
                 {
                     using var request = CreateRequest(url, method, jsonData, headers);
                     
-                    Debug.Log($"HTTP 요청 전송 중... (시도 {attempt + 1}/{maxRetryCount + 1})");
+                    Debug.Log($"HTTP 요청 전송 중... (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1})");
                     var operation = request.SendWebRequest();
                     await operation.WithCancellation(combinedCancellationToken);
 
@@ -221,14 +191,14 @@ namespace ProjectVG.Infrastructure.Network.Http
                 }
             }
 
-            throw new ApiException($"{maxRetryCount + 1}번 시도 후 요청 실패", 0, "최대 재시도 횟수 초과");
+            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 요청 실패", 0, "최대 재시도 횟수 초과");
         }
 
         private async UniTask<T> SendFileRequestAsync<T>(string url, byte[] fileData, string fileName, string fieldName, Dictionary<string, string> headers, CancellationToken cancellationToken)
         {
             var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
 
-            for (int attempt = 0; attempt <= maxRetryCount; attempt++)
+            for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
             {
                 try
                 {
@@ -237,7 +207,7 @@ namespace ProjectVG.Infrastructure.Network.Http
                     
                     using var request = UnityWebRequest.Post(url, form);
                     SetupRequest(request, headers);
-                    request.timeout = (int)timeout;
+                    request.timeout = (int)NetworkConfig.HttpTimeout;
 
                     var operation = request.SendWebRequest();
                     await operation.WithCancellation(combinedCancellationToken);
@@ -261,7 +231,7 @@ namespace ProjectVG.Infrastructure.Network.Http
                 }
             }
 
-            throw new ApiException($"{maxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, "최대 재시도 횟수 초과");
+            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, "최대 재시도 횟수 초과");
         }
 
         private CancellationToken CreateCombinedCancellationToken(CancellationToken cancellationToken)
@@ -274,10 +244,10 @@ namespace ProjectVG.Infrastructure.Network.Http
             var error = new ApiException(request.error, request.responseCode, request.downloadHandler?.text);
             Debug.LogError($"HTTP 요청 실패: {request.result}, 상태코드: {request.responseCode}, 오류: {request.error}");
             
-            if (ShouldRetry(request.responseCode) && attempt < maxRetryCount)
+            if (ShouldRetry(request.responseCode) && attempt < NetworkConfig.MaxRetryCount)
             {
-                Debug.LogWarning($"API 요청 실패 (시도 {attempt + 1}/{maxRetryCount + 1}): {error.Message}");
-                await UniTask.Delay(TimeSpan.FromSeconds(retryDelay * (attempt + 1)), cancellationToken: cancellationToken);
+                Debug.LogWarning($"API 요청 실패 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {error.Message}");
+                await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
                 return;
             }
             
@@ -286,23 +256,23 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         private async UniTask HandleRequestException(Exception ex, int attempt, CancellationToken cancellationToken)
         {
-            if (attempt < maxRetryCount)
+            if (attempt < NetworkConfig.MaxRetryCount)
             {
-                Debug.LogWarning($"API 요청 예외 발생 (시도 {attempt + 1}/{maxRetryCount + 1}): {ex.Message}");
-                await UniTask.Delay(TimeSpan.FromSeconds(retryDelay * (attempt + 1)), cancellationToken: cancellationToken);
+                Debug.LogWarning($"API 요청 예외 발생 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {ex.Message}");
+                await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
                 return;
             }
-            throw new ApiException($"{maxRetryCount + 1}번 시도 후 요청 실패", 0, ex.Message);
+            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 요청 실패", 0, ex.Message);
         }
 
         private async UniTask HandleFileUploadFailure(UnityWebRequest request, int attempt, CancellationToken cancellationToken)
         {
             var error = new ApiException(request.error, request.responseCode, request.downloadHandler?.text);
             
-            if (ShouldRetry(request.responseCode) && attempt < maxRetryCount)
+            if (ShouldRetry(request.responseCode) && attempt < NetworkConfig.MaxRetryCount)
             {
-                Debug.LogWarning($"파일 업로드 실패 (시도 {attempt + 1}/{maxRetryCount + 1}): {error.Message}");
-                await UniTask.Delay(TimeSpan.FromSeconds(retryDelay * (attempt + 1)), cancellationToken: cancellationToken);
+                Debug.LogWarning($"파일 업로드 실패 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {error.Message}");
+                await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
                 return;
             }
             
@@ -311,13 +281,13 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         private async UniTask HandleFileUploadException(Exception ex, int attempt, CancellationToken cancellationToken)
         {
-            if (attempt < maxRetryCount)
+            if (attempt < NetworkConfig.MaxRetryCount)
             {
-                Debug.LogWarning($"파일 업로드 예외 발생 (시도 {attempt + 1}/{maxRetryCount + 1}): {ex.Message}");
-                await UniTask.Delay(TimeSpan.FromSeconds(retryDelay * (attempt + 1)), cancellationToken: cancellationToken);
+                Debug.LogWarning($"파일 업로드 예외 발생 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {ex.Message}");
+                await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
                 return;
             }
-            throw new ApiException($"{maxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, ex.Message);
+            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, ex.Message);
         }
 
         private UnityWebRequest CreateRequest(string url, string method, string jsonData, Dictionary<string, string> headers)
@@ -332,7 +302,7 @@ namespace ProjectVG.Infrastructure.Network.Http
             
             request.downloadHandler = new DownloadHandlerBuffer();
             SetupRequest(request, headers);
-            request.timeout = (int)timeout;
+            request.timeout = (int)NetworkConfig.HttpTimeout;
             
             return request;
         }

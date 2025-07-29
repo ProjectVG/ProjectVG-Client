@@ -17,8 +17,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
     /// </summary>
     public class WebSocketManager : MonoBehaviour
     {
-                            [Header("WebSocket Configuration")]
-                    [SerializeField] private WebSocketConfig webSocketConfig;
+        [Header("WebSocket Configuration")]
+        // NetworkConfig를 사용하여 설정을 관리합니다.
 
         private INativeWebSocket _nativeWebSocket;
         private CancellationTokenSource _cancellationTokenSource;
@@ -67,36 +67,24 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             _cancellationTokenSource = new CancellationTokenSource();
             
-            if (webSocketConfig == null)
-            {
-                Debug.LogWarning("WebSocketConfig가 설정되지 않았습니다. 기본 설정을 사용합니다.");
-            }
-            
             // Native WebSocket 초기화
             InitializeNativeWebSocket();
         }
 
-                            private void InitializeNativeWebSocket()
-                    {
-                        // 실제 WebSocket 구현체 사용
-                        _nativeWebSocket = new RealWebSocket();
-                        Debug.Log("실제 WebSocket 구현체를 사용합니다.");
-                        
-                        // 이벤트 연결
-                        _nativeWebSocket.OnConnected += OnNativeConnected;
-                        _nativeWebSocket.OnDisconnected += OnNativeDisconnected;
-                        _nativeWebSocket.OnError += OnNativeError;
-                        _nativeWebSocket.OnMessageReceived += OnNativeMessageReceived;
-                        _nativeWebSocket.OnBinaryDataReceived += OnNativeBinaryDataReceived;
-                    }
-
-        /// <summary>
-        /// WebSocketConfig 설정
-        /// </summary>
-        public void SetWebSocketConfig(WebSocketConfig config)
+        private void InitializeNativeWebSocket()
         {
-            webSocketConfig = config;
+            // 플랫폼별 WebSocket 구현체 생성
+            _nativeWebSocket = WebSocketFactory.Create();
+            
+            // 이벤트 연결
+            _nativeWebSocket.OnConnected += OnNativeConnected;
+            _nativeWebSocket.OnDisconnected += OnNativeDisconnected;
+            _nativeWebSocket.OnError += OnNativeError;
+            _nativeWebSocket.OnMessageReceived += OnNativeMessageReceived;
+            _nativeWebSocket.OnBinaryDataReceived += OnNativeBinaryDataReceived;
         }
+
+
 
 
 
@@ -347,19 +335,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         /// </summary>
         private string GetWebSocketUrl(string sessionId = null)
         {
-            string baseUrl;
+            string baseUrl = NetworkConfig.GetWebSocketUrl();
             
-            if (webSocketConfig != null)
-            {
-                baseUrl = webSocketConfig.GetWebSocketUrl();
-            }
-            else
-            {
-                // 기본값 (base64 인코딩된 IP:Port 사용)
-                baseUrl = "ws://MTIyLjE1My4xMzAuMjIzOjc5MDA=/ws";
-            }
-            
-            // 세션 ID가 있으면 쿼리 파라미터로 추가 (더미 클라이언트와 동일)
             if (!string.IsNullOrEmpty(sessionId))
             {
                 return $"{baseUrl}?sessionId={sessionId}";
@@ -375,17 +352,19 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         /// </summary>
         private async UniTaskVoid TryReconnectAsync()
         {
-            var config = webSocketConfig ?? CreateDefaultWebSocketConfig();
+            bool autoReconnect = NetworkConfig.AutoReconnect;
+            int maxReconnectAttempts = NetworkConfig.MaxReconnectAttempts;
+            float reconnectDelay = NetworkConfig.ReconnectDelay;
             
-            if (!config.AutoReconnect || _reconnectAttempts >= config.MaxReconnectAttempts)
+            if (!autoReconnect || _reconnectAttempts >= maxReconnectAttempts)
             {
                 return;
             }
 
             _reconnectAttempts++;
-            Debug.Log($"WebSocket 재연결 시도 {_reconnectAttempts}/{config.MaxReconnectAttempts}");
+            Debug.Log($"WebSocket 재연결 시도 {_reconnectAttempts}/{maxReconnectAttempts}");
             
-            await UniTask.Delay(TimeSpan.FromSeconds(config.ReconnectDelay));
+            await UniTask.Delay(TimeSpan.FromSeconds(reconnectDelay));
             
             if (!_isConnected)
             {
@@ -393,13 +372,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
         }
 
-        /// <summary>
-        /// 기본 WebSocket 설정 생성
-        /// </summary>
-        private WebSocketConfig CreateDefaultWebSocketConfig()
-        {
-            return WebSocketConfig.CreateDevelopmentConfig();
-        }
+
 
         #region Native WebSocket Event Handlers
 
