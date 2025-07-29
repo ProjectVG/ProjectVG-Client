@@ -58,5 +58,11 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         /// </summary>
         /// <param name="audioData">오디오 바이트 데이터</param>
         void OnAudioDataReceived(byte[] audioData);
+
+        /// <summary>
+        /// 통합 메시지 수신 시 호출 (텍스트 + 오디오)
+        /// </summary>
+        /// <param name="message">통합 메시지</param>
+        void OnIntegratedMessageReceived(IntegratedMessage message);
     }
 } 

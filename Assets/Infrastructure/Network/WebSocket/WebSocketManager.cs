@@ -7,13 +7,13 @@ using UnityEngine.Networking;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Network.DTOs.WebSocket;
-using ProjectVG.Infrastructure.Network.WebSocket.Platforms;
+using ProjectVG.Infrastructure.Network.WebSocket.Processors;
 
 namespace ProjectVG.Infrastructure.Network.WebSocket
 {
     /// <summary>
-    /// WebSocket 연결 및 메시지 관리자
-    /// UnityWebRequest를 사용하여 WebSocket 연결을 관리하고, 비동기 결과를 Handler로 전달합니다.
+    /// WebSocket 연결 및 메시지 관리자 (Bridge Pattern 적용)
+    /// 메시지 처리기를 통해 JSON과 바이너리 메시지를 분리하여 처리합니다.
     /// </summary>
     public class WebSocketManager : MonoBehaviour
     {
@@ -24,10 +24,20 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         private CancellationTokenSource _cancellationTokenSource;
         private List<IWebSocketHandler> _handlers = new List<IWebSocketHandler>();
         
+        // Bridge Pattern: 메시지 처리기
+        private IMessageProcessor _messageProcessor;
+        
+        // 메시지 버퍼링을 위한 필드 추가
+        private readonly StringBuilder _messageBuffer = new StringBuilder();
+        private readonly object _bufferLock = new object();
+        private bool _isProcessingMessage = false;
+        
         private bool _isConnected = false;
         private bool _isConnecting = false;
         private int _reconnectAttempts = 0;
         private string _sessionId;
+
+
 
         public static WebSocketManager Instance { get; private set; }
         
@@ -36,11 +46,14 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         public event Action OnDisconnected;
         public event Action<string> OnError;
         public event Action<WebSocketMessage> OnMessageReceived;
+        public event Action<byte[]> OnAudioDataReceived;
+        public event Action<IntegratedMessage> OnIntegratedMessageReceived;
 
-        // 프로퍼티
+
         public bool IsConnected => _isConnected;
         public bool IsConnecting => _isConnecting;
         public string SessionId => _sessionId;
+
 
         private void Awake()
         {
@@ -67,8 +80,28 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             _cancellationTokenSource = new CancellationTokenSource();
             
+            // NetworkConfig 기반으로 메시지 처리기 설정
+            InitializeMessageProcessor();
+            
             // Native WebSocket 초기화
             InitializeNativeWebSocket();
+        }
+        
+        /// <summary>
+        /// NetworkConfig 기반으로 메시지 처리기 초기화
+        /// </summary>
+        private void InitializeMessageProcessor()
+        {
+            var messageType = NetworkConfig.WebSocketMessageType;
+            _messageProcessor = MessageProcessorFactory.CreateProcessor(messageType);
+            Debug.Log($"NetworkConfig 기반 메시지 처리기 초기화: {messageType}");
+            
+            // 현재 설정 로그 출력
+            Debug.Log($"=== WebSocket 메시지 처리 설정 ===");
+            Debug.Log($"NetworkConfig 메시지 타입: {messageType}");
+            Debug.Log($"JSON 형식 지원: {NetworkConfig.IsJsonMessageType}");
+            Debug.Log($"바이너리 형식 지원: {NetworkConfig.IsBinaryMessageType}");
+            Debug.Log($"=====================================");
         }
 
         private void InitializeNativeWebSocket()
@@ -142,6 +175,10 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                     _reconnectAttempts = 0;
                     
                     Debug.Log("WebSocket 연결 성공");
+                    
+                    // 연결 후 서버 설정 로드 시도 (선택적)
+                    // LoadServerConfigAsync().Forget();
+                    
                     return true;
                 }
                 else
@@ -246,106 +283,32 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             return await SendMessageAsync(chatMessage, cancellationToken);
         }
 
-
-
         /// <summary>
-        /// 수신된 메시지 처리 (더미 클라이언트와 동일한 방식)
-        /// </summary>
-        private void ProcessReceivedMessage(WebSocketMessage baseMessage)
-        {
-            try
-            {
-                Debug.Log($"메시지 수신: {baseMessage.type} - {baseMessage.data}");
-                
-                // 이벤트 발생
-                OnMessageReceived?.Invoke(baseMessage);
-                foreach (var handler in _handlers)
-                {
-                    handler.OnMessageReceived(baseMessage);
-                }
-
-                // 메시지 타입에 따른 처리
-                switch (baseMessage.type?.ToLower())
-                {
-                    case "session_id":
-                        Debug.Log("세션 ID 메시지 처리 중...");
-                        var sessionMessage = JsonUtility.FromJson<SessionIdMessage>(JsonUtility.ToJson(baseMessage));
-                        _sessionId = sessionMessage.session_id; // 세션 ID 저장
-                        Debug.Log($"세션 ID 저장됨: {_sessionId}");
-                        foreach (var handler in _handlers)
-                        {
-                            handler.OnSessionIdMessageReceived(sessionMessage);
-                        }
-                        break;
-                        
-                    case "chat":
-                        var chatMessage = JsonUtility.FromJson<ChatMessage>(JsonUtility.ToJson(baseMessage));
-                        foreach (var handler in _handlers)
-                        {
-                            handler.OnChatMessageReceived(chatMessage);
-                        }
-                        break;
-                        
-                    case "system":
-                        var systemMessage = JsonUtility.FromJson<SystemMessage>(JsonUtility.ToJson(baseMessage));
-                        foreach (var handler in _handlers)
-                        {
-                            handler.OnSystemMessageReceived(systemMessage);
-                        }
-                        break;
-                        
-                    case "connection":
-                        var connectionMessage = JsonUtility.FromJson<ConnectionMessage>(JsonUtility.ToJson(baseMessage));
-                        foreach (var handler in _handlers)
-                        {
-                            handler.OnConnectionMessageReceived(connectionMessage);
-                        }
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"메시지 처리 실패: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 오디오 데이터 처리 (더미 클라이언트와 동일한 방식)
-        /// </summary>
-        private void ProcessAudioData(byte[] audioData)
-        {
-            try
-            {
-                Debug.Log($"오디오 데이터 수신: {audioData.Length} bytes");
-                
-                // 이벤트 발생
-                foreach (var handler in _handlers)
-                {
-                    handler.OnAudioDataReceived(audioData);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"오디오 데이터 처리 실패: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// WebSocket URL 생성 (더미 클라이언트와 동일한 방식)
+        /// WebSocket URL 생성
         /// </summary>
         private string GetWebSocketUrl(string sessionId = null)
         {
             string baseUrl = NetworkConfig.GetWebSocketUrl();
             
+            Debug.Log($"=== WebSocket URL 생성 ===");
+            Debug.Log($"기본 URL: {baseUrl}");
+            Debug.Log($"세션 ID: {sessionId}");
+            
+            string finalUrl;
             if (!string.IsNullOrEmpty(sessionId))
             {
-                return $"{baseUrl}?sessionId={sessionId}";
+                finalUrl = $"{baseUrl}?sessionId={sessionId}";
+            }
+            else
+            {
+                finalUrl = baseUrl;
             }
             
-            return baseUrl;
+            Debug.Log($"최종 URL: {finalUrl}");
+            Debug.Log($"================================");
+            
+            return finalUrl;
         }
-
-
 
         /// <summary>
         /// 자동 재연결 시도
@@ -371,8 +334,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 ConnectAsync(_sessionId).Forget();
             }
         }
-
-
 
         #region Native WebSocket Event Handlers
 
@@ -426,44 +387,15 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             try
             {
-                Debug.Log($"원시 메시지 수신: {message}");
+                Debug.Log($"=== 메시지 수신 디버깅 ===");
+                Debug.Log($"원시 메시지 길이: {message?.Length ?? 0}");
+                Debug.Log($"원시 메시지 (처음 100자): {message?.Substring(0, Math.Min(100, message?.Length ?? 0))}");
                 Debug.Log($"핸들러 수: {_handlers.Count}");
+                Debug.Log($"현재 메시지 처리기: {_messageProcessor.MessageType}");
+                Debug.Log($"================================");
                 
-                // 클라이언트와 동일한 방식으로 세션 ID 메시지 처리
-                if (message.Contains("\"type\":\"session_id\""))
-                {
-                    Debug.Log("세션 ID 메시지 감지됨");
-                    
-                    // JSON에서 session_id 추출
-                    int sessionIdStart = message.IndexOf("\"session_id\":\"") + 14;
-                    int sessionIdEnd = message.IndexOf("\"", sessionIdStart);
-                    if (sessionIdStart > 13 && sessionIdEnd > sessionIdStart)
-                    {
-                        _sessionId = message.Substring(sessionIdStart, sessionIdEnd - sessionIdStart);
-                        Debug.Log($"세션 ID 저장됨: {_sessionId}");
-                        
-                        // 핸들러들에게 세션 ID 메시지 전달
-                        var sessionMessage = new SessionIdMessage { session_id = _sessionId };
-                        foreach (var handler in _handlers)
-                        {
-                            Debug.Log($"핸들러에게 세션 ID 전달: {handler.GetType().Name}");
-                            handler.OnSessionIdMessageReceived(sessionMessage);
-                        }
-                        return;
-                    }
-                    else
-                    {
-                        Debug.LogError("세션 ID 추출 실패 - JSON 형식 확인 필요");
-                    }
-                }
-                else
-                {
-                    Debug.Log("세션 ID 메시지가 아님 - 다른 메시지 타입");
-                }
-                
-                // 기존 방식으로 처리
-                var baseMessage = JsonUtility.FromJson<WebSocketMessage>(message);
-                ProcessReceivedMessage(baseMessage);
+                // 메시지 버퍼링 처리
+                ProcessBufferedMessage(message);
             }
             catch (Exception ex)
             {
@@ -471,12 +403,132 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 Debug.LogError($"원시 메시지: {message}");
             }
         }
+        
+        /// <summary>
+        /// 메시지 버퍼링 및 완전한 JSON 메시지 처리
+        /// </summary>
+        private void ProcessBufferedMessage(string message)
+        {
+            lock (_bufferLock)
+            {
+                // 메시지를 버퍼에 추가
+                _messageBuffer.Append(message);
+                string bufferedMessage = _messageBuffer.ToString();
+                
+                Debug.Log($"버퍼링된 메시지 길이: {bufferedMessage.Length}");
+                Debug.Log($"버퍼링된 메시지 (처음 100자): {bufferedMessage.Substring(0, Math.Min(100, bufferedMessage.Length))}");
+                
+                // 완전한 JSON 메시지인지 확인
+                if (IsCompleteJsonMessage(bufferedMessage))
+                {
+                    Debug.Log("완전한 JSON 메시지 감지됨. 처리 시작.");
+                    
+                    // JSON 형식인지 확인
+                    if (IsValidJsonMessage(bufferedMessage))
+                    {
+                        Debug.Log("JSON 형식으로 처리합니다.");
+                        // Bridge Pattern: 메시지 처리기에 위임
+                        _messageProcessor.ProcessMessage(bufferedMessage, _handlers);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("JSON 형식이 아닌 메시지가 문자열로 수신됨. 바이너리 처리기로 전달합니다.");
+                        // 바이너리 처리기로 전달
+                        var binaryProcessor = MessageProcessorFactory.CreateProcessor("binary");
+                        binaryProcessor.ProcessMessage(bufferedMessage, _handlers);
+                    }
+                    
+                    // 버퍼 초기화
+                    _messageBuffer.Clear();
+                    Debug.Log("메시지 처리 완료. 버퍼 초기화됨.");
+                }
+                else
+                {
+                    Debug.Log($"불완전한 메시지. 버퍼에 누적 중... (현재 길이: {bufferedMessage.Length})");
+                }
+            }
+        }
+        
+        /// <summary>
+        /// 완전한 JSON 메시지인지 확인
+        /// </summary>
+        private bool IsCompleteJsonMessage(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+                return false;
+                
+            // 중괄호 개수로 완전한 JSON인지 확인
+            int openBraces = 0;
+            int closeBraces = 0;
+            bool inString = false;
+            char escapeChar = '\\';
+            
+            for (int i = 0; i < message.Length; i++)
+            {
+                char c = message[i];
+                
+                if (c == '"' && (i == 0 || message[i - 1] != escapeChar))
+                {
+                    inString = !inString;
+                }
+                else if (!inString)
+                {
+                    if (c == '{')
+                        openBraces++;
+                    else if (c == '}')
+                        closeBraces++;
+                }
+            }
+            
+            bool isComplete = openBraces > 0 && openBraces == closeBraces;
+            Debug.Log($"JSON 완성도 체크: 열린괄호={openBraces}, 닫힌괄호={closeBraces}, 완성={isComplete}");
+            
+            return isComplete;
+        }
+        
+        /// <summary>
+        /// JSON 형식인지 확인
+        /// </summary>
+        private bool IsValidJsonMessage(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+                return false;
+                
+            message = message.Trim();
+            
+            // JSON 객체 시작/끝 확인
+            if (message.StartsWith("{") && message.EndsWith("}"))
+                return true;
+                
+            // JSON 배열 시작/끝 확인
+            if (message.StartsWith("[") && message.EndsWith("]"))
+                return true;
+                
+            // 세션 ID 메시지 특별 처리
+            if (message.Contains("\"type\":\"session_id\""))
+                return true;
+                
+            return false;
+        }
 
         private void OnNativeBinaryDataReceived(byte[] data)
         {
-            ProcessAudioData(data);
+            try
+            {
+                Debug.Log($"바이너리 데이터 수신: {data.Length} bytes");
+                Debug.Log($"현재 메시지 처리기: {_messageProcessor.MessageType}");
+                
+                // Bridge Pattern: 메시지 처리기에 위임
+                _messageProcessor.ProcessBinaryMessage(data, _handlers);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"바이너리 데이터 처리 실패: {ex.Message}");
+            }
         }
 
         #endregion
     }
+
+
 } 

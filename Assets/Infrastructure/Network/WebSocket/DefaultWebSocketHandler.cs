@@ -23,6 +23,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         public System.Action<ConnectionMessage> OnConnectionMessageReceivedEvent;
         public System.Action<SessionIdMessage> OnSessionIdMessageReceivedEvent;
         public System.Action<byte[]> OnAudioDataReceivedEvent;
+        public System.Action<IntegratedMessage> OnIntegratedMessageReceivedEvent;
 
         private void Start()
         {
@@ -157,6 +158,16 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
             
             OnAudioDataReceivedEvent?.Invoke(audioData);
+        }
+
+        public void OnIntegratedMessageReceived(IntegratedMessage message)
+        {
+            if (enableLogging)
+            {
+                Debug.Log($"통합 메시지 수신 - 텍스트: {message.text?.Length ?? 0}자, 오디오: {message.audioData?.Length ?? 0}바이트, 지속시간: {message.audioDuration:F2}초");
+            }
+            
+            OnIntegratedMessageReceivedEvent?.Invoke(message);
         }
 
         #endregion

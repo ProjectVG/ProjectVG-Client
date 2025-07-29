@@ -35,6 +35,7 @@ namespace ProjectVG.Infrastructure.Network.Configs
         [SerializeField] private int maxMessageSize = 65536; // 64KB
         [SerializeField] private float messageTimeout = 10f;
         [SerializeField] private bool enableMessageLogging = true;
+        [SerializeField] private string wsMessageType = "json"; // "json" 또는 "binary"
         
         [Header("Common Settings")]
         [SerializeField] private string userAgent = "ProjectVG-Client/1.0";
@@ -205,6 +206,21 @@ namespace ProjectVG.Infrastructure.Network.Configs
         /// 메시지 로깅 활성화
         /// </summary>
         public static bool EnableMessageLogging => Instance.enableMessageLogging;
+        
+        /// <summary>
+        /// WebSocket 메시지 타입
+        /// </summary>
+        public static string WebSocketMessageType => Instance.wsMessageType;
+        
+        /// <summary>
+        /// JSON 메시지 타입인지 확인
+        /// </summary>
+        public static bool IsJsonMessageType => Instance.wsMessageType?.ToLower() == "json";
+        
+        /// <summary>
+        /// 바이너리 메시지 타입인지 확인
+        /// </summary>
+        public static bool IsBinaryMessageType => Instance.wsMessageType?.ToLower() == "binary";
         
         /// <summary>
         /// 사용자 에이전트
