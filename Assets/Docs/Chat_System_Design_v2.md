@@ -12,6 +12,7 @@
 3. **ChatUI**: 유저 메시지와 캐릭터 메시지 구별 표시
 4. **비동기 처리**: WebSocket을 통한 실시간 메시지 수신
 5. **통합 메시지**: 텍스트 + 오디오 데이터 통합 처리
+6. **세션 관리**: WebSocket 연결 시 세션ID 자동 수신 및 관리
 
 ---
 
@@ -25,16 +26,19 @@ classDiagram
         -AudioManager _audioManager
         -WebSocketManager _webSocketManager
         -ChatSession _currentSession
-        -IntegratedChatMessageHandler _messageHandler
+        -string _sessionId
         +bool IsConnected
         +bool IsInitialized
+        +string SessionId
         +Initialize()
         +SendUserMessage(string message)
-        +ProcessCharacterMessage(IntegratedChatMessage message)
+        +ProcessCharacterMessage(ChatMessage message)
+        +ProcessSessionIdMessage(string sessionId)
         +StartNewSession()
         +EndSession()
         -ValidateUserInput(string message)
-        -HandleMessageReceived(IntegratedChatMessage message)
+        -HandleMessageReceived(ChatMessage message)
+        -OnChatMessageReceived(ChatMessage chatMessage)
     }
 
     %% UI Components
@@ -58,6 +62,25 @@ classDiagram
         -OnVoiceButtonClicked()
     }
 
+    %% WebSocket & Handler
+    class WebSocketManager {
+        -INativeWebSocket _nativeWebSocket
+        -string _sessionId
+        -bool _isConnected
+        -bool _isConnecting
+        +bool IsConnected
+        +bool IsConnecting
+        +string SessionId
+        +ConnectAsync(string sessionId)
+        +DisconnectAsync()
+        +SendMessageAsync(string type, object data)
+        -ProcessSessionIdMessage(object data)
+        -ProcessChatMessage(object data)
+        -OnNativeMessageReceived(string message)
+        +event OnSessionIdReceived
+        +event OnChatMessageReceived
+    }
+
     %% Audio System
     class AudioManager {
         -AudioSource _audioDialogue
@@ -73,47 +96,45 @@ classDiagram
         -OnAudioFinished()
     }
 
-    %% WebSocket & Handler
-    class WebSocketManager {
-        -WebSocketClient _wsClient
-        -string _sessionId
-        -IntegratedChatMessageHandler _messageHandler
-        +bool IsConnected
-        +Connect(string url)
-        +Disconnect()
-        +SendMessage(string message)
-        +RegisterHandler(IntegratedChatMessageHandler handler)
-        +UnregisterHandler(IntegratedChatMessageHandler handler)
-        -OnWebSocketMessage(string message)
-        -OnWebSocketError(string error)
-    }
-
-    class IntegratedChatMessageHandler {
-        -ChatManager _chatManager
-        +ProcessMessage(string jsonMessage)
-        +ParseIntegratedMessage(IntegratedChatMessage message)
-        +ExtractTextData(IntegratedChatMessage message)
-        +ExtractAudioData(IntegratedChatMessage message)
-        +ValidateMessage(IntegratedChatMessage message)
-        -OnMessageParsed(IntegratedChatMessage message)
-    }
-
     %% Data Models
-    class IntegratedChatMessage {
+    class ChatResponse {
         +string Type
         +string MessageType
         +string SessionId
-        +string Text
-        +string AudioData
-        +string AudioFormat
-        +float AudioLength
+        +string? Text
+        +string? AudioData
+        +string? AudioFormat
+        +float? AudioLength
         +DateTime Timestamp
-        +Dictionary~string, object~ Metadata
-        +SetAudioData(byte[] audioBytes)
-        +GetAudioBytes() byte[]
-        +HasTextData() bool
-        +HasAudioData() bool
+        +Dictionary~string, object~? Metadata
+        +SetAudioData(byte[]? audioBytes)
     }
+
+    class VoiceData {
+        +AudioClip AudioClip
+        +float Length
+        +string Format
+        +FromBase64(string, string) VoiceData
+        +HasAudioClip() bool
+        +IsPlayable() bool
+    }
+
+    class ChatMessage {
+        +string SessionId
+        +string? Text
+        +VoiceData? VoiceData
+        +DateTime Timestamp
+        +Dictionary~string, object~? Metadata
+        +FromChatResponse(ChatResponse) ChatMessage
+        +HasTextData() bool
+        +HasVoiceData() bool
+        +IsVoicePlayable() bool
+        +GetAudioClip() AudioClip?
+        +GetVoiceLength() float
+        +GetVoiceFormat() string
+    }
+
+
 
     class ChatSession {
         +string SessionId
@@ -122,7 +143,7 @@ classDiagram
         +DateTime StartTime
         +List~ChatMessage~ MessageHistory
         +AddUserMessage(string content)
-        +AddCharacterMessage(IntegratedChatMessage message)
+        +AddCharacterMessage(ChatMessage message)
         +GetLastMessage() ChatMessage
         +GetMessageCount() int
         +ClearHistory()
@@ -138,7 +159,7 @@ classDiagram
         +bool IsUserMessage
         +string VoiceUrl
         +CreateUserMessage(string content)
-        +CreateCharacterMessage(IntegratedChatMessage message)
+        +CreateCharacterMessage(ChatMessage message)
     }
 
     %% Enums
@@ -154,7 +175,7 @@ classDiagram
     class IChatEventHandler {
         <<interface>>
         +OnUserMessageSent(string message)
-        +OnCharacterMessageReceived(IntegratedChatMessage message)
+        +OnCharacterMessageReceived(ChatMessage message)
         +OnSessionStarted(string sessionId)
         +OnSessionEnded(string sessionId)
         +OnError(string error)
@@ -165,15 +186,15 @@ classDiagram
     ChatManager --> AudioManager : controls
     ChatManager --> WebSocketManager : uses
     ChatManager --> ChatSession : maintains
-    ChatManager --> IntegratedChatMessageHandler : uses
     ChatManager --> IChatEventHandler : implements
 
-    WebSocketManager --> IntegratedChatMessageHandler : notifies
-    IntegratedChatMessageHandler --> ChatManager : notifies
+    WebSocketManager --> ChatResponse : processes
+    WebSocketManager --> ChatManager : notifies via events
+    ChatResponse --> ChatMessage : converts to
 
     ChatSession --> ChatMessage : contains
     ChatMessage --> MessageType : has
-    IntegratedChatMessage --> MessageType : has
+    ChatResponse --> ChatMessage : converts to
 ```
 
 ---
@@ -202,13 +223,19 @@ Assets/
 ├── Infrastructure/Network/
 │   ├── Services/
 │   │   ├── WebSocketManager.cs               # 웹소켓 매니저
-│   │   └── IntegratedChatMessageHandler.cs   # 통합 메시지 핸들러
-│   ├── Models/
-│   │   └── IntegratedChatMessage.cs          # 통합 메시지 모델
+│   │   └── ChatApiService.cs                 # HTTP API 서비스
+│   ├── WebSocket/
+│   │   ├── INativeWebSocket.cs               # 네이티브 웹소켓 인터페이스
+│   │   └── Platforms/
+│   │       ├── DesktopWebSocket.cs           # 데스크톱 웹소켓
+│   │       └── MobileWebSocket.cs            # 모바일 웹소켓
 │   └── DTOs/Chat/
-│       ├── ChatRequest.cs                    # (기존 확장)
-│       ├── ChatResponse.cs                   # (기존 확장)
-│       └── IntegratedChatMessage.cs           # 통합 메시지 모델
+│       ├── ChatRequest.cs                    # HTTP 요청 DTO
+│       ├── ChatResponse.cs                   # HTTP 응답 DTO
+│       └── IntegratedChatMessage.cs          # 통합 메시지 모델
+├── Domain/Chat/Script/
+│   ├── ChatMessage.cs                        # 내부 사용 채팅 메시지
+│   └── VoiceData.cs                          # 음성 데이터 구조
 └── UI/Panels/
     └── ChatPanel.prefab                     # 채팅 패널 프리팹
 ```
@@ -221,10 +248,21 @@ Assets/
 - **역할**: 전체 대화 흐름 조율 (유저 ↔ 서버)
 - **책임**: 
   - 유저 입력 처리 및 전송
-  - 서버 응답 수신 및 처리
+      - 서버 응답 수신 및 처리 (ChatResponse → ChatMessage 변환)
+  - 세션ID 관리 (ProcessSessionIdMessage)
   - UI 상태 관리
   - 오디오 재생 제어
   - 세션 관리
+
+### WebSocketManager
+- **역할**: 실시간 웹소켓 통신 관리
+- **책임**:
+  - 웹소켓 연결 관리
+  - 메시지 송수신
+  - 세션ID 메시지 처리 (ProcessSessionIdMessage)
+  - 채팅 메시지 처리 (ProcessChatMessage)
+      - ChatResponse 기반 이벤트 발생
+  - 연결 상태 모니터링
 
 ### ChatUI
 - **역할**: 유저/캐릭터 메시지 구별 표시
@@ -234,22 +272,6 @@ Assets/
   - 입력 필드 관리
   - 스크롤 자동 조정
   - 타이핑 인디케이터
-
-### WebSocketManager
-- **역할**: 실시간 웹소켓 통신 관리
-- **책임**:
-  - 웹소켓 연결 관리
-  - 메시지 송수신
-  - 핸들러 등록/해제
-  - 연결 상태 모니터링
-
-### IntegratedChatMessageHandler
-- **역할**: 통합 메시지 파싱 및 처리
-- **책임**:
-  - JSON 메시지 파싱
-  - 텍스트/오디오 데이터 추출
-  - 메시지 유효성 검증
-  - ChatManager에 결과 전달
 
 ### AudioManager
 - **역할**: Base64 오디오 데이터 재생
@@ -261,6 +283,137 @@ Assets/
 
 ---
 
+## 데이터 모델 정의
+
+### ChatResponse (서버 응답 데이터 구조)
+```csharp
+namespace ProjectVG.Infrastructure.Network.DTOs.Chat
+{
+    public class ChatResponse
+    {
+        [JsonProperty("type")]
+        public string Type { get; set; } = "chat";
+        
+        [JsonProperty("message_type")]
+        public string MessageType { get; set; } = "json";
+        
+        [JsonProperty("session_id")]
+        public string SessionId { get; set; } = string.Empty;
+        
+        [JsonProperty("text")]
+        public string? Text { get; set; }
+        
+        [JsonProperty("audio_data")]
+        public string? AudioData { get; set; }
+        
+        [JsonProperty("audio_format")]
+        public string? AudioFormat { get; set; } = "wav";
+        
+        [JsonProperty("audio_length")]
+        public float? AudioLength { get; set; }
+        
+        [JsonProperty("timestamp")]
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+        
+        [JsonProperty("metadata")]
+        public Dictionary<string, object>? Metadata { get; set; }
+        
+        // 오디오 데이터를 Base64로 변환하는 메서드
+        public void SetAudioData(byte[]? audioBytes)
+        {
+            if (audioBytes != null && audioBytes.Length > 0)
+            {
+                AudioData = Convert.ToBase64String(audioBytes);
+            }
+            else
+            {
+                AudioData = null;
+            }
+        }
+    }
+}
+```
+
+### VoiceData (음성 데이터 구조)
+```csharp
+namespace ProjectVG.Domain.Chat
+{
+    public class VoiceData
+    {
+        public AudioClip AudioClip { get; set; }
+        public float Length { get; set; }
+        public string Format { get; set; } = "wav";
+        
+        // Base64 문자열에서 VoiceData 생성
+        public static VoiceData FromBase64(string base64Data, string format = "wav")
+        {
+            // Base64를 AudioClip으로 변환하는 로직
+        }
+        
+        // AudioClip이 있는지 확인
+        public bool HasAudioClip() => AudioClip != null;
+        
+        // 재생 가능한지 확인
+        public bool IsPlayable() => HasAudioClip() && Length > 0;
+    }
+}
+```
+
+### ChatMessage (내부 사용 데이터 구조)
+```csharp
+namespace ProjectVG.Domain.Chat
+{
+    public class ChatMessage
+    {
+        public string SessionId { get; set; } = string.Empty;
+        public string? Text { get; set; }
+        public VoiceData? VoiceData { get; set; }
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+        public Dictionary<string, object>? Metadata { get; set; }
+        
+        // ChatResponse에서 ChatMessage로 변환하는 팩토리 메서드
+        public static ChatMessage FromChatResponse(ChatResponse response)
+        {
+            var chatMessage = new ChatMessage
+            {
+                SessionId = response.SessionId,
+                Text = response.Text,
+                Timestamp = response.Timestamp,
+                Metadata = response.Metadata
+            };
+            
+            // Base64 오디오 데이터를 VoiceData로 변환
+            if (!string.IsNullOrEmpty(response.AudioData))
+            {
+                chatMessage.VoiceData = VoiceData.FromBase64(response.AudioData, response.AudioFormat);
+            }
+            
+            return chatMessage;
+        }
+        
+        // 오디오 데이터가 있는지 확인
+        public bool HasVoiceData() => VoiceData != null && VoiceData.IsPlayable();
+        
+        // 텍스트 데이터가 있는지 확인
+        public bool HasTextData() => !string.IsNullOrEmpty(Text);
+        
+        // 음성 재생 가능한지 확인
+        public bool IsVoicePlayable() => HasVoiceData();
+        
+        // AudioClip 가져오기
+        public AudioClip? GetAudioClip() => VoiceData?.AudioClip;
+        
+        // 음성 길이 가져오기
+        public float GetVoiceLength() => VoiceData?.Length ?? 0f;
+        
+        // 음성 포맷 가져오기
+        public string GetVoiceFormat() => VoiceData?.Format ?? string.Empty;
+    }
+}
+```
+
+
+
 ## 데이터 플로우
 
 ```mermaid
@@ -269,22 +422,29 @@ sequenceDiagram
     participant ChatUI
     participant ChatManager
     participant WebSocketManager
-    participant IntegratedChatMessageHandler
     participant Server
     participant AudioManager
+
+    %% WebSocket 연결 및 세션ID 수신
+    ChatManager->>WebSocketManager: ConnectAsync()
+    WebSocketManager->>Server: WebSocket 연결
+    Server-->>WebSocketManager: session_id 메시지
+    WebSocketManager->>WebSocketManager: ProcessSessionIdMessage()
+    WebSocketManager->>ChatManager: OnSessionIdReceived(sessionId)
+    ChatManager->>ChatManager: ProcessSessionIdMessage(sessionId)
 
     %% 유저 메시지 전송
     User->>ChatUI: 텍스트 입력
     ChatUI->>ChatManager: SendUserMessage()
-    ChatManager->>WebSocketManager: SendMessage()
-    WebSocketManager->>Server: WebSocket 전송
+    ChatManager->>Server: HTTP API 전송
     ChatManager->>ChatUI: ShowUserMessage()
 
-    %% 서버 응답 수신
-    Server-->>WebSocketManager: IntegratedChatMessage
-    WebSocketManager->>IntegratedChatMessageHandler: ProcessMessage()
-    IntegratedChatMessageHandler->>IntegratedChatMessageHandler: ParseIntegratedMessage()
-    IntegratedChatMessageHandler->>ChatManager: ProcessCharacterMessage()
+    %% 서버 응답 수신 (ChatResponse → ChatMessage)
+    Server-->>WebSocketManager: ChatResponse 메시지
+    WebSocketManager->>WebSocketManager: ProcessChatMessage()
+    WebSocketManager->>WebSocketManager: ChatResponse → ChatMessage 변환
+    WebSocketManager->>ChatManager: OnChatMessageReceived(ChatMessage)
+    ChatManager->>ChatManager: OnChatMessageReceived(ChatMessage)
     ChatManager->>ChatUI: ShowCharacterMessage()
     ChatManager->>AudioManager: PlayVoiceFromBase64() (오디오 있는 경우)
     AudioManager-->>ChatManager: 재생 완료
@@ -292,16 +452,35 @@ sequenceDiagram
 
 ---
 
+## 메시지 처리 흐름
+
+### 1. 세션ID 처리 흐름
+1. **WebSocket 연결**: ChatManager가 WebSocketManager.ConnectAsync() 호출
+2. **세션ID 수신**: 서버에서 session_id 타입 메시지 전송
+3. **메시지 처리**: WebSocketManager.ProcessSessionIdMessage() 처리
+4. **이벤트 발생**: OnSessionIdReceived 이벤트 발생
+5. **ChatManager 처리**: ChatManager.ProcessSessionIdMessage() 호출
+6. **세션 저장**: ChatManager가 세션ID 저장 및 관리
+
+### 2. 채팅 메시지 처리 흐름
+1. **메시지 수신**: 서버에서 chat 타입 메시지 전송
+2. **ChatResponse 파싱**: WebSocketManager.ProcessChatMessage() 처리
+3. **ChatMessage 변환**: ChatResponse → ChatMessage 변환
+4. **이벤트 발생**: OnChatMessageReceived(ChatMessage) 이벤트 발생
+5. **ChatManager 처리**: ChatManager.OnChatMessageReceived(ChatMessage) 호출
+6. **UI 업데이트**: ChatUI.ShowCharacterMessage() 호출
+7. **오디오 재생**: AudioManager.PlayVoiceFromBase64() 호출 (있는 경우)
+
 ## 구현 우선순위
 
 1. **Phase 1**: 기본 구조 및 모델
-   - IntegratedChatMessage 모델
-   - ChatManager 기본 구조
+   - IntegratedChatMessage 모델 (Application/Models/Chat/)
+   - ChatManager 기본 구조 (세션ID 처리 포함)
    - ChatUI 기본 UI (유저/캐릭터 구별)
 
 2. **Phase 2**: 웹소켓 통신
-   - WebSocketManager 구현
-   - IntegratedChatMessageHandler 구현
+   - WebSocketManager 구현 (ProcessSessionIdMessage, ProcessChatMessage)
+   - ChatData 모델 정의
    - 기본 메시지 송수신
 
 3. **Phase 3**: 오디오 시스템
