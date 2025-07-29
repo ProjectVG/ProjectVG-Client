@@ -20,7 +20,6 @@ namespace ProjectVG.Domain.Chat.Service
         [SerializeField] private VoiceManager _voiceManager;
         
         [Header("Chat Settings")]
-        [SerializeField] private string _serverUrl = "ws://localhost:8080";
         [SerializeField] private bool _autoConnect = true;
         [SerializeField] private string _characterId = "test-character";
         [SerializeField] private string _userId = "test-user";
@@ -102,9 +101,9 @@ namespace ProjectVG.Domain.Chat.Service
             {
                 if (_webSocketManager != null)
                 {
-                    await _webSocketManager.ConnectAsync(_serverUrl);
+                    await _webSocketManager.ConnectAsync();
                     _isConnected = true;
-                    Debug.Log("새로운 채팅 세션 시작");
+                    Debug.Log("새로운 채팅 세션 시작 - 세션 ID 대기 중");
                 }
                 else
                 {
@@ -151,9 +150,16 @@ namespace ProjectVG.Domain.Chat.Service
             if (!ValidateUserInput(message))
                 return;
                 
+            if (string.IsNullOrEmpty(_sessionId))
+            {
+                Debug.LogWarning("세션 ID가 없습니다. WebSocket 연결을 먼저 완료해주세요.");
+                OnError?.Invoke("세션 ID가 없습니다. WebSocket 연결을 먼저 완료해주세요.");
+                return;
+            }
+                
             try
             {
-                Debug.Log($"사용자 메시지 전송: {message}");
+                Debug.Log($"사용자 메시지 전송: {message} (세션 ID: {_sessionId})");
                 
                 // ChatApiService를 통해 HTTP API 호출
                 var chatService = ApiServiceManager.Instance.Chat;
@@ -163,6 +169,8 @@ namespace ProjectVG.Domain.Chat.Service
                     userId: _userId,
                     sessionId: _sessionId
                 );
+
+                // TODO : 메시지 출력
                 
                 if (response != null)
                 {
@@ -220,6 +228,8 @@ namespace ProjectVG.Domain.Chat.Service
                 {
                     _voiceManager.PlayVoice(chatMessage.VoiceData);
                 }
+
+                // TODO : 메시지 출력
                 
                 Debug.Log($"캐릭터 메시지 처리: {chatMessage.Text}");
             }
@@ -271,7 +281,6 @@ namespace ProjectVG.Domain.Chat.Service
 
         private void OnDestroy()
         {
-            // 이벤트 구독 해제
             if (_webSocketManager != null)
             {
                 _webSocketManager.OnSessionIdReceived -= ProcessSessionIdMessage;
