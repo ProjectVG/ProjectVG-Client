@@ -1,6 +1,6 @@
 using UnityEngine;
 using ProjectVG.Core.Audio;
-using ProjectVG.Domain.Chat;
+using ProjectVG.Domain.Chat.Model;
 
 namespace ProjectVG.Tests.Runtime
 {
@@ -21,7 +21,7 @@ namespace ProjectVG.Tests.Runtime
         {
             if (_voiceManager == null)
             {
-                _voiceManager = FindObjectOfType<VoiceManager>();
+                _voiceManager = FindFirstObjectByType<VoiceManager>();
             }
             
             if (_voiceManager != null)

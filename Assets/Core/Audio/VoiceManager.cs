@@ -1,6 +1,6 @@
 using System;
 using UnityEngine;
-using ProjectVG.Domain.Chat;
+using ProjectVG.Domain.Chat.Model;
 
 namespace ProjectVG.Core.Audio
 {

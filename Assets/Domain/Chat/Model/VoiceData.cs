@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace ProjectVG.Domain.Chat
+namespace ProjectVG.Domain.Chat.Model
 {
     [Serializable]
     public class VoiceData

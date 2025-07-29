@@ -7,7 +7,7 @@ using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Network.Http;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
-using ProjectVG.Domain.Chat;
+using ProjectVG.Domain.Chat.Model;
 
 namespace ProjectVG.Tests.Runtime
 {
@@ -160,7 +160,6 @@ namespace ProjectVG.Tests.Runtime
                 _webSocketManager.OnDisconnected += OnWebSocketDisconnected;
                 _webSocketManager.OnError += OnWebSocketError;
                 _webSocketManager.OnSessionIdReceived += OnSessionIdReceived;
-                _webSocketManager.OnChatMessageReceived += OnChatMessageReceived;
                 
                 Debug.Log("NetworkTestManager 초기화 완료");
                 NetworkConfig.LogCurrentSettings();
@@ -170,6 +169,7 @@ namespace ProjectVG.Tests.Runtime
                 Debug.LogError($"NetworkTestManager 초기화 중 오류: {ex.Message}");
             }
         }
+
 
         #region 수동 테스트 메서드들
 

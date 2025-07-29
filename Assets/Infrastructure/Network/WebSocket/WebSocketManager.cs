@@ -1,13 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using UnityEngine;
-using UnityEngine.Networking;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
-using ProjectVG.Domain.Chat;
+using ProjectVG.Domain.Chat.Model;
 
 namespace ProjectVG.Infrastructure.Network.WebSocket
 {

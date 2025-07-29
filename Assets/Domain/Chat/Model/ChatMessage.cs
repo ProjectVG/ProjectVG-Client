@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
 
-namespace ProjectVG.Domain.Chat
+namespace ProjectVG.Domain.Chat.Model
 {
     [Serializable]
     public class ChatMessage
