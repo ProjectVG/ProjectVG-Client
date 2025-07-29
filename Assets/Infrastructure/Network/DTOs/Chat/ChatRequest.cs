@@ -4,9 +4,6 @@ using Newtonsoft.Json;
 
 namespace ProjectVG.Infrastructure.Network.DTOs.Chat
 {
-    /// <summary>
-    /// 채팅 요청 DTO (Newtonsoft.Json을 사용하여 snake_case 지원)
-    /// </summary>
     [Serializable]
     public class ChatRequest
     {

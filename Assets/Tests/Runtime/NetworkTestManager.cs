@@ -7,6 +7,7 @@ using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Network.Http;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
+using ProjectVG.Domain.Chat;
 
 namespace ProjectVG.Tests.Runtime
 {
@@ -261,16 +262,16 @@ namespace ProjectVG.Tests.Runtime
 
                 var response = await _apiServiceManager.Chat.SendChatAsync(chatRequest);
                 
-                if (response != null && response.success)
+                if (response != null)
                 {
-                    Debug.Log($"✅ HTTP 채팅 요청 성공! 응답: {response.message}");
+                    Debug.Log($"✅ HTTP 채팅 요청 성공!");
                     Debug.Log($"   - 세션 ID: {_receivedSessionId}");
                     Debug.Log($"   - 캐릭터 ID: {testCharacterId}");
                     Debug.Log($"   - 사용자 ID: {testUserId}");
                 }
                 else
                 {
-                    Debug.LogError($"❌ HTTP 채팅 요청 실패: {response?.message ?? "알 수 없는 오류"}");
+                    Debug.LogError($"❌ HTTP 채팅 요청 실패: 응답이 null입니다.");
                 }
             }
             catch (Exception ex)
@@ -320,19 +321,7 @@ namespace ProjectVG.Tests.Runtime
             try
             {
                 Debug.Log("=== WebSocket 메시지 전송 시작 ===");
-                
-                bool sent = await _webSocketManager.SendChatMessageAsync(
-                    message: "WebSocket으로 직접 전송하는 테스트 메시지"
-                );
-                
-                if (sent)
-                {
-                    Debug.Log("✅ WebSocket 메시지 전송 성공!");
-                }
-                else
-                {
-                    Debug.LogError("❌ WebSocket 메시지 전송 실패!");
-                }
+                Debug.LogWarning("WebSocket 메시지 전송 기능이 제거되었습니다. HTTP API를 사용하세요.");
             }
             catch (Exception ex)
             {
@@ -517,9 +506,8 @@ namespace ProjectVG.Tests.Runtime
                 
                 await UniTask.Delay(1000);
                 
-                // 5. WebSocket 메시지 전송
-                Debug.Log("5️⃣ WebSocket 메시지 전송 중...");
-                await SendWebSocketMessageInternal();
+                // 5. WebSocket 메시지 전송 (기능 제거됨)
+                Debug.Log("5️⃣ WebSocket 메시지 전송 기능이 제거되었습니다.");
                 
                 await UniTask.Delay(1000);
                 
@@ -786,9 +774,7 @@ namespace ProjectVG.Tests.Runtime
                 return;
             }
 
-            await _webSocketManager.SendChatMessageAsync(
-                message: $"자동 WebSocket 메시지 - {DateTime.Now:HH:mm:ss}"
-            );
+            Debug.LogWarning("WebSocket 메시지 전송 기능이 제거되었습니다. HTTP API를 사용하세요.");
         }
 
         #endregion
@@ -835,11 +821,16 @@ namespace ProjectVG.Tests.Runtime
             Debug.Log($"✅ 세션 ID가 성공적으로 저장되었습니다!");
         }
 
-        private void OnChatMessageReceived(string message)
+        private void OnChatMessageReceived(ChatMessage chatMessage)
         {
-            Debug.Log($"💬 WebSocket 채팅 메시지 수신: {message}");
+            Debug.Log($"💬 WebSocket 채팅 메시지 수신:");
+            Debug.Log($"   - SessionId: {chatMessage.SessionId}");
+            Debug.Log($"   - Text: {chatMessage.Text}");
+            Debug.Log($"   - HasVoiceData: {chatMessage.HasVoiceData()}");
+            Debug.Log($"   - Timestamp: {chatMessage.Timestamp}");
+            
             _chatResponseReceived = true;
-            _lastChatResponse = message;
+            _lastChatResponse = chatMessage.Text;
         }
 
         #endregion
