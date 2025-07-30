@@ -40,6 +40,21 @@ public class ChatManager
 
 ---
 
+## Unity 클래스 네이밍 컨벤션
+
+| 역할 | 접미어 또는 접두어 | 예시 | 설명 |
+|------|-------------------|------|------|
+| **MonoBehaviour** | Controller, Manager, Behaviour, System 등 | PlayerController, GameManager, CameraBehaviour | 씬에 붙는 실행 스크립트 |
+| **데이터 객체** (Plain C# Class) | Data, Info, Model, Config, State 등 | PlayerData, LevelInfo, GameConfig | 직렬화 또는 로직 없는 순수 데이터 |
+| **싱글톤 서비스** | Service, Manager, System | AudioService, InputManager, SaveSystem | 전역 기능 담당 클래스 |
+| **인터페이스** | I 접두어 | IMoveable, IDamageable | 일반 C# 인터페이스 명명 규칙 동일 |
+| **UI 컴포넌트** | UI, Panel, View, Dialog | MainMenuUI, SettingsPanel, GameOverDialog | UI Prefab용 MonoBehaviour |
+| **이벤트/메시지 객체** | Event, Message | GameStartEvent, PlayerDeathMessage | EventBus 또는 Observer 용 메시지 구조체 |
+| **스크립터블 오브젝트** | SO, Config, Asset, Definition | WeaponConfig, LevelDefinition | ScriptableObject 파생 클래스 |
+| **테스트/디버깅** | Debug, Tester, Sample, Fake | PlayerDebug, SoundTester, FakeEnemyAI | 테스트, 샘플 용도 클래스 |
+
+---
+
 ## Unity 특화 컨벤션
 
 ### 클래스명 접미사 규칙
