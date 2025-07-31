@@ -14,18 +14,62 @@ namespace ProjectVG.Domain.Chat.Service
         [Header("Bubble Settings")]
         [SerializeField] private GameObject _chatBubblePrefab;
         [SerializeField] private Transform _bubbleContainer;
+        [Range(0f, 50f)]
         [SerializeField] private float _bubbleSpacing = 10f;
+        [Range(1, 20)]
         [SerializeField] private int _maxBubbles = 10;
         
         [Header("Animation Settings")]
+        [Range(1f, 10f)]
         [SerializeField] private float _bubbleLifetime = 5f;
+        [Range(0.1f, 3f)]
         [SerializeField] private float _fadeOutDuration = 1f;
+        
+        [Header("Container Reference")]
+        [SerializeField] private string _containerPath = "Canvas/ChatBubbleContainer";
         
         private Queue<ChatBubbleUI> _bubbleQueue = new Queue<ChatBubbleUI>();
         private List<ChatBubbleUI> _activeBubbles = new List<ChatBubbleUI>();
         
         public int ActiveBubbleCount => _activeBubbles.Count;
         public int QueueCount => _bubbleQueue.Count;
+        
+        // 슬라이더 조절용 프로퍼티들
+        public float BubbleSpacing
+        {
+            get => _bubbleSpacing;
+            set
+            {
+                _bubbleSpacing = value;
+                UpdateBubblePositions(); // 즉시 위치 업데이트
+            }
+        }
+        
+        public int MaxBubbles
+        {
+            get => _maxBubbles;
+            set
+            {
+                _maxBubbles = Mathf.Max(1, value); // 최소값 1 보장
+                // 현재 버블 개수가 새로운 최대값을 초과하면 오래된 버블들 제거
+                while (_activeBubbles.Count > _maxBubbles)
+                {
+                    RemoveOldestBubble();
+                }
+            }
+        }
+        
+        public float BubbleLifetime
+        {
+            get => _bubbleLifetime;
+            set => _bubbleLifetime = Mathf.Max(0.1f, value); // 최소값 0.1초 보장
+        }
+        
+        public float FadeOutDuration
+        {
+            get => _fadeOutDuration;
+            set => _fadeOutDuration = Mathf.Max(0.1f, value); // 최소값 0.1초 보장
+        }
         
         // 이벤트
         public event Action<ChatBubbleUI> OnBubbleCreated;
@@ -39,21 +83,65 @@ namespace ProjectVG.Domain.Chat.Service
         }
         
         /// <summary>
-        /// 매니저 초기화
+        /// 매니저 초기화 - Canvas 외부에서 Container 참조 설정
         /// </summary>
         private void InitializeManager()
         {
+            // Container 참조 설정
             if (_bubbleContainer == null)
             {
-                _bubbleContainer = transform;
+                _bubbleContainer = FindBubbleContainer();
+            }
+            
+            if (_bubbleContainer == null)
+            {
+                Debug.LogError("ChatBubbleContainer를 찾을 수 없습니다! Canvas 내부에 ChatBubbleContainer가 있는지 확인하세요.");
+                return;
             }
             
             if (_chatBubblePrefab == null)
             {
                 Debug.LogError("ChatBubblePrefab이 설정되지 않았습니다!");
+                return;
             }
             
-            Debug.Log("ChatBubbleManager 초기화 완료");
+            Debug.Log("ChatBubbleTestUI 초기화 완료");
+        }
+        
+        /// <summary>
+        /// Bubble Container 찾기
+        /// </summary>
+        private Transform FindBubbleContainer()
+        {
+            // 1. Inspector에서 설정된 경로로 찾기
+            if (!string.IsNullOrEmpty(_containerPath))
+            {
+                Transform container = transform.root.Find(_containerPath);
+                if (container != null)
+                {
+                    return container;
+                }
+            }
+            
+            // 2. Canvas 내부에서 "ChatBubbleContainer" 이름으로 찾기
+            Canvas canvas = FindAnyObjectByType<Canvas>();
+            if (canvas != null)
+            {
+                Transform container = canvas.transform.Find("ChatBubbleContainer");
+                if (container != null)
+                {
+                    return container;
+                }
+            }
+            
+            // 3. 전체 씬에서 찾기
+            Transform foundContainer = GameObject.Find("ChatBubbleContainer")?.transform;
+            if (foundContainer != null)
+            {
+                return foundContainer;
+            }
+            
+            return null;
         }
         
         /// <summary>
@@ -70,6 +158,12 @@ namespace ProjectVG.Domain.Chat.Service
                 return;
             }
             
+            if (_bubbleContainer == null)
+            {
+                Debug.LogError("BubbleContainer가 설정되지 않았습니다!");
+                return;
+            }
+            
             try
             {
                 // 프리팹 인스턴스 생성
@@ -83,8 +177,11 @@ namespace ProjectVG.Domain.Chat.Service
                     return;
                 }
                 
-                // 버블 초기화
-                bubbleUI.Initialize(actor, text, displayTime);
+                // CanvasGroup 자동 설정 (Unity 베스트 프랙티스)
+                SetupCanvasGroup(bubbleObject);
+                
+                // 버블 초기화 (Manager 참조 전달)
+                bubbleUI.Initialize(actor, text, displayTime, this);
                 
                 // 이벤트 구독
                 bubbleUI.OnBubbleDestroyed += OnBubbleDestroyed;
@@ -208,8 +305,22 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-
-        
+        /// <summary>
+        /// CanvasGroup 자동 설정 (Unity 베스트 프랙티스)
+        /// </summary>
+        private void SetupCanvasGroup(GameObject bubbleObject)
+        {
+            // CanvasGroup이 없으면 자동으로 추가
+            CanvasGroup canvasGroup = bubbleObject.GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+            {
+                canvasGroup = bubbleObject.AddComponent<CanvasGroup>();
+                Debug.Log($"ChatBubble에 CanvasGroup이 자동으로 추가되었습니다: {bubbleObject.name}");
+            }
+            
+            // 초기 상태 설정
+            canvasGroup.alpha = 0f; // 페이드 인을 위해 초기값 설정
+        }
 
         
         private void OnDestroy()

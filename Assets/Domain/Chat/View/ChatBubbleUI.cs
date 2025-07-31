@@ -16,9 +16,11 @@ namespace ProjectVG.Domain.Chat.View
     {
         [Header("UI Components")]
         [SerializeField] private RectTransform _rectTransform;
-        [SerializeField] private CanvasGroup _canvasGroup;
         [SerializeField] private TextMeshProUGUI _textComponent;
         [SerializeField] private Image _backgroundImage;
+        
+        // CanvasGroup은 동적으로 생성되므로 SerializeField 제거
+        private CanvasGroup _canvasGroup;
         
         [Header("Animation Settings")]
         [SerializeField] private float _slideInDuration = 0.5f;
@@ -43,6 +45,8 @@ namespace ProjectVG.Domain.Chat.View
         private Coroutine _typingCoroutine;
         private Coroutine _lifetimeCoroutine;
         
+        private ChatBubbleManager _manager;
+        
         // 이벤트
         public event Action<ChatBubbleUI> OnBubbleCreated;
         public event Action<ChatBubbleUI> OnBubbleTypingComplete;
@@ -61,21 +65,62 @@ namespace ProjectVG.Domain.Chat.View
         }
         
         /// <summary>
-        /// 컴포넌트 초기화
+        /// 컴포넌트 초기화 - Unity 베스트 프랙티스 적용
         /// </summary>
         private void InitializeComponents()
         {
+            // 1. RectTransform (필수)
             if (_rectTransform == null)
                 _rectTransform = GetComponent<RectTransform>();
                 
-            if (_canvasGroup == null)
-                _canvasGroup = GetComponent<CanvasGroup>();
+            // 2. CanvasGroup (동적 생성/검색)
+            _canvasGroup = GetOrCreateCanvasGroup();
                 
+            // 3. Text Component
             if (_textComponent == null)
                 _textComponent = GetComponentInChildren<TextMeshProUGUI>();
                 
+            // 4. Background Image
             if (_backgroundImage == null)
                 _backgroundImage = GetComponent<Image>();
+                
+            // 5. 컴포넌트 검증
+            ValidateComponents();
+        }
+        
+        /// <summary>
+        /// CanvasGroup 가져오기 또는 생성
+        /// </summary>
+        private CanvasGroup GetOrCreateCanvasGroup()
+        {
+            CanvasGroup canvasGroup = GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+            {
+                canvasGroup = gameObject.AddComponent<CanvasGroup>();
+                Debug.Log($"ChatBubbleUI에 CanvasGroup 컴포넌트가 자동으로 추가되었습니다: {gameObject.name}");
+            }
+            return canvasGroup;
+        }
+        
+        /// <summary>
+        /// 필수 컴포넌트 검증
+        /// </summary>
+        private void ValidateComponents()
+        {
+            if (_rectTransform == null)
+            {
+                Debug.LogError($"ChatBubbleUI에 RectTransform이 없습니다: {gameObject.name}");
+            }
+            
+            if (_textComponent == null)
+            {
+                Debug.LogWarning($"ChatBubbleUI에 TextMeshProUGUI가 없습니다: {gameObject.name}");
+            }
+            
+            if (_backgroundImage == null)
+            {
+                Debug.LogWarning($"ChatBubbleUI에 Image 컴포넌트가 없습니다: {gameObject.name}");
+            }
         }
         
         /// <summary>
@@ -84,11 +129,13 @@ namespace ProjectVG.Domain.Chat.View
         /// <param name="actor">메시지 발신자</param>
         /// <param name="text">메시지 내용</param>
         /// <param name="displayTime">표시 시간</param>
-        public void Initialize(Actor actor, string text, float displayTime)
+        /// <param name="manager">ChatBubbleManager 참조 (선택사항)</param>
+        public void Initialize(Actor actor, string text, float displayTime, ChatBubbleManager manager = null)
         {
             _actor = actor;
             _fullText = text;
             _displayTime = displayTime;
+            _manager = manager;
             
             ApplyStyle();
             StartAnimation();
@@ -259,8 +306,11 @@ namespace ProjectVG.Domain.Chat.View
         /// </summary>
         private IEnumerator LifetimeCoroutine()
         {
+            // Manager의 설정값 사용, 없으면 기본값 사용
+            float maintainTime = _manager != null ? _manager.BubbleLifetime : _maintainDuration;
+            
             // 유지 시간 대기
-            yield return new WaitForSeconds(_maintainDuration);
+            yield return new WaitForSeconds(maintainTime);
             
             // 페이드아웃 시작
             StartFadeOut();
@@ -283,13 +333,16 @@ namespace ProjectVG.Domain.Chat.View
         {
             _isAnimating = true;
             
+            // Manager의 설정값 사용, 없으면 기본값 사용
+            float fadeOutTime = _manager != null ? _manager.FadeOutDuration : _slideOutDuration;
+            
             float elapsed = 0f;
             float startAlpha = _canvasGroup != null ? _canvasGroup.alpha : 1f;
             
-            while (elapsed < _slideOutDuration)
+            while (elapsed < fadeOutTime)
             {
                 elapsed += Time.deltaTime;
-                float progress = elapsed / _slideOutDuration;
+                float progress = elapsed / fadeOutTime;
                 
                 if (_canvasGroup != null)
                 {
