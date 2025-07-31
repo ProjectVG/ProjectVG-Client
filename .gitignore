@@ -130,3 +130,5 @@ InitTestScene*.unity*
 *.m4b
 *.m4r
 *.m4p
+/Assets/Plugins/FiveMinuteChat
+/Assets/Plugins/WebGLTemplates

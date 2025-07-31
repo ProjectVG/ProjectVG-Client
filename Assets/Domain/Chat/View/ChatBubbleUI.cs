@@ -23,16 +23,18 @@ namespace ProjectVG.Domain.Chat.View
         private CanvasGroup _canvasGroup;
         
         [Header("Animation Settings")]
-        [SerializeField] private float _slideInDuration = 0.5f;
-        [SerializeField] private float _slideOutDuration = 0.3f;
-        [SerializeField] private float _typingSpeed = 0.05f;
-        [SerializeField] private float _maintainDuration = 3f;
+        [SerializeField] private float _slideInDuration = 0.25f;
+        [SerializeField] private float _slideOutDuration = 0.03f;
+        [SerializeField] private float _typingSpeed = 0.025f;
+        [SerializeField] private float _maintainDuration = 1.5f;
         
         [Header("Style Settings")]
         [SerializeField] private Color _userBubbleColor = Color.blue;
         [SerializeField] private Color _characterBubbleColor = Color.gray;
-        [SerializeField] private Vector2 _userBubbleOffset = new Vector2(50f, 0f);
-        [SerializeField] private Vector2 _characterBubbleOffset = new Vector2(-50f, 0f);
+        
+        [Header("Layout Settings")]
+        [SerializeField] private ContentSizeFitter _contentSizeFitter;
+        [SerializeField] private LayoutElement _layoutElement;
         
         private Actor _actor;
         private string _fullText;
@@ -69,23 +71,65 @@ namespace ProjectVG.Domain.Chat.View
         /// </summary>
         private void InitializeComponents()
         {
-            // 1. RectTransform (필수)
             if (_rectTransform == null)
                 _rectTransform = GetComponent<RectTransform>();
                 
-            // 2. CanvasGroup (동적 생성/검색)
             _canvasGroup = GetOrCreateCanvasGroup();
                 
-            // 3. Text Component
             if (_textComponent == null)
                 _textComponent = GetComponentInChildren<TextMeshProUGUI>();
                 
-            // 4. Background Image
             if (_backgroundImage == null)
                 _backgroundImage = GetComponent<Image>();
+            
+            // Layout 컴포넌트 자동 설정
+            SetupLayoutComponents();
                 
-            // 5. 컴포넌트 검증
             ValidateComponents();
+        }
+        
+        /// <summary>
+        /// Layout 컴포넌트 자동 설정
+        /// </summary>
+        private void SetupLayoutComponents()
+        {
+            // ContentSizeFitter 설정
+            if (_contentSizeFitter == null)
+            {
+                _contentSizeFitter = GetComponent<ContentSizeFitter>();
+                if (_contentSizeFitter == null)
+                {
+                    _contentSizeFitter = gameObject.AddComponent<ContentSizeFitter>();
+                    Debug.Log($"ChatBubbleUI에 ContentSizeFitter가 자동으로 추가되었습니다: {gameObject.name}");
+                }
+            }
+            
+            _contentSizeFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            _contentSizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            
+            // LayoutElement 설정
+            if (_layoutElement == null)
+            {
+                _layoutElement = GetComponent<LayoutElement>();
+                if (_layoutElement == null)
+                {
+                    _layoutElement = gameObject.AddComponent<LayoutElement>();
+                    Debug.Log($"ChatBubbleUI에 LayoutElement가 자동으로 추가되었습니다: {gameObject.name}");
+                }
+            }
+            
+            // Actor에 따른 크기 설정
+            if (_actor == Actor.User)
+            {
+                _layoutElement.preferredHeight = 80f;
+                _layoutElement.preferredWidth = 300f;
+            }
+            else
+            {
+                _layoutElement.preferredHeight = 120f;
+                _layoutElement.preferredWidth = 400f;
+                _layoutElement.flexibleWidth = 1f;
+            }
         }
         
         /// <summary>
@@ -156,12 +200,8 @@ namespace ProjectVG.Domain.Chat.View
                 _backgroundImage.color = _actor == Actor.User ? _userBubbleColor : _characterBubbleColor;
             }
             
-            // 정렬 설정
-            if (_rectTransform != null)
-            {
-                Vector2 offset = _actor == Actor.User ? _userBubbleOffset : _characterBubbleOffset;
-                _rectTransform.anchoredPosition = offset;
-            }
+            // Layout 컴포넌트 재설정 (Actor 정보가 설정된 후)
+            SetupLayoutComponents();
         }
         
         /// <summary>
@@ -172,11 +212,12 @@ namespace ProjectVG.Domain.Chat.View
             if (_isAnimating) return;
             
             _isAnimating = true;
+            Debug.Log($"ChatBubbleUI 애니메이션 시작: {_actor} - {_fullText}");
             StartCoroutine(SlideInAnimation());
         }
         
         /// <summary>
-        /// 슬라이드 인 애니메이션
+        /// 슬라이드 인 애니메이션 (토스트 스타일)
         /// </summary>
         private IEnumerator SlideInAnimation()
         {
@@ -188,13 +229,18 @@ namespace ProjectVG.Domain.Chat.View
             
             Vector2 startPos = _rectTransform.anchoredPosition;
             Vector2 endPos = startPos + new Vector2(0f, 100f); // 아래에서 위로
+            Vector2 bouncePos = endPos + new Vector2(0f, 20f); // 튀는 위치
+            
+            // Manager의 설정값 사용, 없으면 기본값 사용
+            float slideInTime = _manager != null ? _manager.FadeInDuration : _slideInDuration;
             
             float elapsed = 0f;
             
-            while (elapsed < _slideInDuration)
+            // 1단계: 빠른 슬라이드 업
+            while (elapsed < slideInTime * 0.7f)
             {
                 elapsed += Time.deltaTime;
-                float progress = elapsed / _slideInDuration;
+                float progress = elapsed / (slideInTime * 0.7f);
                 
                 // 알파 페이드 인
                 if (_canvasGroup != null)
@@ -202,8 +248,27 @@ namespace ProjectVG.Domain.Chat.View
                     _canvasGroup.alpha = progress;
                 }
                 
-                // 위치 이동
-                _rectTransform.anchoredPosition = Vector2.Lerp(startPos, endPos, progress);
+                // 위치 이동 (빠른 슬라이드)
+                _rectTransform.anchoredPosition = Vector2.Lerp(startPos, bouncePos, progress);
+                
+                yield return null;
+            }
+            
+            // 2단계: 튀는 효과
+            float bounceElapsed = 0f;
+            float bounceDuration = slideInTime * 0.3f;
+            
+            while (bounceElapsed < bounceDuration)
+            {
+                bounceElapsed += Time.deltaTime;
+                float bounceProgress = bounceElapsed / bounceDuration;
+                
+                // 사인 곡선을 사용한 튀는 효과
+                float bounce = Mathf.Sin(bounceProgress * Mathf.PI) * 0.3f;
+                Vector2 currentPos = Vector2.Lerp(bouncePos, endPos, bounceProgress);
+                currentPos.y += bounce * 20f; // 튀는 높이
+                
+                _rectTransform.anchoredPosition = currentPos;
                 
                 yield return null;
             }
@@ -214,6 +279,9 @@ namespace ProjectVG.Domain.Chat.View
                 _canvasGroup.alpha = 1f;
             }
             _rectTransform.anchoredPosition = endPos;
+            
+            _isAnimating = false;
+            Debug.Log($"ChatBubbleUI 토스트 애니메이션 완료: {_actor}");
             
             // 텍스트 출력 시작
             StartTextAnimation();
@@ -230,15 +298,19 @@ namespace ProjectVG.Domain.Chat.View
             _isTyping = true;
             _typingProgress = 0f;
             
+            Debug.Log($"ChatBubbleUI 텍스트 애니메이션 시작: {_actor} - {_fullText}");
+            
             if (_actor == Actor.User)
             {
                 // User는 즉시 출력
                 _textComponent.text = _fullText;
+                Debug.Log($"ChatBubbleUI User 텍스트 즉시 출력 완료");
                 CompleteTyping();
             }
             else
             {
                 // Character는 타이핑 효과
+                Debug.Log($"ChatBubbleUI Character 타이핑 시작");
                 _typingCoroutine = StartCoroutine(TypeText());
             }
         }
@@ -251,6 +323,8 @@ namespace ProjectVG.Domain.Chat.View
             int totalCharacters = _fullText.Length;
             int currentCharacter = 0;
             
+            Debug.Log($"ChatBubbleUI 타이핑 시작: 총 {totalCharacters}자");
+            
             while (currentCharacter < totalCharacters)
             {
                 _textComponent.text = _fullText.Substring(0, currentCharacter + 1);
@@ -260,6 +334,7 @@ namespace ProjectVG.Domain.Chat.View
                 yield return new WaitForSeconds(_typingSpeed);
             }
             
+            Debug.Log($"ChatBubbleUI 타이핑 완료: {totalCharacters}자");
             CompleteTyping();
         }
         
@@ -282,9 +357,10 @@ namespace ProjectVG.Domain.Chat.View
                 _textComponent.text = _fullText;
             }
             
+            Debug.Log($"ChatBubbleUI 타이핑 완료: {_actor} - {_fullText}");
             OnBubbleTypingComplete?.Invoke(this);
             
-            // 수명 관리 시작
+            // 텍스트 타이핑 완료 후에만 수명 관리 시작
             StartLifetimeManagement();
         }
         
@@ -298,6 +374,7 @@ namespace ProjectVG.Domain.Chat.View
                 StopCoroutine(_lifetimeCoroutine);
             }
             
+            Debug.Log($"ChatBubbleUI 수명 관리 시작: {_actor}");
             _lifetimeCoroutine = StartCoroutine(LifetimeCoroutine());
         }
         
@@ -306,11 +383,22 @@ namespace ProjectVG.Domain.Chat.View
         /// </summary>
         private IEnumerator LifetimeCoroutine()
         {
+            // 텍스트 타이핑이 완료될 때까지 대기
+            while (_isTyping)
+            {
+                Debug.Log($"ChatBubbleUI 타이핑 완료 대기 중: {_actor}");
+                yield return null;
+            }
+            
             // Manager의 설정값 사용, 없으면 기본값 사용
-            float maintainTime = _manager != null ? _manager.BubbleLifetime : _maintainDuration;
+            float maintainTime = _manager != null ? _manager.RemainingTimeAfterTyping : _maintainDuration;
+            
+            Debug.Log($"ChatBubbleUI 유지 시간 시작: {_actor} - {maintainTime}초");
             
             // 유지 시간 대기
             yield return new WaitForSeconds(maintainTime);
+            
+            Debug.Log($"ChatBubbleUI 유지 시간 완료: {_actor}");
             
             // 페이드아웃 시작
             StartFadeOut();
@@ -323,11 +411,12 @@ namespace ProjectVG.Domain.Chat.View
         {
             if (_isAnimating) return;
             
+            Debug.Log($"ChatBubbleUI 페이드아웃 시작: {_actor}");
             StartCoroutine(FadeOutAnimation());
         }
         
         /// <summary>
-        /// 페이드아웃 애니메이션
+        /// 페이드아웃 애니메이션 (위로 빠르게 사라짐)
         /// </summary>
         private IEnumerator FadeOutAnimation()
         {
@@ -336,18 +425,26 @@ namespace ProjectVG.Domain.Chat.View
             // Manager의 설정값 사용, 없으면 기본값 사용
             float fadeOutTime = _manager != null ? _manager.FadeOutDuration : _slideOutDuration;
             
+            Debug.Log($"ChatBubbleUI 페이드아웃 애니메이션 시작: {_actor} - {fadeOutTime}초");
+            
             float elapsed = 0f;
             float startAlpha = _canvasGroup != null ? _canvasGroup.alpha : 1f;
+            Vector2 startPos = _rectTransform.anchoredPosition;
+            Vector2 endPos = startPos + new Vector2(0f, 100f); // 위로 빠르게 사라짐
             
             while (elapsed < fadeOutTime)
             {
                 elapsed += Time.deltaTime;
                 float progress = elapsed / fadeOutTime;
                 
+                // 알파 페이드아웃
                 if (_canvasGroup != null)
                 {
                     _canvasGroup.alpha = Mathf.Lerp(startAlpha, 0f, progress);
                 }
+                
+                // 위치 이동 (위로 빠르게 사라짐)
+                _rectTransform.anchoredPosition = Vector2.Lerp(startPos, endPos, progress);
                 
                 yield return null;
             }
@@ -358,6 +455,7 @@ namespace ProjectVG.Domain.Chat.View
                 _canvasGroup.alpha = 0f;
             }
             
+            Debug.Log($"ChatBubbleUI 페이드아웃 완료: {_actor}");
             OnBubbleDestroyed?.Invoke(this);
             
             // 게임오브젝트 제거

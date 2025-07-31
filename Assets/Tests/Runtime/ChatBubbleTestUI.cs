@@ -16,8 +16,8 @@ public class ChatBubbleTestUI : MonoBehaviour
     [Header("Test Settings")]
     [SerializeField] private string _userTestMessage = "Hello! I am a user.";
     [SerializeField] private string _characterTestMessage = "Hello! I am a character. The weather is really nice today.";
-    [Range(1f, 10f)]
-    [SerializeField] private float _displayTime = 3f;
+    [Range(0.5f, 5f)]
+    [SerializeField] private float _displayTime = 1.5f;  // 타이핑 완료 후 잔존 시간
     
     private void Start()
     {
