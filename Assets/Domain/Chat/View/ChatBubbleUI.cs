@@ -104,9 +104,6 @@ namespace ProjectVG.Domain.Chat.View
                 }
             }
             
-            _contentSizeFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-            _contentSizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            
             // LayoutElement 설정
             if (_layoutElement == null)
             {
@@ -118,18 +115,8 @@ namespace ProjectVG.Domain.Chat.View
                 }
             }
             
-            // Actor에 따른 크기 설정
-            if (_actor == Actor.User)
-            {
-                _layoutElement.preferredHeight = 80f;
-                _layoutElement.preferredWidth = 300f;
-            }
-            else
-            {
-                _layoutElement.preferredHeight = 120f;
-                _layoutElement.preferredWidth = 400f;
-                _layoutElement.flexibleWidth = 1f;
-            }
+            // 크기는 ContentSizeFitter와 GridLayoutGroup에 완전히 맡김
+            // 직접적인 크기 설정 제거
         }
         
         /// <summary>
@@ -200,8 +187,21 @@ namespace ProjectVG.Domain.Chat.View
                 _backgroundImage.color = _actor == Actor.User ? _userBubbleColor : _characterBubbleColor;
             }
             
-            // Layout 컴포넌트 재설정 (Actor 정보가 설정된 후)
-            SetupLayoutComponents();
+            // 크기와 위치는 GridLayoutGroup과 ContentSizeFitter에 완전히 맡김
+            Debug.Log($"ChatBubbleUI 스타일 적용 완료: {_actor}");
+        }
+        
+        /// <summary>
+        /// 애니메이션 초기화
+        /// </summary>
+        private void InitializeAnimation()
+        {
+            if (_canvasGroup != null)
+            {
+                _canvasGroup.alpha = 0f;
+            }
+            
+            Debug.Log($"ChatBubbleUI 애니메이션 초기화 완료: {_actor}");
         }
         
         /// <summary>
@@ -213,6 +213,10 @@ namespace ProjectVG.Domain.Chat.View
             
             _isAnimating = true;
             Debug.Log($"ChatBubbleUI 애니메이션 시작: {_actor} - {_fullText}");
+            
+            // 애니메이션 초기화
+            InitializeAnimation();
+            
             StartCoroutine(SlideInAnimation());
         }
         
@@ -221,54 +225,20 @@ namespace ProjectVG.Domain.Chat.View
         /// </summary>
         private IEnumerator SlideInAnimation()
         {
-            // 초기 상태 설정
-            if (_canvasGroup != null)
-            {
-                _canvasGroup.alpha = 0f;
-            }
-            
-            Vector2 startPos = _rectTransform.anchoredPosition;
-            Vector2 endPos = startPos + new Vector2(0f, 100f); // 아래에서 위로
-            Vector2 bouncePos = endPos + new Vector2(0f, 20f); // 튀는 위치
-            
-            // Manager의 설정값 사용, 없으면 기본값 사용
-            float slideInTime = _manager != null ? _manager.FadeInDuration : _slideInDuration;
-            
+            // GridLayoutGroup이 위치를 관리하므로 알파 애니메이션만 수행
+            float slideInTime = _slideInDuration;
             float elapsed = 0f;
             
-            // 1단계: 빠른 슬라이드 업
-            while (elapsed < slideInTime * 0.7f)
+            while (elapsed < slideInTime)
             {
                 elapsed += Time.deltaTime;
-                float progress = elapsed / (slideInTime * 0.7f);
+                float progress = elapsed / slideInTime;
                 
-                // 알파 페이드 인
+                // 알파 페이드 인만 수행
                 if (_canvasGroup != null)
                 {
                     _canvasGroup.alpha = progress;
                 }
-                
-                // 위치 이동 (빠른 슬라이드)
-                _rectTransform.anchoredPosition = Vector2.Lerp(startPos, bouncePos, progress);
-                
-                yield return null;
-            }
-            
-            // 2단계: 튀는 효과
-            float bounceElapsed = 0f;
-            float bounceDuration = slideInTime * 0.3f;
-            
-            while (bounceElapsed < bounceDuration)
-            {
-                bounceElapsed += Time.deltaTime;
-                float bounceProgress = bounceElapsed / bounceDuration;
-                
-                // 사인 곡선을 사용한 튀는 효과
-                float bounce = Mathf.Sin(bounceProgress * Mathf.PI) * 0.3f;
-                Vector2 currentPos = Vector2.Lerp(bouncePos, endPos, bounceProgress);
-                currentPos.y += bounce * 20f; // 튀는 높이
-                
-                _rectTransform.anchoredPosition = currentPos;
                 
                 yield return null;
             }
@@ -278,10 +248,9 @@ namespace ProjectVG.Domain.Chat.View
             {
                 _canvasGroup.alpha = 1f;
             }
-            _rectTransform.anchoredPosition = endPos;
             
             _isAnimating = false;
-            Debug.Log($"ChatBubbleUI 토스트 애니메이션 완료: {_actor}");
+            Debug.Log($"ChatBubbleUI 페이드인 애니메이션 완료: {_actor}");
             
             // 텍스트 출력 시작
             StartTextAnimation();
@@ -391,7 +360,7 @@ namespace ProjectVG.Domain.Chat.View
             }
             
             // Manager의 설정값 사용, 없으면 기본값 사용
-            float maintainTime = _manager != null ? _manager.RemainingTimeAfterTyping : _maintainDuration;
+            float maintainTime = _maintainDuration;
             
             Debug.Log($"ChatBubbleUI 유지 시간 시작: {_actor} - {maintainTime}초");
             
@@ -416,35 +385,29 @@ namespace ProjectVG.Domain.Chat.View
         }
         
         /// <summary>
-        /// 페이드아웃 애니메이션 (위로 빠르게 사라짐)
+        /// 페이드아웃 애니메이션 (알파만 조작)
         /// </summary>
         private IEnumerator FadeOutAnimation()
         {
             _isAnimating = true;
             
-            // Manager의 설정값 사용, 없으면 기본값 사용
-            float fadeOutTime = _manager != null ? _manager.FadeOutDuration : _slideOutDuration;
+            float fadeOutTime = _slideOutDuration;
             
             Debug.Log($"ChatBubbleUI 페이드아웃 애니메이션 시작: {_actor} - {fadeOutTime}초");
             
             float elapsed = 0f;
             float startAlpha = _canvasGroup != null ? _canvasGroup.alpha : 1f;
-            Vector2 startPos = _rectTransform.anchoredPosition;
-            Vector2 endPos = startPos + new Vector2(0f, 100f); // 위로 빠르게 사라짐
             
             while (elapsed < fadeOutTime)
             {
                 elapsed += Time.deltaTime;
                 float progress = elapsed / fadeOutTime;
                 
-                // 알파 페이드아웃
+                // 알파 페이드아웃만 수행
                 if (_canvasGroup != null)
                 {
                     _canvasGroup.alpha = Mathf.Lerp(startAlpha, 0f, progress);
                 }
-                
-                // 위치 이동 (위로 빠르게 사라짐)
-                _rectTransform.anchoredPosition = Vector2.Lerp(startPos, endPos, progress);
                 
                 yield return null;
             }
