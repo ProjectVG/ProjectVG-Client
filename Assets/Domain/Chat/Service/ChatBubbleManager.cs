@@ -21,14 +21,10 @@ namespace ProjectVG.Domain.Chat.Service
         [SerializeField] private GameObject _chatBubblePrefab;
         [SerializeField] private Transform _bubbleContainer;
         
-        [Header("Container Reference")]
-        [SerializeField] private string _containerPath = "Canvas/ChatBubbleContainer";
-        
         private List<ChatBubbleUI> _activeBubbles = new List<ChatBubbleUI>();
         
         public int ActiveBubbleCount => _activeBubbles.Count;
         
-        // 이벤트
         public event Action<ChatBubbleUI> OnBubbleCreated;
         public event Action<ChatBubbleUI> OnBubbleDestroyed;
         public event Action OnAllBubblesCleared;
@@ -43,20 +39,11 @@ namespace ProjectVG.Domain.Chat.Service
         /// </summary>
         private void InitializeManager()
         {
-            // Container 참조 설정
             if (_bubbleContainer == null)
             {
-                _bubbleContainer = FindBubbleContainer();
-            }
-            
-            if (_bubbleContainer == null)
-            {
-                Debug.LogError("ChatBubbleContainer를 찾을 수 없습니다!");
+                Debug.LogError("BubbleContainer가 설정되지 않았습니다! 인스펙터에서 설정해주세요.");
                 return;
             }
-            
-            // Layout 컴포넌트 자동 설정
-            SetupLayoutComponents();
             
             if (_chatBubblePrefab == null)
             {
@@ -65,81 +52,6 @@ namespace ProjectVG.Domain.Chat.Service
             }
             
             Debug.Log("ChatBubbleManager 초기화 완료");
-        }
-        
-        /// <summary>
-        /// Layout 컴포넌트 자동 설정
-        /// </summary>
-        private void SetupLayoutComponents()
-        {
-            // ScrollRect 설정
-            if (_scrollRect == null)
-            {
-                _scrollRect = _bubbleContainer.GetComponentInParent<ScrollRect>();
-                if (_scrollRect == null)
-                {
-                    Debug.LogWarning("ScrollRect를 찾을 수 없습니다. 자동으로 추가합니다.");
-                    _scrollRect = _bubbleContainer.gameObject.AddComponent<ScrollRect>();
-                }
-            }
-            
-            // GridLayoutGroup 설정
-            if (_gridLayoutGroup == null)
-            {
-                _gridLayoutGroup = _bubbleContainer.GetComponent<GridLayoutGroup>();
-                if (_gridLayoutGroup == null)
-                {
-                    _gridLayoutGroup = _bubbleContainer.gameObject.AddComponent<GridLayoutGroup>();
-                    Debug.Log("GridLayoutGroup이 자동으로 추가되었습니다.");
-                }
-            }
-            
-            // ContentSizeFitter 설정
-            if (_contentSizeFitter == null)
-            {
-                _contentSizeFitter = _bubbleContainer.GetComponent<ContentSizeFitter>();
-                if (_contentSizeFitter == null)
-                {
-                    _contentSizeFitter = _bubbleContainer.gameObject.AddComponent<ContentSizeFitter>();
-                    Debug.Log("ContentSizeFitter가 자동으로 추가되었습니다.");
-                }
-            }
-        }
-        
-        /// <summary>
-        /// Bubble Container 찾기
-        /// </summary>
-        private Transform FindBubbleContainer()
-        {
-            // 1. Inspector에서 설정된 경로로 찾기
-            if (!string.IsNullOrEmpty(_containerPath))
-            {
-                Transform container = transform.root.Find(_containerPath);
-                if (container != null)
-                {
-                    return container;
-                }
-            }
-            
-            // 2. Canvas 내부에서 "ChatBubbleContainer" 이름으로 찾기
-            Canvas canvas = FindAnyObjectByType<Canvas>();
-            if (canvas != null)
-            {
-                Transform container = canvas.transform.Find("ChatBubbleContainer");
-                if (container != null)
-                {
-                    return container;
-                }
-            }
-            
-            // 3. 전체 씬에서 찾기
-            Transform foundContainer = GameObject.Find("ChatBubbleContainer")?.transform;
-            if (foundContainer != null)
-            {
-                return foundContainer;
-            }
-            
-            return null;
         }
         
         /// <summary>
@@ -161,7 +73,6 @@ namespace ProjectVG.Domain.Chat.Service
             
             try
             {
-                // 프리팹 인스턴스 생성
                 GameObject bubbleObject = Instantiate(_chatBubblePrefab, _bubbleContainer);
                 ChatBubbleUI bubbleUI = bubbleObject.GetComponent<ChatBubbleUI>();
                 
@@ -172,16 +83,12 @@ namespace ProjectVG.Domain.Chat.Service
                     return;
                 }
                 
-                // CanvasGroup 자동 설정
                 SetupCanvasGroup(bubbleObject);
                 
-                // 버블 초기화
                 bubbleUI.Initialize(actor, text, displayTime, this);
                 
-                // 이벤트 구독
                 bubbleUI.OnBubbleDestroyed += OnBubbleDestroyed;
                 
-                // 리스트에 추가
                 _activeBubbles.Add(bubbleUI);
                 
                 OnBubbleCreated?.Invoke(bubbleUI);
@@ -203,7 +110,6 @@ namespace ProjectVG.Domain.Chat.Service
             
             try
             {
-                // 이벤트 구독 해제
                 if (bubble != null)
                 {
                     bubble.OnBubbleDestroyed -= OnBubbleDestroyed;
