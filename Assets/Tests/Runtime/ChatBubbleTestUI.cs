@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 using ProjectVG.Domain.Chat.Model;
 using ProjectVG.Domain.Chat.Service;
 
@@ -12,12 +13,27 @@ public class ChatBubbleTestUI : MonoBehaviour
     [SerializeField] private Button _btnCreateUserBubble;
     [SerializeField] private Button _btnCreateCharacterBubble;
     [SerializeField] private Button _btnClearAllBubbles;
+    [SerializeField] private Button _btnCreateSequence;
+    [SerializeField] private Button _btnCreateRapidSequence;
     
     [Header("Test Settings")]
     [SerializeField] private string _userTestMessage = "Hello! I am a user.";
     [SerializeField] private string _characterTestMessage = "Hello! I am a character. The weather is really nice today.";
     [Range(0.5f, 5f)]
     [SerializeField] private float _displayTime = 1.5f;  // 타이핑 완료 후 잔존 시간
+    
+    [Header("Sequence Test Settings")]
+    [SerializeField] private string[] _sequenceMessages = {
+        "안녕하세요!",
+        "오늘 날씨가 정말 좋네요.",
+        "무엇을 도와드릴까요?",
+        "재미있는 이야기를 해드릴게요.",
+        "그럼 이제 안녕히 가세요!"
+    };
+    [SerializeField] private float _sequenceDelay = 0.5f;
+    [SerializeField] private float _rapidSequenceDelay = 0.2f;
+    
+    private Coroutine _sequenceCoroutine;
     
     private void Start()
     {
@@ -63,6 +79,16 @@ public class ChatBubbleTestUI : MonoBehaviour
         if (_btnClearAllBubbles != null)
         {
             _btnClearAllBubbles.onClick.AddListener(ClearAllBubbles);
+        }
+        
+        if (_btnCreateSequence != null)
+        {
+            _btnCreateSequence.onClick.AddListener(CreateMessageSequence);
+        }
+        
+        if (_btnCreateRapidSequence != null)
+        {
+            _btnCreateRapidSequence.onClick.AddListener(CreateRapidMessageSequence);
         }
     }
     
@@ -115,6 +141,76 @@ public class ChatBubbleTestUI : MonoBehaviour
     }
     
     /// <summary>
+    /// 메시지 시퀀스 생성 (토스트 애니메이션 테스트용)
+    /// </summary>
+    public void CreateMessageSequence()
+    {
+        if (_sequenceCoroutine != null)
+        {
+            StopCoroutine(_sequenceCoroutine);
+        }
+        
+        _sequenceCoroutine = StartCoroutine(CreateMessageSequenceCoroutine());
+    }
+    
+    /// <summary>
+    /// 빠른 메시지 시퀀스 생성 (큐 애니메이션 테스트용)
+    /// </summary>
+    public void CreateRapidMessageSequence()
+    {
+        if (_sequenceCoroutine != null)
+        {
+            StopCoroutine(_sequenceCoroutine);
+        }
+        
+        _sequenceCoroutine = StartCoroutine(CreateRapidMessageSequenceCoroutine());
+    }
+    
+    /// <summary>
+    /// 메시지 시퀀스 코루틴
+    /// </summary>
+    private IEnumerator CreateMessageSequenceCoroutine()
+    {
+        Debug.Log("메시지 시퀀스 시작");
+        
+        for (int i = 0; i < _sequenceMessages.Length; i++)
+        {
+            Actor actor = (i % 2 == 0) ? Actor.Character : Actor.User;
+            string message = _sequenceMessages[i];
+            
+            _chatBubbleManager.CreateBubble(actor, message, _displayTime);
+            
+            Debug.Log($"시퀀스 메시지 {i + 1}/{_sequenceMessages.Length}: {actor} - {message}");
+            
+            yield return new WaitForSeconds(_sequenceDelay);
+        }
+        
+        Debug.Log("메시지 시퀀스 완료");
+    }
+    
+    /// <summary>
+    /// 빠른 메시지 시퀀스 코루틴
+    /// </summary>
+    private IEnumerator CreateRapidMessageSequenceCoroutine()
+    {
+        Debug.Log("빠른 메시지 시퀀스 시작");
+        
+        for (int i = 0; i < _sequenceMessages.Length; i++)
+        {
+            Actor actor = (i % 2 == 0) ? Actor.Character : Actor.User;
+            string message = _sequenceMessages[i];
+            
+            _chatBubbleManager.CreateBubble(actor, message, _displayTime);
+            
+            Debug.Log($"빠른 시퀀스 메시지 {i + 1}/{_sequenceMessages.Length}: {actor} - {message}");
+            
+            yield return new WaitForSeconds(_rapidSequenceDelay);
+        }
+        
+        Debug.Log("빠른 메시지 시퀀스 완료");
+    }
+    
+    /// <summary>
     /// 테스트 메시지 설정
     /// </summary>
     public void SetUserTestMessage(string message)
@@ -136,5 +232,13 @@ public class ChatBubbleTestUI : MonoBehaviour
     public void SetDisplayTime(float time)
     {
         _displayTime = time;
+    }
+    
+    private void OnDestroy()
+    {
+        if (_sequenceCoroutine != null)
+        {
+            StopCoroutine(_sequenceCoroutine);
+        }
     }
 }

@@ -25,6 +25,27 @@ namespace ProjectVG.Domain.Chat.View
         [SerializeField] private float _slideInDuration = 0.25f;
         [SerializeField] private float _slideOutDuration = 0.03f;
         [SerializeField] private float _typingSpeed = 0.025f;
+        [SerializeField] private bool _enableAutoDestroy = true;
+        [SerializeField] private float _defaultDisplayTime = 3f;
+        
+        [Header("Toast Animation Settings")]
+        [SerializeField] private float _toastBounceDuration = 0.3f;
+        [SerializeField] private float _toastBounceHeight = 20f;
+        [SerializeField] private float _toastBounceScale = 1.1f;
+        [SerializeField] private float _queueSlideDuration = 0.2f;
+        [SerializeField] private float _queueSlideDistance = 10f;
+        [SerializeField] private bool _enableBounceEffect = true;
+        [SerializeField] private bool _enableScaleEffect = true;
+        [SerializeField] private EasingType _bounceEasing = EasingType.Bounce;
+        [SerializeField] private EasingType _queueEasing = EasingType.Quart;
+        
+        public enum EasingType
+        {
+            Bounce,
+            Quart,
+            Back,
+            Elastic
+        }
         
         [Header("Style Settings")]
         [SerializeField] private Color _userBubbleColor = Color.blue;
@@ -43,18 +64,26 @@ namespace ProjectVG.Domain.Chat.View
         private bool _isTyping = false;
         private float _typingProgress = 0f;
         private Coroutine _typingCoroutine;
+        private Coroutine _animationCoroutine;
         
         private ChatBubbleManager _manager;
+        
+        // 애니메이션 관련 변수들
+        private Vector3 _originalPosition;
+        private Vector3 _originalScale;
+        private bool _isToastAnimationComplete = false;
         
         public event Action<ChatBubbleUI> OnBubbleCreated;
         public event Action<ChatBubbleUI> OnBubbleTypingComplete;
         public event Action<ChatBubbleUI> OnBubbleDestroyed;
+        public event Action<ChatBubbleUI> OnToastAnimationComplete;
         
         public Actor Actor => _actor;
         public string Text => _fullText;
         public float DisplayTime => _displayTime;
         public bool IsAnimating => _isAnimating;
         public bool IsTyping => _isTyping;
+        public bool IsToastAnimationComplete => _isToastAnimationComplete;
         
         private void Awake()
         {
@@ -144,17 +173,43 @@ namespace ProjectVG.Domain.Chat.View
         }
         
         /// <summary>
+        /// 이징 타입에 따른 이징 함수 반환
+        /// </summary>
+        private float GetEasing(float t, EasingType easingType)
+        {
+            switch (easingType)
+            {
+                case EasingType.Bounce:
+                    return EaseOutBounce(t);
+                case EasingType.Quart:
+                    return EaseOutQuart(t);
+                case EasingType.Back:
+                    return EaseOutBack(t);
+                case EasingType.Elastic:
+                    return EaseOutElastic(t);
+                default:
+                    return EaseOutQuart(t);
+            }
+        }
+        
+        /// <summary>
         /// 버블 초기화
         /// </summary>
         public void Initialize(Actor actor, string text, float displayTime, ChatBubbleManager manager = null)
         {
             _actor = actor;
             _fullText = text;
-            _displayTime = displayTime;
+            _displayTime = displayTime < 0f ? _defaultDisplayTime : displayTime;
             _manager = manager;
             
             ApplyStyle();
-            StartAnimation();
+            
+            // 레이아웃 업데이트 후 원본 위치 저장
+            Canvas.ForceUpdateCanvases();
+            _originalPosition = _rectTransform.localPosition;
+            _originalScale = _rectTransform.localScale;
+            
+            StartToastAnimation();
             
             if (_actor == Actor.User)
             {
@@ -187,6 +242,26 @@ namespace ProjectVG.Domain.Chat.View
         }
         
         /// <summary>
+        /// 토스트 애니메이션 시작
+        /// </summary>
+        private void StartToastAnimation()
+        {
+            if (_isAnimating) return;
+            
+            _isAnimating = true;
+            Debug.Log($"ChatBubbleUI 토스트 애니메이션 시작: {_actor} - {_fullText}");
+            
+            InitializeAnimation();
+            
+            if (_animationCoroutine != null)
+            {
+                StopCoroutine(_animationCoroutine);
+            }
+            
+            _animationCoroutine = StartCoroutine(ToastBounceAnimation());
+        }
+        
+        /// <summary>
         /// 애니메이션 초기화
         /// </summary>
         private void InitializeAnimation()
@@ -196,54 +271,157 @@ namespace ProjectVG.Domain.Chat.View
                 _canvasGroup.alpha = 0f;
             }
             
+            // 시작 위치 설정 (아래에서 시작)
+            Vector3 startPosition = _originalPosition;
+            startPosition.y -= _toastBounceHeight;
+            _rectTransform.localPosition = startPosition;
+            
+            // 시작 스케일 설정 (작게 시작)
+            _rectTransform.localScale = Vector3.zero;
+            
             Debug.Log($"ChatBubbleUI 애니메이션 초기화 완료: {_actor}");
         }
         
         /// <summary>
-        /// 애니메이션 시작
+        /// 토스트 튀어오르기 애니메이션
         /// </summary>
-        private void StartAnimation()
+        private IEnumerator ToastBounceAnimation()
         {
-            if (_isAnimating) return;
-            
-            _isAnimating = true;
-            Debug.Log($"ChatBubbleUI 애니메이션 시작: {_actor} - {_fullText}");
-            
-            InitializeAnimation();
-            
-            StartCoroutine(SlideInAnimation());
-        }
-        
-        /// <summary>
-        /// 슬라이드 인 애니메이션 (토스트 스타일)
-        /// </summary>
-        private IEnumerator SlideInAnimation()
-        {
-            float slideInTime = _slideInDuration;
             float elapsed = 0f;
+            float duration = _toastBounceDuration;
             
-            while (elapsed < slideInTime)
+            Vector3 startPosition = _rectTransform.localPosition;
+            Vector3 targetPosition = _originalPosition;
+            Vector3 startScale = Vector3.zero;
+            Vector3 targetScale = _originalScale;
+            
+            // 첫 번째 단계: 튀어오르기
+            while (elapsed < duration * 0.6f)
             {
                 elapsed += Time.deltaTime;
-                float progress = elapsed / slideInTime;
+                float progress = elapsed / (duration * 0.6f);
+                float easeProgress = GetEasing(progress, _bounceEasing);
+                
+                _rectTransform.localPosition = Vector3.Lerp(startPosition, targetPosition, easeProgress);
+                _rectTransform.localScale = Vector3.Lerp(startScale, targetScale, easeProgress);
                 
                 if (_canvasGroup != null)
                 {
-                    _canvasGroup.alpha = progress;
+                    _canvasGroup.alpha = easeProgress;
                 }
                 
                 yield return null;
             }
             
+            // 두 번째 단계: 살짝 튀어오르기
+            Vector3 bouncePosition = targetPosition;
+            Vector3 bounceScale = targetScale;
+            
+            if (_enableBounceEffect)
+            {
+                bouncePosition += Vector3.up * (_toastBounceHeight * 0.3f);
+            }
+            
+            if (_enableScaleEffect)
+            {
+                bounceScale = targetScale * _toastBounceScale;
+            }
+            
+            elapsed = 0f;
+            while (elapsed < duration * 0.4f)
+            {
+                elapsed += Time.deltaTime;
+                float progress = elapsed / (duration * 0.4f);
+                float easeProgress = GetEasing(progress, _bounceEasing);
+                
+                _rectTransform.localPosition = Vector3.Lerp(targetPosition, bouncePosition, easeProgress);
+                _rectTransform.localScale = Vector3.Lerp(targetScale, bounceScale, easeProgress);
+                
+                yield return null;
+            }
+            
+            // 최종 위치로 복귀
+            elapsed = 0f;
+            Vector3 finalStartPos = _rectTransform.localPosition;
+            Vector3 finalStartScale = _rectTransform.localScale;
+            
+            while (elapsed < duration * 0.3f)
+            {
+                elapsed += Time.deltaTime;
+                float progress = elapsed / (duration * 0.3f);
+                float easeProgress = GetEasing(progress, _bounceEasing);
+                
+                _rectTransform.localPosition = Vector3.Lerp(finalStartPos, _originalPosition, easeProgress);
+                _rectTransform.localScale = Vector3.Lerp(finalStartScale, _originalScale, easeProgress);
+                
+                yield return null;
+            }
+            
+            // 최종 상태 설정
+            _rectTransform.localPosition = _originalPosition;
+            _rectTransform.localScale = _originalScale;
             if (_canvasGroup != null)
             {
                 _canvasGroup.alpha = 1f;
             }
             
             _isAnimating = false;
-            Debug.Log($"ChatBubbleUI 페이드인 애니메이션 완료: {_actor}");
+            _isToastAnimationComplete = true;
+            
+            Debug.Log($"ChatBubbleUI 토스트 애니메이션 완료: {_actor}");
+            OnToastAnimationComplete?.Invoke(this);
             
             StartTextAnimation();
+        }
+        
+        /// <summary>
+        /// 큐 슬라이드 애니메이션 (다른 버블이 생성될 때 호출)
+        /// </summary>
+        public void StartQueueSlideAnimation()
+        {
+            if (!_isToastAnimationComplete) return;
+            
+            if (_animationCoroutine != null)
+            {
+                StopCoroutine(_animationCoroutine);
+            }
+            
+            _animationCoroutine = StartCoroutine(QueueSlideAnimation());
+        }
+        
+        /// <summary>
+        /// 큐 슬라이드 애니메이션
+        /// </summary>
+        private IEnumerator QueueSlideAnimation()
+        {
+            // 현재 위치를 시작 위치로 설정
+            Vector3 startPosition = _rectTransform.localPosition;
+            
+            // 레이아웃 업데이트 후 새로운 위치 계산
+            Canvas.ForceUpdateCanvases();
+            Vector3 targetPosition = _rectTransform.localPosition;
+            
+            // 시작 위치를 원래 위치로 복원
+            _rectTransform.localPosition = startPosition;
+            
+            float elapsed = 0f;
+            float duration = _queueSlideDuration;
+            
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float progress = elapsed / duration;
+                float easeProgress = GetEasing(progress, _queueEasing);
+                
+                _rectTransform.localPosition = Vector3.Lerp(startPosition, targetPosition, easeProgress);
+                
+                yield return null;
+            }
+            
+            _rectTransform.localPosition = targetPosition;
+            _originalPosition = targetPosition;
+            
+            Debug.Log($"ChatBubbleUI 큐 슬라이드 애니메이션 완료: {_actor}");
         }
         
         /// <summary>
@@ -316,6 +494,31 @@ namespace ProjectVG.Domain.Chat.View
             
             Debug.Log($"ChatBubbleUI 타이핑 완료: {_actor} - {_fullText}");
             OnBubbleTypingComplete?.Invoke(this);
+            
+            // 자동 삭제 시작
+            StartAutoDestroy();
+        }
+        
+        /// <summary>
+        /// 자동 삭제 시작
+        /// </summary>
+        private void StartAutoDestroy()
+        {
+            if (_enableAutoDestroy && _displayTime > 0f)
+            {
+                StartCoroutine(AutoDestroyCoroutine());
+            }
+        }
+        
+        /// <summary>
+        /// 자동 삭제 코루틴
+        /// </summary>
+        private IEnumerator AutoDestroyCoroutine()
+        {
+            yield return new WaitForSeconds(_displayTime);
+            
+            Debug.Log($"ChatBubbleUI 자동 삭제 시작: {_actor} - {_fullText}");
+            StartFadeOut();
         }
         
         /// <summary>
@@ -386,11 +589,68 @@ namespace ProjectVG.Domain.Chat.View
             StartFadeOut();
         }
         
+        /// <summary>
+        /// EaseOutBounce 이징 함수
+        /// </summary>
+        private float EaseOutBounce(float t)
+        {
+            if (t < 1f / 2.75f)
+            {
+                return 7.5625f * t * t;
+            }
+            else if (t < 2f / 2.75f)
+            {
+                return 7.5625f * (t -= 1.5f / 2.75f) * t + 0.75f;
+            }
+            else if (t < 2.5f / 2.75f)
+            {
+                return 7.5625f * (t -= 2.25f / 2.75f) * t + 0.9375f;
+            }
+            else
+            {
+                return 7.5625f * (t -= 2.625f / 2.75f) * t + 0.984375f;
+            }
+        }
+        
+        /// <summary>
+        /// EaseOutQuart 이징 함수
+        /// </summary>
+        private float EaseOutQuart(float t)
+        {
+            return 1f - Mathf.Pow(1f - t, 4f);
+        }
+        
+        /// <summary>
+        /// EaseOutBack 이징 함수 (튀어오르는 효과)
+        /// </summary>
+        private float EaseOutBack(float t)
+        {
+            float c1 = 1.70158f;
+            float c3 = c1 + 1f;
+            return 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);
+        }
+        
+        /// <summary>
+        /// EaseOutElastic 이징 함수 (탄성 효과)
+        /// </summary>
+        private float EaseOutElastic(float t)
+        {
+            float c4 = (2f * Mathf.PI) / 3f;
+            if (t == 0f) return 0f;
+            if (t == 1f) return 1f;
+            return Mathf.Pow(2f, -10f * t) * Mathf.Sin((t * 10f - 0.75f) * c4) + 1f;
+        }
+        
         private void OnDestroy()
         {
             if (_typingCoroutine != null)
             {
                 StopCoroutine(_typingCoroutine);
+            }
+            
+            if (_animationCoroutine != null)
+            {
+                StopCoroutine(_animationCoroutine);
             }
         }
     }
