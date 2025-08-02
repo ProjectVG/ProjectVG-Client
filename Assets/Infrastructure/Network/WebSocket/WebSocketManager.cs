@@ -26,6 +26,11 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         private bool _isConnecting = false;
         private int _reconnectAttempts = 0;
         private string _sessionId;
+        private bool _autoReconnect = true;
+        private float _reconnectDelay = 5f;
+        private int _maxReconnectAttempts = 10;
+        private float _maxReconnectDelay = 60f;
+        private bool _useExponentialBackoff = true;
         
         [Inject] private SessionManager _sessionManager;
 
@@ -39,7 +44,10 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         public bool IsConnected => _isConnected;
         public bool IsConnecting => _isConnecting;
         public string SessionId => _sessionId;
+        public bool AutoReconnect => _autoReconnect;
+        public int ReconnectAttempts => _reconnectAttempts;
 
+        #region Lifecycle
         private void Awake()
         {
             if (Instance == null)
@@ -58,30 +66,16 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             Shutdown();
         }
-        
+        #endregion
+
         public void Shutdown()
         {
+            _autoReconnect = false;
             DisconnectAsync().Forget();
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
         }
-
-        private void InitializeManager()
-        {
-            _cancellationTokenSource = new CancellationTokenSource();
-            InitializeNativeWebSocket();
-        }
-
-        private void InitializeNativeWebSocket()
-        {
-            _nativeWebSocket = WebSocketFactory.Create();
-            
-            _nativeWebSocket.OnConnected += OnNativeConnected;
-            _nativeWebSocket.OnDisconnected += OnNativeDisconnected;
-            _nativeWebSocket.OnError += OnNativeError;
-            _nativeWebSocket.OnMessageReceived += OnNativeMessageReceived;
-        }
-
+        
         public async UniTask<bool> ConnectAsync(string sessionId = null, CancellationToken cancellationToken = default)
         {
             if (_isConnected || _isConnecting)
@@ -149,8 +143,23 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 await _nativeWebSocket.DisconnectAsync();
             }
 
-            Debug.Log("WebSocket 연결 해제");
+            Debug.Log("[WebSocket] 연결 해제");
             OnDisconnected?.Invoke();
+        }
+        
+        public void SetAutoReconnect(bool enabled)
+        {
+            _autoReconnect = enabled;
+            Debug.Log($"[WebSocket] 자동 재연결 설정: {enabled}");
+        }
+        
+        public void SetReconnectSettings(int maxAttempts, float delay, float maxDelay = 60f, bool useExponentialBackoff = true)
+        {
+            _maxReconnectAttempts = maxAttempts;
+            _reconnectDelay = delay;
+            _maxReconnectDelay = maxDelay;
+            _useExponentialBackoff = useExponentialBackoff;
+            Debug.Log($"[WebSocket] 재연결 설정 변경: 최대시도={maxAttempts}, 기본지연={delay}초, 최대지연={maxDelay}초, 지수백오프={useExponentialBackoff}");
         }
 
         public async UniTask<bool> SendMessageAsync(string type, string data)
@@ -158,6 +167,35 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             throw new NotImplementedException();
         }
 
+        public void LogConnectionStatus()
+        {
+            Debug.Log($"[WebSocket] 연결 상태: {(_isConnected ? "연결됨" : "연결안됨")}");
+            Debug.Log($"[WebSocket] 연결 중: {(_isConnecting ? "예" : "아니오")}");
+            Debug.Log($"[WebSocket] 자동 재연결: {(_autoReconnect ? "활성화" : "비활성화")}");
+            Debug.Log($"[WebSocket] 재연결 시도: {_reconnectAttempts}/{_maxReconnectAttempts}");
+            Debug.Log($"[WebSocket] 지수 백오프: {(_useExponentialBackoff ? "활성화" : "비활성화")}");
+        }
+
+        #region Private Initialization
+        private void InitializeManager()
+        {
+            _cancellationTokenSource = new CancellationTokenSource();
+            InitializeNativeWebSocket();
+            StartConnectionMonitoring();
+        }
+
+        private void InitializeNativeWebSocket()
+        {
+            _nativeWebSocket = WebSocketFactory.Create();
+            
+            _nativeWebSocket.OnConnected += OnNativeConnected;
+            _nativeWebSocket.OnDisconnected += OnNativeDisconnected;
+            _nativeWebSocket.OnError += OnNativeError;
+            _nativeWebSocket.OnMessageReceived += OnNativeMessageReceived;
+        }
+        #endregion
+
+        #region Private Connection Management
         private string GetWebSocketUrl(string sessionId = null)
         {
             string baseUrl = NetworkConfig.GetWebSocketUrl();
@@ -172,33 +210,55 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 
         private async UniTaskVoid TryReconnectAsync()
         {
-            bool autoReconnect = NetworkConfig.AutoReconnect;
-            int maxReconnectAttempts = NetworkConfig.MaxReconnectAttempts;
-            float reconnectDelay = NetworkConfig.ReconnectDelay;
-            
-            if (!autoReconnect || _reconnectAttempts >= maxReconnectAttempts)
+            if (!_autoReconnect || _reconnectAttempts >= _maxReconnectAttempts)
             {
+                Debug.LogWarning($"[WebSocket] 재연결 시도 횟수 초과: {_reconnectAttempts}/{_maxReconnectAttempts}");
                 return;
             }
 
             _reconnectAttempts++;
-            Debug.Log($"WebSocket 재연결 시도 {_reconnectAttempts}/{maxReconnectAttempts}");
             
-            await UniTask.Delay(TimeSpan.FromSeconds(reconnectDelay));
+            // 지수적 백오프 계산
+            float delay = _reconnectDelay;
+            if (_useExponentialBackoff)
+            {
+                delay = Mathf.Min(_reconnectDelay * Mathf.Pow(2, _reconnectAttempts - 1), _maxReconnectDelay);
+            }
+            
+            Debug.Log($"[WebSocket] 재연결 시도 {_reconnectAttempts}/{_maxReconnectAttempts} (지연: {delay:F1}초)");
+            
+            await UniTask.Delay(TimeSpan.FromSeconds(delay));
             
             if (!_isConnected)
             {
-                ConnectAsync(_sessionId).Forget();
+                await ConnectAsync(_sessionId);
             }
         }
+        
+        private async UniTaskVoid StartConnectionMonitoring()
+        {
+            while (!_cancellationTokenSource.Token.IsCancellationRequested)
+            {
+                await UniTask.Delay(TimeSpan.FromSeconds(30), cancellationToken: _cancellationTokenSource.Token);
+                
+                // 연결이 끊어진 상태이고 재연결 시도 횟수가 남아있을 때만 재연결
+                if (!_isConnected && !_isConnecting && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts)
+                {
+                    Debug.Log("[WebSocket] 연결 상태 확인 - 재연결 시도");
+                    await ConnectAsync(_sessionId);
+                }
+            }
+        }
+        #endregion
 
+        #region Private Event Handlers
         private void OnNativeConnected()
         {
             _isConnected = true;
             _isConnecting = false;
             _reconnectAttempts = 0;
             
-            Debug.Log("WebSocket 연결 성공");
+            Debug.Log("[WebSocket] 연결 성공");
             OnConnected?.Invoke();
         }
 
@@ -207,8 +267,13 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _isConnected = false;
             _isConnecting = false;
             
+            Debug.Log("[WebSocket] 연결 해제됨");
             OnDisconnected?.Invoke();
-            TryReconnectAsync().Forget();
+            
+            if (_autoReconnect)
+            {
+                TryReconnectAsync().Forget();
+            }
         }
 
         private void OnNativeError(string error)
@@ -232,7 +297,9 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 Debug.LogError($"원시 메시지: {message}");
             }
         }
-        
+        #endregion
+
+        #region Private Message Processing
         private void ProcessBufferedMessage(string message)
         {
             lock (_bufferLock)
@@ -380,8 +447,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 Debug.LogError($"원시 데이터: {data}");
             }
         }
+        #endregion
     }
-
-
-
 } 
