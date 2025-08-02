@@ -159,7 +159,6 @@ namespace ProjectVG.Tests.Runtime
                 _webSocketManager.OnConnected += OnWebSocketConnected;
                 _webSocketManager.OnDisconnected += OnWebSocketDisconnected;
                 _webSocketManager.OnError += OnWebSocketError;
-                _webSocketManager.OnSessionIdReceived += OnSessionIdReceived;
                 
                 Debug.Log("NetworkTestManager 초기화 완료");
                 NetworkConfig.LogCurrentSettings();

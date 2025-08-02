@@ -5,11 +5,14 @@ using UnityEngine;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
+using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Domain.Chat.Model;
+using ProjectVG.Core.Managers;
+using ProjectVG.Core.Attributes;
 
 namespace ProjectVG.Infrastructure.Network.WebSocket
 {
-    public class WebSocketManager : MonoBehaviour
+    public class WebSocketManager : MonoBehaviour, IManager
     {
         private INativeWebSocket _nativeWebSocket;
         private CancellationTokenSource _cancellationTokenSource;
@@ -21,13 +24,14 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         private bool _isConnecting = false;
         private int _reconnectAttempts = 0;
         private string _sessionId;
+        
+        [Inject] private SessionManager _sessionManager;
 
         public static WebSocketManager Instance { get; private set; }
         
         public event Action OnConnected;
         public event Action OnDisconnected;
         public event Action<string> OnError;
-        public event Action<string> OnSessionIdReceived;
         public event Action<ChatMessage> OnChatMessageReceived;
 
         public bool IsConnected => _isConnected;
@@ -49,6 +53,11 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         }
 
         private void OnDestroy()
+        {
+            Shutdown();
+        }
+        
+        public void Shutdown()
         {
             DisconnectAsync().Forget();
             _cancellationTokenSource?.Cancel();
@@ -140,6 +149,44 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 
             Debug.Log("WebSocket 연결 해제");
             OnDisconnected?.Invoke();
+        }
+
+        public async UniTask<bool> SendMessageAsync(string type, object data)
+        {
+            if (!_isConnected)
+            {
+                Debug.LogWarning("WebSocket이 연결되지 않아 메시지를 보낼 수 없습니다.");
+                return false;
+            }
+
+            try
+            {
+                var message = new WebSocketMessage
+                {
+                    type = type,
+                    data = data
+                };
+
+                var jsonMessage = JsonUtility.ToJson(message);
+                Debug.Log($"메시지 전송: {jsonMessage}");
+
+                var success = await _nativeWebSocket.SendMessageAsync(jsonMessage);
+                if (success)
+                {
+                    Debug.Log($"메시지 전송 성공: {type}");
+                }
+                else
+                {
+                    Debug.LogError($"메시지 전송 실패: {type}");
+                }
+
+                return success;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"메시지 전송 중 예외 발생: {ex.Message}");
+                return false;
+            }
         }
 
         private string GetWebSocketUrl(string sessionId = null)
@@ -313,8 +360,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 
                 switch (webSocketMessage.type)
                 {
-                    case "session_id":
-                        ProcessSessionIdMessage(webSocketMessage.data);
+                    case "session":
+                        ProcessSessionMessage(webSocketMessage.data);
                         break;
                     case "chat":
                         ProcessChatMessage(webSocketMessage.data);
@@ -330,21 +377,23 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
         }
 
-        private void ProcessSessionIdMessage(object data)
+        private void ProcessSessionMessage(object data)
         {
             try
             {
-                var sessionIdData = JsonUtility.FromJson<SessionIdData>(JsonUtility.ToJson(data));
-                if (sessionIdData != null)
+                if (_sessionManager != null)
                 {
-                    _sessionId = sessionIdData.session_id;
-                    Debug.Log($"세션 ID 수신: {sessionIdData.session_id}");
-                    OnSessionIdReceived?.Invoke(sessionIdData.session_id);
+                    string sessionData = JsonUtility.ToJson(data);
+                    _sessionManager.HandleSessionMessage(sessionData);
+                }
+                else
+                {
+                    Debug.LogWarning("SessionManager가 없어서 세션 메시지를 처리할 수 없습니다.");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"세션 ID 메시지 처리 중 오류: {ex.Message}");
+                Debug.LogError($"세션 메시지 처리 중 오류: {ex.Message}");
             }
         }
 
@@ -387,9 +436,5 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         public object data;
     }
 
-    [Serializable]
-    public class SessionIdData
-    {
-        public string session_id;
-    }
+
 } 
