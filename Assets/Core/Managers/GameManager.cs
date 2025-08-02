@@ -5,6 +5,7 @@ using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.Http;
 using ProjectVG.Core.DI;
+using Cysharp.Threading.Tasks;
 
 namespace ProjectVG.Core.Managers
 {
@@ -75,7 +76,7 @@ namespace ProjectVG.Core.Managers
         /// <summary>
         /// 게임 초기화
         /// </summary>
-        public void InitializeGame()
+        public async void InitializeGame()
         {
             if (_isInitialized)
             {
@@ -93,7 +94,10 @@ namespace ProjectVG.Core.Managers
                 // 2. 매니저들 간의 의존성 설정
                 SetupDependencies();
                 
-                // 3. 초기화 완료
+                // 3. 세션 연결 시도
+                await TryConnectSessionAsync();
+                
+                // 4. 초기화 완료
                 _isInitialized = true;
                 Debug.Log("게임 초기화 완료");
                 OnGameInitialized?.Invoke();
@@ -207,6 +211,47 @@ namespace ProjectVG.Core.Managers
         
         #endregion
         
+        #region Session Connection
+        
+        /// <summary>
+        /// 세션 연결 시도
+        /// </summary>
+        public async UniTask<bool> TryConnectSessionAsync()
+        {
+            if (_sessionManager == null)
+            {
+                Debug.LogError("SessionManager가 초기화되지 않았습니다.");
+                return false;
+            }
+            
+            try
+            {
+                Debug.Log("세션 연결 시도 중...");
+                
+                // WebSocket 연결
+                if (_webSocketManager != null && !_webSocketManager.IsConnected)
+                {
+                    bool webSocketConnected = await _webSocketManager.ConnectAsync();
+                    if (!webSocketConnected)
+                    {
+                        Debug.LogError("WebSocket 연결 실패");
+                        return false;
+                    }
+                }
+                
+                // WebSocket 연결 완료 후 세션 ID 자동 수신 대기
+                Debug.Log("WebSocket 연결 완료 - 세션 ID 자동 수신 대기 중");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"세션 연결 중 오류 발생: {ex.Message}");
+                return false;
+            }
+        }
+        
+        #endregion
+        
         #region Shutdown
         
         /// <summary>
@@ -252,6 +297,14 @@ namespace ProjectVG.Core.Managers
         }
         
         /// <summary>
+        /// 세션 연결 상태 확인
+        /// </summary>
+        public bool IsSessionConnected()
+        {
+            return _sessionManager != null && _sessionManager.IsSessionConnected;
+        }
+        
+        /// <summary>
         /// 매니저 상태 로그 출력
         /// </summary>
         [ContextMenu("Log Manager Status")]
@@ -263,6 +316,7 @@ namespace ProjectVG.Core.Managers
             Debug.Log($"SessionManager: {(_sessionManager != null ? "존재함" : "없음")}");
             Debug.Log($"HttpApiClient: {(_httpApiClient != null ? "존재함" : "없음")}");
             Debug.Log($"매니저 준비 상태: {(AreManagersReady() ? "준비됨" : "미준비")}");
+            Debug.Log($"세션 연결 상태: {(IsSessionConnected() ? "연결됨" : "미연결")}");
         }
         
         #endregion

@@ -3,6 +3,7 @@ using System;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Core.Managers;
+using Newtonsoft.Json.Linq;
 
 namespace ProjectVG.Infrastructure.Network.Services
 {
@@ -100,12 +101,11 @@ namespace ProjectVG.Infrastructure.Network.Services
             
             if (_webSocketManager.IsConnected)
             {
-                Debug.Log("새 세션 요청 중...");
-                await _webSocketManager.SendMessageAsync("session", "request");
+                Debug.Log("WebSocket 연결 완료 - 세션 ID 자동 수신 대기 중");
             }
             else
             {
-                string error = "WebSocket 연결 실패로 세션 요청할 수 없습니다.";
+                string error = "WebSocket 연결 실패";
                 Debug.LogError(error);
                 OnSessionError?.Invoke(error);
             }
@@ -128,19 +128,20 @@ namespace ProjectVG.Infrastructure.Network.Services
         {
             try
             {
-                var sessionData = JsonUtility.FromJson<SessionResponse>(data);
+                var jsonObject = JObject.Parse(data);
+                string sessionId = jsonObject["session_id"]?.ToString();
                 
-                if (sessionData != null && !string.IsNullOrEmpty(sessionData.SessionId))
+                if (!string.IsNullOrEmpty(sessionId))
                 {
-                    _sessionId = sessionData.SessionId;
+                    _sessionId = sessionId;
                     _isSessionConnected = true;
                     
-                    Debug.Log($"세션 시작됨: {_sessionId}");
+                    Debug.Log($"[Session] 시작: {_sessionId}");
                     OnSessionStarted?.Invoke(_sessionId);
                 }
                 else
                 {
-                    string error = "세션 응답 데이터가 유효하지 않습니다.";
+                    string error = $"세션 응답 데이터가 유효하지 않습니다.";
                     Debug.LogError(error);
                     OnSessionError?.Invoke(error);
                 }
@@ -185,10 +186,5 @@ namespace ProjectVG.Infrastructure.Network.Services
             }
         }
         
-        [System.Serializable]
-        private class SessionResponse
-        {
-            public string SessionId;
-        }
     }
 } 

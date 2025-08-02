@@ -9,6 +9,8 @@ using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Domain.Chat.Model;
 using ProjectVG.Core.Managers;
 using ProjectVG.Core.Attributes;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ProjectVG.Infrastructure.Network.WebSocket
 {
@@ -151,42 +153,9 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             OnDisconnected?.Invoke();
         }
 
-        public async UniTask<bool> SendMessageAsync(string type, object data)
+        public async UniTask<bool> SendMessageAsync(string type, string data)
         {
-            if (!_isConnected)
-            {
-                Debug.LogWarning("WebSocket이 연결되지 않아 메시지를 보낼 수 없습니다.");
-                return false;
-            }
-
-            try
-            {
-                var message = new WebSocketMessage
-                {
-                    type = type,
-                    data = data
-                };
-
-                var jsonMessage = JsonUtility.ToJson(message);
-                Debug.Log($"메시지 전송: {jsonMessage}");
-
-                var success = await _nativeWebSocket.SendMessageAsync(jsonMessage);
-                if (success)
-                {
-                    Debug.Log($"메시지 전송 성공: {type}");
-                }
-                else
-                {
-                    Debug.LogError($"메시지 전송 실패: {type}");
-                }
-
-                return success;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"메시지 전송 중 예외 발생: {ex.Message}");
-                return false;
-            }
+            throw new NotImplementedException();
         }
 
         private string GetWebSocketUrl(string sessionId = null)
@@ -271,12 +240,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 _messageBuffer.Append(message);
                 string bufferedMessage = _messageBuffer.ToString();
                 
-                Debug.Log($"버퍼링된 메시지 길이: {bufferedMessage.Length}");
-                
                 if (IsCompleteJsonMessage(bufferedMessage))
                 {
-                    Debug.Log("완전한 JSON 메시지 감지됨. 처리 시작.");
-                    
                     if (IsValidJsonMessage(bufferedMessage))
                     {
                         ProcessMessage(bufferedMessage);
@@ -287,11 +252,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                     }
                     
                     _messageBuffer.Clear();
-                    Debug.Log("메시지 처리 완료. 버퍼 초기화됨.");
-                }
-                else
-                {
-                    Debug.Log($"불완전한 메시지. 버퍼에 누적 중... (현재 길이: {bufferedMessage.Length})");
                 }
             }
         }
@@ -323,10 +283,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 }
             }
             
-            bool isComplete = openBraces > 0 && openBraces == closeBraces;
-            Debug.Log($"JSON 완성도 체크: 열린괄호={openBraces}, 닫힌괄호={closeBraces}, 완성={isComplete}");
-            
-            return isComplete;
+            return openBraces > 0 && openBraces == closeBraces;
         }
         
         private bool IsValidJsonMessage(string message)
@@ -349,25 +306,22 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             try
             {
-                var webSocketMessage = JsonUtility.FromJson<WebSocketMessage>(message);
-                if (webSocketMessage == null)
-                {
-                    Debug.LogError("WebSocket 메시지 파싱 실패");
-                    return;
-                }
+                var jsonObject = JObject.Parse(message);
+                string messageType = jsonObject["type"]?.ToString();
+                JToken dataToken = jsonObject["data"];
+                
+                Debug.Log($"[WebSocket] {messageType}: {dataToken}");
 
-                Debug.Log($"메시지 타입: {webSocketMessage.type}");
-
-                switch (webSocketMessage.type)
+                switch (messageType)
                 {
                     case "session":
-                        ProcessSessionMessage(webSocketMessage.data);
+                        ProcessSessionMessage(dataToken.ToString());
                         break;
                     case "chat":
-                        ProcessChatMessage(webSocketMessage.data);
+                        ProcessChatMessage(dataToken.ToString());
                         break;
                     default:
-                        Debug.LogWarning($"알 수 없는 메시지 타입: {webSocketMessage.type}");
+                        Debug.LogWarning($"알 수 없는 메시지 타입: {messageType}");
                         break;
                 }
             }
@@ -377,14 +331,13 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
         }
 
-        private void ProcessSessionMessage(object data)
+        private void ProcessSessionMessage(string data)
         {
             try
             {
                 if (_sessionManager != null)
                 {
-                    string sessionData = JsonUtility.ToJson(data);
-                    _sessionManager.HandleSessionMessage(sessionData);
+                    _sessionManager.HandleSessionMessage(data);
                 }
                 else
                 {
@@ -397,11 +350,11 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
         }
 
-        private void ProcessChatMessage(object data)
+        private void ProcessChatMessage(string data)
         {
             try
             {
-                var chatResponse = JsonUtility.FromJson<ChatResponse>(JsonUtility.ToJson(data));
+                var chatResponse = JsonUtility.FromJson<ChatResponse>(data);
                 if (chatResponse == null)
                 {
                     Debug.LogError("ChatResponse 파싱 실패");
@@ -424,17 +377,11 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             catch (Exception ex)
             {
                 Debug.LogError($"채팅 메시지 처리 중 오류: {ex.Message}");
-                Debug.LogError($"원시 데이터: {JsonUtility.ToJson(data)}");
+                Debug.LogError($"원시 데이터: {data}");
             }
         }
     }
 
-    [Serializable]
-    public class WebSocketMessage
-    {
-        public string type;
-        public object data;
-    }
 
 
 } 
