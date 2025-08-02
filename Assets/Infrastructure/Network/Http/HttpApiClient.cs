@@ -58,7 +58,7 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         public async UniTask<T> GetAsync<T>(string endpoint, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
         {
-            var url = GetFullUrl(endpoint);
+            var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
             return await SendRequestAsync<T>(url, UnityWebRequest.kHttpVerbGET, null, headers, cancellationToken);
         }
 
@@ -87,6 +87,12 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             var url = GetFullUrl(endpoint);
             return await SendFileRequestAsync<T>(url, fileData, fileName, fieldName, headers, cancellationToken);
+        }
+        
+        public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        {
+            var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
+            return await SendFormDataRequestAsync<T>(url, formData, headers, cancellationToken);
         }
 
         public void Shutdown()
@@ -135,6 +141,11 @@ namespace ProjectVG.Infrastructure.Network.Http
         private string GetFullUrl(string endpoint)
         {
             return NetworkConfig.GetFullApiUrl(endpoint);
+        }
+        
+        private bool IsFullUrl(string url)
+        {
+            return url.StartsWith("http://") || url.StartsWith("https://");
         }
 
         private string SerializeData(object data)
@@ -232,6 +243,57 @@ namespace ProjectVG.Infrastructure.Network.Http
             }
 
             throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, "최대 재시도 횟수 초과");
+        }
+        
+        private async UniTask<T> SendFormDataRequestAsync<T>(string url, Dictionary<string, object> formData, Dictionary<string, string> headers, CancellationToken cancellationToken)
+        {
+            var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
+
+            for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
+            {
+                try
+                {
+                    var form = new WWWForm();
+                    
+                    foreach (var kvp in formData)
+                    {
+                        if (kvp.Value is byte[] byteData)
+                        {
+                            form.AddBinaryData(kvp.Key, byteData, "file.wav");
+                        }
+                        else
+                        {
+                            form.AddField(kvp.Key, kvp.Value.ToString());
+                        }
+                    }
+                    
+                    using var request = UnityWebRequest.Post(url, form);
+                    SetupRequest(request, headers);
+                    request.timeout = (int)NetworkConfig.HttpTimeout;
+
+                    var operation = request.SendWebRequest();
+                    await operation.WithCancellation(combinedCancellationToken);
+
+                    if (request.result == UnityWebRequest.Result.Success)
+                    {
+                        return ParseResponse<T>(request);
+                    }
+                    else
+                    {
+                        await HandleFileUploadFailure(request, attempt, combinedCancellationToken);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (ex is not ApiException)
+                {
+                    await HandleFileUploadException(ex, attempt, combinedCancellationToken);
+                }
+            }
+
+            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 폼 데이터 업로드 실패", 0, "최대 재시도 횟수 초과");
         }
 
         private CancellationToken CreateCombinedCancellationToken(CancellationToken cancellationToken)

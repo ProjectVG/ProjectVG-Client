@@ -20,6 +20,8 @@ namespace ProjectVG.Core.Audio
         private VoiceData? _currentVoice;
         private bool _isPlaying = false;
         
+        public static VoiceManager Instance { get; private set; }
+        
         public bool IsPlaying => _isPlaying;
         public float Volume => _volume;
         public VoiceData? CurrentVoice => _currentVoice;
@@ -30,7 +32,21 @@ namespace ProjectVG.Core.Audio
         
         private void Awake()
         {
+            InitializeSingleton();
             InitializeVoiceSource();
+        }
+        
+        private void InitializeSingleton()
+        {
+            if (Instance == null)
+            {
+                Instance = this;
+                DontDestroyOnLoad(gameObject);
+            }
+            else
+            {
+                Destroy(gameObject);
+            }
         }
         
         private void InitializeVoiceSource()

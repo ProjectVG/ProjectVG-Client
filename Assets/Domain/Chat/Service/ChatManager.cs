@@ -54,10 +54,10 @@ namespace ProjectVG.Domain.Chat.Service
             {
                 // 컴포넌트 자동 찾기
                 if (_webSocketManager == null)
-                    _webSocketManager = FindFirstObjectByType<WebSocketManager>();
+                    _webSocketManager = WebSocketManager.Instance;
                     
                 if (_voiceManager == null)
-                    _voiceManager = FindFirstObjectByType<VoiceManager>();
+                    _voiceManager = VoiceManager.Instance;
                 
                 // 이벤트 구독
                 if (_webSocketManager != null)
