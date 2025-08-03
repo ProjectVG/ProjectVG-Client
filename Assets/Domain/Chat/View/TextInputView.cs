@@ -90,7 +90,7 @@ namespace ProjectVG.Domain.Chat.View
         {
             if (_chatManager == null)
             {
-                _chatManager = FindObjectOfType<ChatManager>();
+                _chatManager = FindAnyObjectByType<ChatManager>();
                 if (_chatManager == null)
                 {
                     Debug.LogWarning("TextInputView: ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");

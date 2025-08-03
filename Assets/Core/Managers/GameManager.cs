@@ -41,14 +41,14 @@ namespace ProjectVG.Core.Managers
         private void Awake()
         {
             InitializeSingleton();
+            if (_autoInitializeOnStart) {
+                InitializeGame();
+            }
         }
         
         private void Start()
         {
-            if (_autoInitializeOnStart)
-            {
-                InitializeGame();
-            }
+            
         }
         
         private void OnDestroy()
