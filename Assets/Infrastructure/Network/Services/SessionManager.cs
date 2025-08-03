@@ -7,10 +7,8 @@ using Newtonsoft.Json.Linq;
 
 namespace ProjectVG.Infrastructure.Network.Services
 {
-    public class SessionManager : MonoBehaviour, IManager
+    public class SessionManager : Singleton<SessionManager>, IManager
     {
-        public static SessionManager Instance { get; private set; }
-        
         [Header("Session Info")]
         [SerializeField] private string _sessionId = "";
         [SerializeField] private bool _isSessionConnected = false;
@@ -26,22 +24,9 @@ namespace ProjectVG.Infrastructure.Network.Services
         public event Action<string> OnSessionEnded;
         public event Action<string> OnSessionError;
         
-        private void Awake()
+        protected override void Awake()
         {
-            InitializeSingleton();
-        }
-        
-        private void InitializeSingleton()
-        {
-            if (Instance == null)
-            {
-                Instance = this;
-                DontDestroyOnLoad(gameObject);
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
+            base.Awake();
         }
         
         private void Start()
@@ -56,7 +41,6 @@ namespace ProjectVG.Infrastructure.Network.Services
                 
             try
             {
-                // WebSocketManager가 반드시 존재해야 함
                 if (_webSocketManager == null)
                 {
                     _webSocketManager = WebSocketManager.Instance;
@@ -66,7 +50,6 @@ namespace ProjectVG.Infrastructure.Network.Services
                     }
                 }
                 
-                // 강한 결합: WebSocketManager 이벤트에 직접 구독
                 _webSocketManager.OnConnected += OnWebSocketConnected;
                 _webSocketManager.OnDisconnected += OnWebSocketDisconnected;
                 _webSocketManager.OnError += OnWebSocketError;
@@ -185,6 +168,5 @@ namespace ProjectVG.Infrastructure.Network.Services
                 _webSocketManager.OnError -= OnWebSocketError;
             }
         }
-        
     }
 } 

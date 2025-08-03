@@ -5,10 +5,7 @@ using System.Collections.Generic;
 
 namespace ProjectVG.Core.Audio
 {
-    /// <summary>
-    /// 음성 녹음 기능을 제공하는 클래스
-    /// </summary>
-    public class AudioRecorder : MonoBehaviour
+    public class AudioRecorder : Singleton<AudioRecorder>
     {
         [Header("Recording Settings")]
         [SerializeField] private int _sampleRate = 44100;
@@ -20,8 +17,6 @@ namespace ProjectVG.Core.Audio
         private float _recordingStartTime;
         private List<float> _audioBuffer;
         
-        public static AudioRecorder Instance { get; private set; }
-        
         public bool IsRecording => _isRecording;
         public float RecordingDuration => _isRecording ? Time.time - _recordingStartTime : 0f;
         public bool IsRecordingAvailable => Microphone.devices.Length > 0;
@@ -31,29 +26,12 @@ namespace ProjectVG.Core.Audio
         public event Action<AudioClip>? OnRecordingCompleted;
         public event Action<string>? OnError;
         
-        private void Awake()
+        protected override void Awake()
         {
-            InitializeSingleton();
+            base.Awake();
             _audioBuffer = new List<float>();
         }
         
-        private void InitializeSingleton()
-        {
-            if (Instance == null)
-            {
-                Instance = this;
-                DontDestroyOnLoad(gameObject);
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
-        }
-        
-        /// <summary>
-        /// 녹음 시작
-        /// </summary>
-        /// <returns>녹음 시작 성공 여부</returns>
         public bool StartRecording()
         {
             if (_isRecording)
@@ -75,7 +53,6 @@ namespace ProjectVG.Core.Audio
                 _recordingStartTime = Time.time;
                 _audioBuffer.Clear();
                 
-                // 마이크에서 녹음 시작
                 _recordingClip = Microphone.Start(null, false, _maxRecordingLength, _sampleRate);
                 
                 OnRecordingStarted?.Invoke();
@@ -92,10 +69,6 @@ namespace ProjectVG.Core.Audio
             }
         }
         
-        /// <summary>
-        /// 녹음 중지
-        /// </summary>
-        /// <returns>녹음된 AudioClip</returns>
         public AudioClip? StopRecording()
         {
             if (!_isRecording)
@@ -108,10 +81,8 @@ namespace ProjectVG.Core.Audio
             {
                 _isRecording = false;
                 
-                // 마이크 녹음 중지
                 Microphone.End(null);
                 
-                // 녹음된 데이터 처리
                 if (_recordingClip != null)
                 {
                     ProcessRecordingClip();
@@ -132,11 +103,6 @@ namespace ProjectVG.Core.Audio
             }
         }
         
-        /// <summary>
-        /// 녹음된 AudioClip을 byte 배열로 변환
-        /// </summary>
-        /// <param name="audioClip">변환할 AudioClip</param>
-        /// <returns>byte 배열</returns>
         public byte[] AudioClipToBytes(AudioClip audioClip)
         {
             if (audioClip == null)
@@ -144,11 +110,9 @@ namespace ProjectVG.Core.Audio
                 
             try
             {
-                // AudioClip의 샘플 데이터 가져오기
                 float[] samples = new float[audioClip.samples * audioClip.channels];
                 audioClip.GetData(samples, 0);
                 
-                // float 배열을 byte 배열로 변환 (16비트 PCM)
                 byte[] audioBytes = new byte[samples.Length * 2];
                 for (int i = 0; i < samples.Length; i++)
                 {
@@ -165,15 +129,11 @@ namespace ProjectVG.Core.Audio
             }
         }
         
-        /// <summary>
-        /// 녹음된 AudioClip 처리
-        /// </summary>
         private void ProcessRecordingClip()
         {
             if (_recordingClip == null)
                 return;
                 
-            // 녹음된 실제 길이 계산
             int recordedLength = Microphone.GetPosition(null);
             if (recordedLength <= 0)
             {
@@ -181,7 +141,6 @@ namespace ProjectVG.Core.Audio
                 return;
             }
             
-            // 새로운 AudioClip 생성 (실제 녹음된 길이만큼)
             AudioClip processedClip = AudioClip.Create(
                 "RecordedAudio",
                 recordedLength,
@@ -190,7 +149,6 @@ namespace ProjectVG.Core.Audio
                 false
             );
             
-            // 데이터 복사
             float[] samples = new float[recordedLength * _recordingClip.channels];
             _recordingClip.GetData(samples, 0);
             processedClip.SetData(samples, 0);
@@ -198,9 +156,6 @@ namespace ProjectVG.Core.Audio
             _recordingClip = processedClip;
         }
         
-        /// <summary>
-        /// 녹음 시간 제한 체크
-        /// </summary>
         private void Update()
         {
             if (_isRecording && RecordingDuration >= _maxRecordingLength)
@@ -209,9 +164,6 @@ namespace ProjectVG.Core.Audio
             }
         }
         
-        /// <summary>
-        /// 녹음 중지 (자동 정리)
-        /// </summary>
         private void OnDestroy()
         {
             if (_isRecording)
@@ -220,19 +172,11 @@ namespace ProjectVG.Core.Audio
             }
         }
         
-        /// <summary>
-        /// 사용 가능한 마이크 목록 가져오기
-        /// </summary>
-        /// <returns>마이크 이름 배열</returns>
         public string[] GetAvailableMicrophones()
         {
             return Microphone.devices;
         }
         
-        /// <summary>
-        /// 기본 마이크 이름 가져오기
-        /// </summary>
-        /// <returns>기본 마이크 이름</returns>
         public string GetDefaultMicrophone()
         {
             string[] devices = Microphone.devices;

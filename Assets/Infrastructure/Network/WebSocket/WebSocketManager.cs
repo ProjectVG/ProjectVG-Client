@@ -14,7 +14,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ProjectVG.Infrastructure.Network.WebSocket
 {
-    public class WebSocketManager : MonoBehaviour, IManager
+    public class WebSocketManager : Singleton<WebSocketManager>, IManager
     {
         private INativeWebSocket _nativeWebSocket;
         private CancellationTokenSource _cancellationTokenSource;
@@ -34,8 +34,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         
         [Inject] private SessionManager _sessionManager;
 
-        public static WebSocketManager Instance { get; private set; }
-        
         public event Action OnConnected;
         public event Action OnDisconnected;
         public event Action<string> OnError;
@@ -47,26 +45,16 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         public bool AutoReconnect => _autoReconnect;
         public int ReconnectAttempts => _reconnectAttempts;
 
-        #region Lifecycle
-        private void Awake()
+        protected override void Awake()
         {
-            if (Instance == null)
-            {
-                Instance = this;
-                DontDestroyOnLoad(gameObject);
-                InitializeManager();
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
+            base.Awake();
+            InitializeManager();
         }
 
         private void OnDestroy()
         {
             Shutdown();
         }
-        #endregion
 
         public void Shutdown()
         {
@@ -178,7 +166,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             Debug.Log($"[WebSocket] 수신 버퍼 크기: {NetworkConfig.ReceiveBufferSize / 1024}KB");
         }
 
-        #region Private Initialization
         private void InitializeManager()
         {
             _cancellationTokenSource = new CancellationTokenSource();
@@ -195,9 +182,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _nativeWebSocket.OnError += OnNativeError;
             _nativeWebSocket.OnMessageReceived += OnNativeMessageReceived;
         }
-        #endregion
 
-        #region Private Connection Management
         private string GetWebSocketUrl(string sessionId = null)
         {
             string baseUrl = NetworkConfig.GetWebSocketUrl();
@@ -220,7 +205,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 
             _reconnectAttempts++;
             
-            // 지수적 백오프 계산
             float delay = _reconnectDelay;
             if (_useExponentialBackoff)
             {
@@ -243,7 +227,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             {
                 await UniTask.Delay(TimeSpan.FromSeconds(30), cancellationToken: _cancellationTokenSource.Token);
                 
-                // 연결이 끊어진 상태이고 재연결 시도 횟수가 남아있을 때만 재연결
                 if (!_isConnected && !_isConnecting && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts)
                 {
                     Debug.Log("[WebSocket] 연결 상태 확인 - 재연결 시도");
@@ -251,9 +234,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 }
             }
         }
-        #endregion
 
-        #region Private Event Handlers
         private void OnNativeConnected()
         {
             _isConnected = true;
@@ -299,9 +280,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 Debug.LogError($"원시 메시지: {message}");
             }
         }
-        #endregion
 
-        #region Private Message Processing
         private void ProcessBufferedMessage(string message)
         {
             lock (_bufferLock)
@@ -453,6 +432,5 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 Debug.LogError($"원시 데이터: {data}");
             }
         }
-        #endregion
     }
 } 

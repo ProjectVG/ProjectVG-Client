@@ -14,11 +14,7 @@ using ProjectVG.Core.Attributes;
 
 namespace ProjectVG.Infrastructure.Network.Http
 {
-    /// <summary>
-    /// HTTP API 클라이언트
-    /// UnityWebRequest를 사용하여 서버와 통신하며, UniTask 기반 비동기 처리를 지원합니다.
-    /// </summary>
-    public class HttpApiClient : MonoBehaviour, IManager
+    public class HttpApiClient : Singleton<HttpApiClient>, IManager
     {
         [Header("API Configuration")]
 
@@ -30,13 +26,10 @@ namespace ProjectVG.Infrastructure.Network.Http
         private CancellationTokenSource cancellationTokenSource;
         [Inject] private SessionManager _sessionManager;
 
-        public static HttpApiClient Instance { get; private set; }
-
-        #region Unity Lifecycle
-
-        private void Awake()
+        protected override void Awake()
         {
-            InitializeSingleton();
+            base.Awake();
+            InitializeClient();
         }
 
         private void OnDestroy()
@@ -44,38 +37,22 @@ namespace ProjectVG.Infrastructure.Network.Http
             Shutdown();
         }
 
-        #endregion
-
-        #region Public API
-
-        /// <summary>
-        /// 기본 헤더 추가
-        /// </summary>
         public void AddDefaultHeader(string key, string value)
         {
             defaultHeaders[key] = value;
         }
 
-        /// <summary>
-        /// 인증 토큰 설정
-        /// </summary>
         public void SetAuthToken(string token)
         {
             AddDefaultHeader(AUTHORIZATION_HEADER, $"{BEARER_PREFIX}{token}");
         }
 
-        /// <summary>
-        /// GET 요청 수행
-        /// </summary>
         public async UniTask<T> GetAsync<T>(string endpoint, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
         {
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
             return await SendRequestAsync<T>(url, UnityWebRequest.kHttpVerbGET, null, headers, cancellationToken);
         }
 
-        /// <summary>
-        /// POST 요청 수행
-        /// </summary>
         public async UniTask<T> PostAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, CancellationToken cancellationToken = default)
         {
             var url = GetFullUrl(endpoint);
@@ -84,9 +61,6 @@ namespace ProjectVG.Infrastructure.Network.Http
             return await SendRequestAsync<T>(url, UnityWebRequest.kHttpVerbPOST, jsonData, headers, cancellationToken);
         }
 
-        /// <summary>
-        /// PUT 요청 수행
-        /// </summary>
         public async UniTask<T> PutAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, CancellationToken cancellationToken = default)
         {
             var url = GetFullUrl(endpoint);
@@ -94,58 +68,28 @@ namespace ProjectVG.Infrastructure.Network.Http
             return await SendRequestAsync<T>(url, UnityWebRequest.kHttpVerbPUT, jsonData, headers, cancellationToken);
         }
 
-        /// <summary>
-        /// DELETE 요청 수행
-        /// </summary>
         public async UniTask<T> DeleteAsync<T>(string endpoint, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
         {
             var url = GetFullUrl(endpoint);
             return await SendRequestAsync<T>(url, UnityWebRequest.kHttpVerbDELETE, null, headers, cancellationToken);
         }
 
-        /// <summary>
-        /// 파일 업로드 요청 수행
-        /// </summary>
         public async UniTask<T> UploadFileAsync<T>(string endpoint, byte[] fileData, string fileName, string fieldName = "file", Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
         {
             var url = GetFullUrl(endpoint);
             return await SendFileRequestAsync<T>(url, fileData, fileName, fieldName, headers, cancellationToken);
         }
         
-        /// <summary>
-        /// 폼 데이터 POST 요청 수행
-        /// </summary>
         public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
         {
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
             return await SendFormDataRequestAsync<T>(url, formData, headers, cancellationToken);
         }
 
-        /// <summary>
-        /// 매니저 종료 처리
-        /// </summary>
         public void Shutdown()
         {
             cancellationTokenSource?.Cancel();
             cancellationTokenSource?.Dispose();
-        }
-
-        #endregion
-
-        #region Private Methods
-
-        private void InitializeSingleton()
-        {
-            if (Instance == null)
-            {
-                Instance = this;
-                DontDestroyOnLoad(gameObject);
-                InitializeClient();
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
         }
 
         private void InitializeClient()
@@ -470,13 +414,8 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             return responseCode >= 500 || responseCode == 429;
         }
-
-        #endregion
     }
 
-    /// <summary>
-    /// API 예외 클래스
-    /// </summary>
     public class ApiException : Exception
     {
         public long StatusCode { get; }
