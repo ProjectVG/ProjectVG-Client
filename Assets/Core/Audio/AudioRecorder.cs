@@ -12,7 +12,7 @@ namespace ProjectVG.Core.Audio
         [SerializeField] private int _channels = 1;
         [SerializeField] private int _maxRecordingLength = 30;
         
-        private AudioClip _recordingClip;
+        private AudioClip? _recordingClip;
         private bool _isRecording = false;
         private float _recordingStartTime;
         private List<float> _audioBuffer;

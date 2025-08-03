@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
@@ -20,7 +21,7 @@ public class ChatBubbleTestUI : MonoBehaviour
     [SerializeField] private string _userTestMessage = "Hello! I am a user.";
     [SerializeField] private string _characterTestMessage = "Hello! I am a character. The weather is really nice today.";
     [Range(0.5f, 5f)]
-    [SerializeField] private float _displayTime = 1.5f;  // 타이핑 완료 후 잔존 시간
+    [SerializeField] private float _displayTime = 1.5f;
     
     [Header("Sequence Test Settings")]
     [SerializeField] private string[] _sequenceMessages = {
@@ -33,7 +34,7 @@ public class ChatBubbleTestUI : MonoBehaviour
     [SerializeField] private float _sequenceDelay = 0.5f;
     [SerializeField] private float _rapidSequenceDelay = 0.2f;
     
-    private Coroutine _sequenceCoroutine;
+    private Coroutine? _sequenceCoroutine;
     
     private void Start()
     {
@@ -49,7 +50,7 @@ public class ChatBubbleTestUI : MonoBehaviour
         // ChatBubbleManager 자동 찾기
         if (_chatBubbleManager == null)
         {
-            _chatBubbleManager = FindObjectOfType<ChatBubbleManager>();
+            _chatBubbleManager = FindAnyObjectByType<ChatBubbleManager>();
             if (_chatBubbleManager == null)
             {
                 Debug.LogError("ChatBubbleManager를 찾을 수 없습니다!");

@@ -187,7 +187,7 @@ namespace ProjectVG.Domain.Chat.Service
             {
                 while (true)
                 {
-                    ChatMessage message = null;
+                    ChatMessage message;
                     
                     lock (_queueLock)
                     {

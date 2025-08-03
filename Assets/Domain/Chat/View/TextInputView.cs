@@ -13,7 +13,7 @@ namespace ProjectVG.Domain.Chat.View
         [SerializeField] private TMP_InputField _inputField;
         [SerializeField] private Button _btnSend;
         
-        private ChatManager _chatManager;
+        private ChatManager? _chatManager;
         
         public event Action<string>? OnTextMessageSent;
         public event Action<string>? OnError;

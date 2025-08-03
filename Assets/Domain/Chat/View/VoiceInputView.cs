@@ -23,7 +23,7 @@ namespace ProjectVG.Domain.Chat.View
         
         private ChatManager _chatManager;
         private AudioRecorder _audioRecorder;
-        private ISTTService _sttService;
+        private ISTTService? _sttService;
         private bool _isRecording = false;
         private float _recordingStartTime;
         

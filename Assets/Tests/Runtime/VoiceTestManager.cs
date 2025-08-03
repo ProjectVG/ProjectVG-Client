@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEngine;
 using ProjectVG.Core.Audio;
 using ProjectVG.Domain.Chat.Model;

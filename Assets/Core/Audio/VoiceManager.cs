@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using UnityEngine;
 using ProjectVG.Domain.Chat.Model;
@@ -21,9 +22,9 @@ namespace ProjectVG.Core.Audio
         public float Volume => _volume;
         public VoiceData? CurrentVoice => _currentVoice;
         
-        public event Action OnVoiceFinished;
-        public event Action<VoiceData> OnVoiceStarted;
-        public event Action OnVoiceStopped;
+        public event Action? OnVoiceFinished;
+        public event Action<VoiceData>? OnVoiceStarted;
+        public event Action? OnVoiceStopped;
         
         #region Unity Lifecycle
         
