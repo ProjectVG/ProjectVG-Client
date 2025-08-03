@@ -26,11 +26,33 @@ namespace ProjectVG.Core.Audio
         public event Action<AudioClip>? OnRecordingCompleted;
         public event Action<string>? OnError;
         
+        #region Unity Lifecycle
+        
         protected override void Awake()
         {
             base.Awake();
             _audioBuffer = new List<float>();
         }
+        
+        private void Update()
+        {
+            if (_isRecording && RecordingDuration >= _maxRecordingLength)
+            {
+                StopRecording();
+            }
+        }
+        
+        private void OnDestroy()
+        {
+            if (_isRecording)
+            {
+                StopRecording();
+            }
+        }
+        
+        #endregion
+        
+        #region Public Methods
         
         public bool StartRecording()
         {
@@ -129,6 +151,21 @@ namespace ProjectVG.Core.Audio
             }
         }
         
+        public string[] GetAvailableMicrophones()
+        {
+            return Microphone.devices;
+        }
+        
+        public string GetDefaultMicrophone()
+        {
+            string[] devices = Microphone.devices;
+            return devices.Length > 0 ? devices[0] : string.Empty;
+        }
+        
+        #endregion
+        
+        #region Private Methods
+        
         private void ProcessRecordingClip()
         {
             if (_recordingClip == null)
@@ -156,31 +193,6 @@ namespace ProjectVG.Core.Audio
             _recordingClip = processedClip;
         }
         
-        private void Update()
-        {
-            if (_isRecording && RecordingDuration >= _maxRecordingLength)
-            {
-                StopRecording();
-            }
-        }
-        
-        private void OnDestroy()
-        {
-            if (_isRecording)
-            {
-                StopRecording();
-            }
-        }
-        
-        public string[] GetAvailableMicrophones()
-        {
-            return Microphone.devices;
-        }
-        
-        public string GetDefaultMicrophone()
-        {
-            string[] devices = Microphone.devices;
-            return devices.Length > 0 ? devices[0] : string.Empty;
-        }
+        #endregion
     }
 } 

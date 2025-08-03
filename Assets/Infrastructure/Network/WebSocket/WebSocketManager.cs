@@ -44,25 +44,23 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         public string SessionId => _sessionId;
         public bool AutoReconnect => _autoReconnect;
         public int ReconnectAttempts => _reconnectAttempts;
-
+        
+        #region Unity Lifecycle
+        
         protected override void Awake()
         {
             base.Awake();
-            InitializeManager();
+            Initialize();
         }
 
         private void OnDestroy()
         {
             Shutdown();
         }
-
-        public void Shutdown()
-        {
-            _autoReconnect = false;
-            DisconnectAsync().Forget();
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource?.Dispose();
-        }
+        
+        #endregion
+        
+        #region Public Methods
         
         public async UniTask<bool> ConnectAsync(string sessionId = null, CancellationToken cancellationToken = default)
         {
@@ -166,7 +164,19 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             Debug.Log($"[WebSocket] 수신 버퍼 크기: {NetworkConfig.ReceiveBufferSize / 1024}KB");
         }
 
-        private void InitializeManager()
+        public void Shutdown()
+        {
+            _autoReconnect = false;
+            DisconnectAsync().Forget();
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
+        }
+        
+        #endregion
+        
+        #region Private Methods
+        
+        private void Initialize()
         {
             _cancellationTokenSource = new CancellationTokenSource();
             InitializeNativeWebSocket();
@@ -432,5 +442,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 Debug.LogError($"원시 데이터: {data}");
             }
         }
+        
+        #endregion
     }
 } 

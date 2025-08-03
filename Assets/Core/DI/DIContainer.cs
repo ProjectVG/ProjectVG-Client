@@ -9,6 +9,17 @@ namespace ProjectVG.Core.DI
     {
         private readonly Dictionary<Type, object> _services = new Dictionary<Type, object>();
         
+        #region Unity Lifecycle
+        
+        protected override void Awake()
+        {
+            base.Awake();
+        }
+        
+        #endregion
+        
+        #region Public Methods
+        
         public void Register<T>(T service)
         {
             _services[typeof(T)] = service;
@@ -53,6 +64,10 @@ namespace ProjectVG.Core.DI
             }
         }
         
+        #endregion
+        
+        #region Private Methods
+        
         private object GetService(Type serviceType)
         {
             if (_services.TryGetValue(serviceType, out var service))
@@ -61,5 +76,7 @@ namespace ProjectVG.Core.DI
             }
             return null;
         }
+        
+        #endregion
     }
 } 

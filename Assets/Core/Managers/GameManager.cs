@@ -31,6 +31,8 @@ namespace ProjectVG.Core.Managers
         public event Action OnGameInitialized;
         public event Action<string> OnInitializationError;
         
+        #region Unity Lifecycle
+        
         protected override void Awake()
         {
             base.Awake();
@@ -41,8 +43,12 @@ namespace ProjectVG.Core.Managers
         
         private void OnDestroy()
         {
-            ShutdownGame();
+            Shutdown();
         }
+        
+        #endregion
+        
+        #region Public Methods
         
         public async void InitializeGame()
         {
@@ -56,7 +62,7 @@ namespace ProjectVG.Core.Managers
             
             try
             {
-                InitializeManagers();
+                Initialize();
                 SetupDependencies();
                 await TryConnectSessionAsync();
                 
@@ -72,7 +78,91 @@ namespace ProjectVG.Core.Managers
             }
         }
         
-        private void InitializeManagers()
+        public async UniTask<bool> TryConnectSessionAsync()
+        {
+            if (_sessionManager == null)
+            {
+                Debug.LogError("SessionManager가 초기화되지 않았습니다.");
+                return false;
+            }
+            
+            try
+            {
+                Debug.Log("세션 연결 시도 중...");
+                
+                if (_webSocketManager != null && !_webSocketManager.IsConnected)
+                {
+                    bool webSocketConnected = await _webSocketManager.ConnectAsync();
+                    if (!webSocketConnected)
+                    {
+                        Debug.LogError("WebSocket 연결 실패");
+                        return false;
+                    }
+                }
+                
+                Debug.Log("WebSocket 연결 완료 - 세션 ID 자동 수신 대기 중");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"세션 연결 중 오류 발생: {ex.Message}");
+                return false;
+            }
+        }
+        
+        public void Shutdown()
+        {
+            if (!_isInitialized) return;
+            
+            Debug.Log("게임 종료 처리 시작...");
+            
+            for (int i = _managers.Count - 1; i >= 0; i--)
+            {
+                try
+                {
+                    _managers[i]?.Shutdown();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"매니저 종료 중 오류: {ex.Message}");
+                }
+            }
+            
+            _managers.Clear();
+            _isInitialized = false;
+            
+            Debug.Log("게임 종료 처리 완료");
+        }
+        
+        public bool AreManagersReady()
+        {
+            return _webSocketManager != null && 
+                   _sessionManager != null && 
+                   _httpApiClient != null;
+        }
+        
+        public bool IsSessionConnected()
+        {
+            return _sessionManager != null && _sessionManager.IsSessionConnected;
+        }
+        
+        [ContextMenu("Log Manager Status")]
+        public void LogManagerStatus()
+        {
+            Debug.Log("=== 매니저 상태 ===");
+            Debug.Log($"GameManager 초기화: {_isInitialized}");
+            Debug.Log($"WebSocketManager: {(_webSocketManager != null ? "존재함" : "없음")}");
+            Debug.Log($"SessionManager: {(_sessionManager != null ? "존재함" : "없음")}");
+            Debug.Log($"HttpApiClient: {(_httpApiClient != null ? "존재함" : "없음")}");
+            Debug.Log($"매니저 준비 상태: {(AreManagersReady() ? "준비됨" : "미준비")}");
+            Debug.Log($"세션 연결 상태: {(IsSessionConnected() ? "연결됨" : "미연결")}");
+        }
+        
+        #endregion
+        
+        #region Private Methods
+        
+        private void Initialize()
         {
             InitializeWebSocketManager();
             InitializeSessionManager();
@@ -162,85 +252,7 @@ namespace ProjectVG.Core.Managers
             }
         }
         
-        public async UniTask<bool> TryConnectSessionAsync()
-        {
-            if (_sessionManager == null)
-            {
-                Debug.LogError("SessionManager가 초기화되지 않았습니다.");
-                return false;
-            }
-            
-            try
-            {
-                Debug.Log("세션 연결 시도 중...");
-                
-                if (_webSocketManager != null && !_webSocketManager.IsConnected)
-                {
-                    bool webSocketConnected = await _webSocketManager.ConnectAsync();
-                    if (!webSocketConnected)
-                    {
-                        Debug.LogError("WebSocket 연결 실패");
-                        return false;
-                    }
-                }
-                
-                Debug.Log("WebSocket 연결 완료 - 세션 ID 자동 수신 대기 중");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"세션 연결 중 오류 발생: {ex.Message}");
-                return false;
-            }
-        }
-        
-        public void ShutdownGame()
-        {
-            if (!_isInitialized) return;
-            
-            Debug.Log("게임 종료 처리 시작...");
-            
-            for (int i = _managers.Count - 1; i >= 0; i--)
-            {
-                try
-                {
-                    _managers[i]?.Shutdown();
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"매니저 종료 중 오류: {ex.Message}");
-                }
-            }
-            
-            _managers.Clear();
-            _isInitialized = false;
-            
-            Debug.Log("게임 종료 처리 완료");
-        }
-        
-        public bool AreManagersReady()
-        {
-            return _webSocketManager != null && 
-                   _sessionManager != null && 
-                   _httpApiClient != null;
-        }
-        
-        public bool IsSessionConnected()
-        {
-            return _sessionManager != null && _sessionManager.IsSessionConnected;
-        }
-        
-        [ContextMenu("Log Manager Status")]
-        public void LogManagerStatus()
-        {
-            Debug.Log("=== 매니저 상태 ===");
-            Debug.Log($"GameManager 초기화: {_isInitialized}");
-            Debug.Log($"WebSocketManager: {(_webSocketManager != null ? "존재함" : "없음")}");
-            Debug.Log($"SessionManager: {(_sessionManager != null ? "존재함" : "없음")}");
-            Debug.Log($"HttpApiClient: {(_httpApiClient != null ? "존재함" : "없음")}");
-            Debug.Log($"매니저 준비 상태: {(AreManagersReady() ? "준비됨" : "미준비")}");
-            Debug.Log($"세션 연결 상태: {(IsSessionConnected() ? "연결됨" : "미연결")}");
-        }
+        #endregion
     }
     
     public interface IManager

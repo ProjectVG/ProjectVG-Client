@@ -85,116 +85,30 @@ namespace ProjectVG.Domain.Chat.View
         public bool IsTyping => _isTyping;
         public bool IsToastAnimationComplete => _isToastAnimationComplete;
         
+        #region Unity Lifecycle
+        
         private void Awake()
         {
-            InitializeComponents();
+            Initialize();
         }
         
-        /// <summary>
-        /// 컴포넌트 초기화 - Unity 베스트 프랙티스 적용
-        /// </summary>
-        private void InitializeComponents()
+        private void OnDestroy()
         {
-            if (_rectTransform == null)
-                _rectTransform = GetComponent<RectTransform>();
-                
-            _canvasGroup = GetOrCreateCanvasGroup();
-                
-            if (_textComponent == null)
-                _textComponent = GetComponentInChildren<TextMeshProUGUI>();
-                
-            if (_backgroundImage == null)
-                _backgroundImage = GetComponent<Image>();
-            
-            SetupLayoutComponents();
-                
-            ValidateComponents();
-        }
-        
-        /// <summary>
-        /// Layout 컴포넌트 자동 설정
-        /// </summary>
-        private void SetupLayoutComponents()
-        {
-            if (_contentSizeFitter == null)
+            if (_typingCoroutine != null)
             {
-                _contentSizeFitter = GetComponent<ContentSizeFitter>();
-                if (_contentSizeFitter == null)
-                {
-                    _contentSizeFitter = gameObject.AddComponent<ContentSizeFitter>();
-                    Debug.Log($"ChatBubbleUI에 ContentSizeFitter가 자동으로 추가되었습니다: {gameObject.name}");
-                }
+                StopCoroutine(_typingCoroutine);
             }
             
-            if (_layoutElement == null)
+            if (_animationCoroutine != null)
             {
-                _layoutElement = GetComponent<LayoutElement>();
-                if (_layoutElement == null)
-                {
-                    _layoutElement = gameObject.AddComponent<LayoutElement>();
-                    Debug.Log($"ChatBubbleUI에 LayoutElement가 자동으로 추가되었습니다: {gameObject.name}");
-                }
+                StopCoroutine(_animationCoroutine);
             }
         }
         
-        /// <summary>
-        /// CanvasGroup 가져오기 또는 생성
-        /// </summary>
-        private CanvasGroup GetOrCreateCanvasGroup()
-        {
-            CanvasGroup canvasGroup = GetComponent<CanvasGroup>();
-            if (canvasGroup == null)
-            {
-                canvasGroup = gameObject.AddComponent<CanvasGroup>();
-                Debug.Log($"ChatBubbleUI에 CanvasGroup 컴포넌트가 자동으로 추가되었습니다: {gameObject.name}");
-            }
-            return canvasGroup;
-        }
+        #endregion
         
-        /// <summary>
-        /// 필수 컴포넌트 검증
-        /// </summary>
-        private void ValidateComponents()
-        {
-            if (_rectTransform == null)
-            {
-                Debug.LogError($"ChatBubbleUI에 RectTransform이 없습니다: {gameObject.name}");
-            }
-            
-            if (_textComponent == null)
-            {
-                Debug.LogWarning($"ChatBubbleUI에 TextMeshProUGUI가 없습니다: {gameObject.name}");
-            }
-            
-            if (_backgroundImage == null)
-            {
-                Debug.LogWarning($"ChatBubbleUI에 Image 컴포넌트가 없습니다: {gameObject.name}");
-            }
-        }
+        #region Public Methods
         
-        /// <summary>
-        /// 이징 타입에 따른 이징 함수 반환
-        /// </summary>
-        private float GetEasing(float t, EasingType easingType)
-        {
-            switch (easingType)
-            {
-                case EasingType.Bounce:
-                    return EaseOutBounce(t);
-                case EasingType.Quart:
-                    return EaseOutQuart(t);
-                case EasingType.Back:
-                    return EaseOutBack(t);
-                case EasingType.Elastic:
-                    return EaseOutElastic(t);
-                default:
-                    return EaseOutQuart(t);
-            }
-        }
-        
-        /// <summary>
-        /// 버블 초기화
-        /// </summary>
         public void Initialize(Actor actor, string text, float displayTime, ChatBubbleManager manager = null)
         {
             _actor = actor;
@@ -204,7 +118,6 @@ namespace ProjectVG.Domain.Chat.View
             
             ApplyStyle();
             
-            // 레이아웃 업데이트 후 원본 위치 저장
             Canvas.ForceUpdateCanvases();
             _originalPosition = _rectTransform.localPosition;
             _originalScale = _rectTransform.localScale;
@@ -228,9 +141,152 @@ namespace ProjectVG.Domain.Chat.View
             Debug.Log($"ChatBubbleUI 초기화: {actor} - {text}");
         }
         
-        /// <summary>
-        /// 스타일 적용
-        /// </summary>
+        public void StartQueueSlideAnimation()
+        {
+            if (!_isToastAnimationComplete) return;
+            
+            if (_animationCoroutine != null)
+            {
+                StopCoroutine(_animationCoroutine);
+            }
+            
+            _animationCoroutine = StartCoroutine(QueueSlideAnimation());
+        }
+        
+        public void CompleteTyping()
+        {
+            if (_typingCoroutine != null)
+            {
+                StopCoroutine(_typingCoroutine);
+                _typingCoroutine = null;
+            }
+            
+            _isTyping = false;
+            _typingProgress = 1f;
+            
+            if (_textComponent != null)
+            {
+                _textComponent.text = _fullText;
+            }
+            
+            Debug.Log($"ChatBubbleUI 타이핑 완료: {_actor} - {_fullText}");
+            OnBubbleTypingComplete?.Invoke(this);
+            
+            StartAutoDestroy();
+        }
+        
+        public void StartFadeOut()
+        {
+            if (_isAnimating) return;
+            
+            Debug.Log($"ChatBubbleUI 페이드아웃 시작: {_actor}");
+            StartCoroutine(FadeOutAnimation());
+        }
+        
+        public void ForceComplete()
+        {
+            if (_isTyping)
+            {
+                CompleteTyping();
+            }
+        }
+        
+        public void ForceDestroy()
+        {
+            StartFadeOut();
+        }
+        
+        #endregion
+        
+        #region Private Methods
+        
+        private void Initialize()
+        {
+            if (_rectTransform == null)
+                _rectTransform = GetComponent<RectTransform>();
+                
+            _canvasGroup = GetOrCreateCanvasGroup();
+                
+            if (_textComponent == null)
+                _textComponent = GetComponentInChildren<TextMeshProUGUI>();
+                
+            if (_backgroundImage == null)
+                _backgroundImage = GetComponent<Image>();
+            
+            SetupLayoutComponents();
+                
+            ValidateComponents();
+        }
+        
+        private void SetupLayoutComponents()
+        {
+            if (_contentSizeFitter == null)
+            {
+                _contentSizeFitter = GetComponent<ContentSizeFitter>();
+                if (_contentSizeFitter == null)
+                {
+                    _contentSizeFitter = gameObject.AddComponent<ContentSizeFitter>();
+                    Debug.Log($"ChatBubbleUI에 ContentSizeFitter가 자동으로 추가되었습니다: {gameObject.name}");
+                }
+            }
+            
+            if (_layoutElement == null)
+            {
+                _layoutElement = GetComponent<LayoutElement>();
+                if (_layoutElement == null)
+                {
+                    _layoutElement = gameObject.AddComponent<LayoutElement>();
+                    Debug.Log($"ChatBubbleUI에 LayoutElement가 자동으로 추가되었습니다: {gameObject.name}");
+                }
+            }
+        }
+        
+        private CanvasGroup GetOrCreateCanvasGroup()
+        {
+            CanvasGroup canvasGroup = GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+            {
+                canvasGroup = gameObject.AddComponent<CanvasGroup>();
+                Debug.Log($"ChatBubbleUI에 CanvasGroup 컴포넌트가 자동으로 추가되었습니다: {gameObject.name}");
+            }
+            return canvasGroup;
+        }
+        
+        private void ValidateComponents()
+        {
+            if (_rectTransform == null)
+            {
+                Debug.LogError($"ChatBubbleUI에 RectTransform이 없습니다: {gameObject.name}");
+            }
+            
+            if (_textComponent == null)
+            {
+                Debug.LogWarning($"ChatBubbleUI에 TextMeshProUGUI가 없습니다: {gameObject.name}");
+            }
+            
+            if (_backgroundImage == null)
+            {
+                Debug.LogWarning($"ChatBubbleUI에 Image 컴포넌트가 없습니다: {gameObject.name}");
+            }
+        }
+        
+        private float GetEasing(float t, EasingType easingType)
+        {
+            switch (easingType)
+            {
+                case EasingType.Bounce:
+                    return EaseOutBounce(t);
+                case EasingType.Quart:
+                    return EaseOutQuart(t);
+                case EasingType.Back:
+                    return EaseOutBack(t);
+                case EasingType.Elastic:
+                    return EaseOutElastic(t);
+                default:
+                    return EaseOutQuart(t);
+            }
+        }
+        
         private void ApplyStyle()
         {
             if (_backgroundImage != null)
@@ -241,9 +297,6 @@ namespace ProjectVG.Domain.Chat.View
             Debug.Log($"ChatBubbleUI 스타일 적용 완료: {_actor}");
         }
         
-        /// <summary>
-        /// 토스트 애니메이션 시작
-        /// </summary>
         private void StartToastAnimation()
         {
             if (_isAnimating) return;
@@ -261,9 +314,6 @@ namespace ProjectVG.Domain.Chat.View
             _animationCoroutine = StartCoroutine(ToastBounceAnimation());
         }
         
-        /// <summary>
-        /// 애니메이션 초기화
-        /// </summary>
         private void InitializeAnimation()
         {
             if (_canvasGroup != null)
@@ -271,20 +321,15 @@ namespace ProjectVG.Domain.Chat.View
                 _canvasGroup.alpha = 0f;
             }
             
-            // 시작 위치 설정 (아래에서 시작)
             Vector3 startPosition = _originalPosition;
             startPosition.y -= _toastBounceHeight;
             _rectTransform.localPosition = startPosition;
             
-            // 시작 스케일 설정 (작게 시작)
             _rectTransform.localScale = Vector3.zero;
             
             Debug.Log($"ChatBubbleUI 애니메이션 초기화 완료: {_actor}");
         }
         
-        /// <summary>
-        /// 토스트 튀어오르기 애니메이션
-        /// </summary>
         private IEnumerator ToastBounceAnimation()
         {
             float elapsed = 0f;
@@ -295,7 +340,6 @@ namespace ProjectVG.Domain.Chat.View
             Vector3 startScale = Vector3.zero;
             Vector3 targetScale = _originalScale;
             
-            // 첫 번째 단계: 튀어오르기
             while (elapsed < duration * 0.6f)
             {
                 elapsed += Time.deltaTime;
@@ -313,7 +357,6 @@ namespace ProjectVG.Domain.Chat.View
                 yield return null;
             }
             
-            // 두 번째 단계: 살짝 튀어오르기
             Vector3 bouncePosition = targetPosition;
             Vector3 bounceScale = targetScale;
             
@@ -340,7 +383,6 @@ namespace ProjectVG.Domain.Chat.View
                 yield return null;
             }
             
-            // 최종 위치로 복귀
             elapsed = 0f;
             Vector3 finalStartPos = _rectTransform.localPosition;
             Vector3 finalStartScale = _rectTransform.localScale;
@@ -357,7 +399,6 @@ namespace ProjectVG.Domain.Chat.View
                 yield return null;
             }
             
-            // 최종 상태 설정
             _rectTransform.localPosition = _originalPosition;
             _rectTransform.localScale = _originalScale;
             if (_canvasGroup != null)
@@ -374,34 +415,13 @@ namespace ProjectVG.Domain.Chat.View
             StartTextAnimation();
         }
         
-        /// <summary>
-        /// 큐 슬라이드 애니메이션 (다른 버블이 생성될 때 호출)
-        /// </summary>
-        public void StartQueueSlideAnimation()
-        {
-            if (!_isToastAnimationComplete) return;
-            
-            if (_animationCoroutine != null)
-            {
-                StopCoroutine(_animationCoroutine);
-            }
-            
-            _animationCoroutine = StartCoroutine(QueueSlideAnimation());
-        }
-        
-        /// <summary>
-        /// 큐 슬라이드 애니메이션
-        /// </summary>
         private IEnumerator QueueSlideAnimation()
         {
-            // 현재 위치를 시작 위치로 설정
             Vector3 startPosition = _rectTransform.localPosition;
             
-            // 레이아웃 업데이트 후 새로운 위치 계산
             Canvas.ForceUpdateCanvases();
             Vector3 targetPosition = _rectTransform.localPosition;
             
-            // 시작 위치를 원래 위치로 복원
             _rectTransform.localPosition = startPosition;
             
             float elapsed = 0f;
@@ -424,9 +444,6 @@ namespace ProjectVG.Domain.Chat.View
             Debug.Log($"ChatBubbleUI 큐 슬라이드 애니메이션 완료: {_actor}");
         }
         
-        /// <summary>
-        /// 텍스트 애니메이션 시작
-        /// </summary>
         private void StartTextAnimation()
         {
             if (_textComponent == null) return;
@@ -450,9 +467,6 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        /// <summary>
-        /// 텍스트 타이핑 애니메이션
-        /// </summary>
         private IEnumerator TypeText()
         {
             int totalCharacters = _fullText.Length;
@@ -473,35 +487,6 @@ namespace ProjectVG.Domain.Chat.View
             CompleteTyping();
         }
         
-        /// <summary>
-        /// 타이핑 완료
-        /// </summary>
-        public void CompleteTyping()
-        {
-            if (_typingCoroutine != null)
-            {
-                StopCoroutine(_typingCoroutine);
-                _typingCoroutine = null;
-            }
-            
-            _isTyping = false;
-            _typingProgress = 1f;
-            
-            if (_textComponent != null)
-            {
-                _textComponent.text = _fullText;
-            }
-            
-            Debug.Log($"ChatBubbleUI 타이핑 완료: {_actor} - {_fullText}");
-            OnBubbleTypingComplete?.Invoke(this);
-            
-            // 자동 삭제 시작
-            StartAutoDestroy();
-        }
-        
-        /// <summary>
-        /// 자동 삭제 시작
-        /// </summary>
         private void StartAutoDestroy()
         {
             if (_enableAutoDestroy && _displayTime > 0f)
@@ -510,9 +495,6 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        /// <summary>
-        /// 자동 삭제 코루틴
-        /// </summary>
         private IEnumerator AutoDestroyCoroutine()
         {
             yield return new WaitForSeconds(_displayTime);
@@ -521,20 +503,6 @@ namespace ProjectVG.Domain.Chat.View
             StartFadeOut();
         }
         
-        /// <summary>
-        /// 페이드아웃 시작
-        /// </summary>
-        public void StartFadeOut()
-        {
-            if (_isAnimating) return;
-            
-            Debug.Log($"ChatBubbleUI 페이드아웃 시작: {_actor}");
-            StartCoroutine(FadeOutAnimation());
-        }
-        
-        /// <summary>
-        /// 페이드아웃 애니메이션 (알파만 조작)
-        /// </summary>
         private IEnumerator FadeOutAnimation()
         {
             _isAnimating = true;
@@ -570,28 +538,6 @@ namespace ProjectVG.Domain.Chat.View
             Destroy(gameObject);
         }
         
-        /// <summary>
-        /// 강제 완료 (디버깅용)
-        /// </summary>
-        public void ForceComplete()
-        {
-            if (_isTyping)
-            {
-                CompleteTyping();
-            }
-        }
-        
-        /// <summary>
-        /// 강제 제거 (디버깅용)
-        /// </summary>
-        public void ForceDestroy()
-        {
-            StartFadeOut();
-        }
-        
-        /// <summary>
-        /// EaseOutBounce 이징 함수
-        /// </summary>
         private float EaseOutBounce(float t)
         {
             if (t < 1f / 2.75f)
@@ -612,17 +558,11 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        /// <summary>
-        /// EaseOutQuart 이징 함수
-        /// </summary>
         private float EaseOutQuart(float t)
         {
             return 1f - Mathf.Pow(1f - t, 4f);
         }
         
-        /// <summary>
-        /// EaseOutBack 이징 함수 (튀어오르는 효과)
-        /// </summary>
         private float EaseOutBack(float t)
         {
             float c1 = 1.70158f;
@@ -630,9 +570,6 @@ namespace ProjectVG.Domain.Chat.View
             return 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);
         }
         
-        /// <summary>
-        /// EaseOutElastic 이징 함수 (탄성 효과)
-        /// </summary>
         private float EaseOutElastic(float t)
         {
             float c4 = (2f * Mathf.PI) / 3f;
@@ -641,17 +578,6 @@ namespace ProjectVG.Domain.Chat.View
             return Mathf.Pow(2f, -10f * t) * Mathf.Sin((t * 10f - 0.75f) * c4) + 1f;
         }
         
-        private void OnDestroy()
-        {
-            if (_typingCoroutine != null)
-            {
-                StopCoroutine(_typingCoroutine);
-            }
-            
-            if (_animationCoroutine != null)
-            {
-                StopCoroutine(_animationCoroutine);
-            }
-        }
+        #endregion
     }
 } 

@@ -13,21 +13,19 @@ namespace ProjectVG.Infrastructure.Network.Services
 
         public ChatApiService Chat => _chatService ??= new ChatApiService();
         public CharacterApiService Character => _characterService ??= new CharacterApiService();
-
+        
+        #region Unity Lifecycle
+        
         protected override void Awake()
         {
             base.Awake();
-            InitializeServices();
+            Initialize();
         }
-
-        private void InitializeServices()
-        {
-            _chatService = new ChatApiService();
-            _characterService = new CharacterApiService();
-            
-            Debug.Log("API 서비스 매니저 초기화 완료");
-        }
-
+        
+        #endregion
+        
+        #region Public Methods
+        
         /// <summary>
         /// 모든 서비스 재초기화
         /// </summary>
@@ -38,5 +36,19 @@ namespace ProjectVG.Infrastructure.Network.Services
             
             Debug.Log("API 서비스 재초기화 완료");
         }
+        
+        #endregion
+        
+        #region Private Methods
+        
+        private void Initialize()
+        {
+            _chatService = new ChatApiService();
+            _characterService = new CharacterApiService();
+            
+            Debug.Log("API 서비스 매니저 초기화 완료");
+        }
+        
+        #endregion
     }
 } 

@@ -9,9 +9,6 @@ using ProjectVG.Core.Audio;
 
 namespace ProjectVG.Domain.Chat.View
 {
-    /// <summary>
-    /// 음성 입력 UI 컴포넌트
-    /// </summary>
     public class VoiceInputView : MonoBehaviour
     {
         [Header("UI Components")]
@@ -33,14 +30,41 @@ namespace ProjectVG.Domain.Chat.View
         public event Action<string>? OnVoiceMessageSent;
         public event Action<string>? OnError;
         
+        #region Unity Lifecycle
+        
         private void Start()
         {
             Initialize();
         }
         
-        /// <summary>
-        /// VoiceInputView 초기화
-        /// </summary>
+        private void Update()
+        {
+            if (_isRecording && Time.time - _recordingStartTime > _maxRecordingTime)
+            {
+                StopVoiceRecording();
+            }
+        }
+        
+        private void OnDestroy()
+        {
+            if (_isRecording)
+            {
+                StopVoiceRecording();
+            }
+            
+            if (_audioRecorder != null)
+            {
+                _audioRecorder.OnRecordingStarted -= OnRecordingStarted;
+                _audioRecorder.OnRecordingStopped -= OnRecordingStopped;
+                _audioRecorder.OnRecordingCompleted -= OnRecordingCompleted;
+                _audioRecorder.OnError -= OnRecordingError;
+            }
+        }
+        
+        #endregion
+        
+        #region Public Methods
+        
         public void Initialize()
         {
             SetupComponents();
@@ -49,11 +73,124 @@ namespace ProjectVG.Domain.Chat.View
             SetupChatManager();
         }
         
-        #region 초기화 설정
+        public void SetChatManager(ChatManager chatManager)
+        {
+            _chatManager = chatManager;
+        }
         
-        /// <summary>
-        /// 컴포넌트 설정
-        /// </summary>
+        public async void SendVoiceMessage(byte[] audioData)
+        {
+            if (audioData == null || audioData.Length == 0)
+                return;
+                
+            try
+            {
+                UpdateVoiceStatus(_voiceStatusProcessing);
+                
+                string transcribedText = await ConvertSpeechToText(audioData);
+                
+                if (!string.IsNullOrWhiteSpace(transcribedText))
+                {
+                    if (_chatManager != null)
+                    {
+                        _chatManager.SendUserMessage(transcribedText);
+                    }
+                    
+                    OnVoiceMessageSent?.Invoke(transcribedText);
+                }
+                else
+                {
+                    OnError?.Invoke("음성을 텍스트로 변환할 수 없습니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"음성 메시지 전송 실패: {ex.Message}");
+                OnError?.Invoke($"음성 메시지 전송 실패: {ex.Message}");
+            }
+            finally
+            {
+                UpdateVoiceStatus(string.Empty);
+            }
+        }
+        
+        public void StartVoiceRecording()
+        {
+            if (_isRecording)
+                return;
+                
+            if (_audioRecorder == null)
+            {
+                Debug.LogError("AudioRecorder가 없습니다.");
+                OnError?.Invoke("AudioRecorder가 없습니다.");
+                return;
+            }
+                
+            try
+            {
+                _isRecording = true;
+                _recordingStartTime = Time.time;
+                UpdateVoiceButtonState(true);
+                UpdateVoiceStatus(_voiceStatusRecording);
+                
+                bool success = _audioRecorder.StartRecording();
+                if (!success)
+                {
+                    _isRecording = false;
+                    UpdateVoiceButtonState(false);
+                    UpdateVoiceStatus(string.Empty);
+                }
+                
+                Debug.Log("음성 녹음 시작");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"음성 녹음 시작 실패: {ex.Message}");
+                OnError?.Invoke($"음성 녹음 시작 실패: {ex.Message}");
+                StopVoiceRecording();
+            }
+        }
+        
+        public void StopVoiceRecording()
+        {
+            if (!_isRecording)
+                return;
+                
+            if (_audioRecorder == null)
+            {
+                Debug.LogError("AudioRecorder가 없습니다.");
+                return;
+            }
+                
+            try
+            {
+                _isRecording = false;
+                UpdateVoiceButtonState(false);
+                UpdateVoiceStatus(string.Empty);
+                
+                AudioClip recordedClip = _audioRecorder.StopRecording();
+                if (recordedClip != null)
+                {
+                    byte[] audioData = _audioRecorder.AudioClipToBytes(recordedClip);
+                    if (audioData.Length > 0)
+                    {
+                        SendVoiceMessage(audioData);
+                    }
+                }
+                
+                Debug.Log("음성 녹음 중지");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"음성 녹음 중지 실패: {ex.Message}");
+                OnError?.Invoke($"음성 녹음 중지 실패: {ex.Message}");
+            }
+        }
+        
+        #endregion
+        
+        #region Private Methods
+        
         private void SetupComponents()
         {
             if (_btnVoice == null)
@@ -103,9 +240,6 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        /// <summary>
-        /// 이벤트 핸들러 설정
-        /// </summary>
         private void SetupEventHandlers()
         {
             if (_btnVoice != null)
@@ -123,18 +257,6 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        /// <summary>
-        /// ChatManager 설정
-        /// </summary>
-        /// <param name="chatManager">설정할 ChatManager</param>
-        public void SetChatManager(ChatManager chatManager)
-        {
-            _chatManager = chatManager;
-        }
-        
-        /// <summary>
-        /// ChatManager 자동 설정 (null인 경우 자동 생성)
-        /// </summary>
         public void SetupChatManager()
         {
             if (_chatManager == null)
@@ -151,133 +273,6 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        #endregion
-        
-        /// <summary>
-        /// 음성 메시지 전송
-        /// </summary>
-        /// <param name="audioData">음성 데이터</param>
-        public async void SendVoiceMessage(byte[] audioData)
-        {
-            if (audioData == null || audioData.Length == 0)
-                return;
-                
-            try
-            {
-                UpdateVoiceStatus(_voiceStatusProcessing);
-                
-                string transcribedText = await ConvertSpeechToText(audioData);
-                
-                if (!string.IsNullOrWhiteSpace(transcribedText))
-                {
-                    if (_chatManager != null)
-                    {
-                        _chatManager.SendUserMessage(transcribedText);
-                    }
-                    
-                    OnVoiceMessageSent?.Invoke(transcribedText);
-                }
-                else
-                {
-                    OnError?.Invoke("음성을 텍스트로 변환할 수 없습니다.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"음성 메시지 전송 실패: {ex.Message}");
-                OnError?.Invoke($"음성 메시지 전송 실패: {ex.Message}");
-            }
-            finally
-            {
-                UpdateVoiceStatus(string.Empty);
-            }
-        }
-        
-        /// <summary>
-        /// 음성 녹음 시작
-        /// </summary>
-        public void StartVoiceRecording()
-        {
-            if (_isRecording)
-                return;
-                
-            if (_audioRecorder == null)
-            {
-                Debug.LogError("AudioRecorder가 없습니다.");
-                OnError?.Invoke("AudioRecorder가 없습니다.");
-                return;
-            }
-                
-            try
-            {
-                _isRecording = true;
-                _recordingStartTime = Time.time;
-                UpdateVoiceButtonState(true);
-                UpdateVoiceStatus(_voiceStatusRecording);
-                
-                bool success = _audioRecorder.StartRecording();
-                if (!success)
-                {
-                    _isRecording = false;
-                    UpdateVoiceButtonState(false);
-                    UpdateVoiceStatus(string.Empty);
-                }
-                
-                Debug.Log("음성 녹음 시작");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"음성 녹음 시작 실패: {ex.Message}");
-                OnError?.Invoke($"음성 녹음 시작 실패: {ex.Message}");
-                StopVoiceRecording();
-            }
-        }
-        
-        /// <summary>
-        /// 음성 녹음 중지
-        /// </summary>
-        public void StopVoiceRecording()
-        {
-            if (!_isRecording)
-                return;
-                
-            if (_audioRecorder == null)
-            {
-                Debug.LogError("AudioRecorder가 없습니다.");
-                return;
-            }
-                
-            try
-            {
-                _isRecording = false;
-                UpdateVoiceButtonState(false);
-                UpdateVoiceStatus(string.Empty);
-                
-                AudioClip recordedClip = _audioRecorder.StopRecording();
-                if (recordedClip != null)
-                {
-                    byte[] audioData = _audioRecorder.AudioClipToBytes(recordedClip);
-                    if (audioData.Length > 0)
-                    {
-                        SendVoiceMessage(audioData);
-                    }
-                }
-                
-                Debug.Log("음성 녹음 중지");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"음성 녹음 중지 실패: {ex.Message}");
-                OnError?.Invoke($"음성 녹음 중지 실패: {ex.Message}");
-            }
-        }
-        
-        #region UI 업데이트
-        
-        /// <summary>
-        /// 음성 버튼 상태 업데이트
-        /// </summary>
-        /// <param name="isRecording">녹음 중 여부</param>
         private void UpdateVoiceButtonState(bool isRecording)
         {
             if (_btnVoice != null)
@@ -287,10 +282,6 @@ namespace ProjectVG.Domain.Chat.View
                 _btnVoiceStop.gameObject.SetActive(isRecording);
         }
         
-        /// <summary>
-        /// 음성 상태 텍스트 업데이트
-        /// </summary>
-        /// <param name="status">상태 텍스트</param>
         private void UpdateVoiceStatus(string status)
         {
             if (_txtVoiceStatus != null)
@@ -300,15 +291,6 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        #endregion
-        
-        #region 음성 처리
-        
-        /// <summary>
-        /// 음성을 텍스트로 변환
-        /// </summary>
-        /// <param name="audioData">음성 데이터</param>
-        /// <returns>변환된 텍스트</returns>
         private async System.Threading.Tasks.Task<string> ConvertSpeechToText(byte[] audioData)
         {
             if (_sttService == null)
@@ -334,55 +316,31 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        #endregion
-        
-        #region 이벤트 핸들러
-        
-        /// <summary>
-        /// 음성 버튼 클릭 처리
-        /// </summary>
         private void OnVoiceButtonClicked()
         {
             StartVoiceRecording();
         }
         
-        /// <summary>
-        /// 음성 중지 버튼 클릭 처리
-        /// </summary>
         private void OnVoiceStopButtonClicked()
         {
             StopVoiceRecording();
         }
         
-        /// <summary>
-        /// 녹음 시작 이벤트 처리
-        /// </summary>
         private void OnRecordingStarted()
         {
             Debug.Log("녹음 시작됨");
         }
         
-        /// <summary>
-        /// 녹음 중지 이벤트 처리
-        /// </summary>
         private void OnRecordingStopped()
         {
             Debug.Log("녹음 중지됨");
         }
         
-        /// <summary>
-        /// 녹음 완료 이벤트 처리
-        /// </summary>
-        /// <param name="audioClip">녹음된 AudioClip</param>
         private void OnRecordingCompleted(AudioClip audioClip)
         {
             Debug.Log($"녹음 완료: {audioClip.length}초");
         }
         
-        /// <summary>
-        /// 녹음 오류 이벤트 처리
-        /// </summary>
-        /// <param name="error">오류 메시지</param>
         private void OnRecordingError(string error)
         {
             Debug.LogError($"녹음 오류: {error}");
@@ -390,29 +348,5 @@ namespace ProjectVG.Domain.Chat.View
         }
         
         #endregion
-        
-        private void Update()
-        {
-            if (_isRecording && Time.time - _recordingStartTime > _maxRecordingTime)
-            {
-                StopVoiceRecording();
-            }
-        }
-        
-        private void OnDestroy()
-        {
-            if (_isRecording)
-            {
-                StopVoiceRecording();
-            }
-            
-            if (_audioRecorder != null)
-            {
-                _audioRecorder.OnRecordingStarted -= OnRecordingStarted;
-                _audioRecorder.OnRecordingStopped -= OnRecordingStopped;
-                _audioRecorder.OnRecordingCompleted -= OnRecordingCompleted;
-                _audioRecorder.OnError -= OnRecordingError;
-            }
-        }
     }
 } 

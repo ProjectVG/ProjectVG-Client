@@ -25,18 +25,24 @@ namespace ProjectVG.Infrastructure.Network.Http
         private readonly Dictionary<string, string> defaultHeaders = new Dictionary<string, string>();
         private CancellationTokenSource cancellationTokenSource;
         [Inject] private SessionManager _sessionManager;
-
+        
+        #region Unity Lifecycle
+        
         protected override void Awake()
         {
             base.Awake();
-            InitializeClient();
+            Initialize();
         }
 
         private void OnDestroy()
         {
             Shutdown();
         }
-
+        
+        #endregion
+        
+        #region Public Methods
+        
         public void AddDefaultHeader(string key, string value)
         {
             defaultHeaders[key] = value;
@@ -91,8 +97,12 @@ namespace ProjectVG.Infrastructure.Network.Http
             cancellationTokenSource?.Cancel();
             cancellationTokenSource?.Dispose();
         }
-
-        private void InitializeClient()
+        
+        #endregion
+        
+        #region Private Methods
+        
+        private void Initialize()
         {
             cancellationTokenSource = new CancellationTokenSource();
             ApplyNetworkConfig();
@@ -414,6 +424,8 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             return responseCode >= 500 || responseCode == 429;
         }
+        
+        #endregion
     }
 
     public class ApiException : Exception

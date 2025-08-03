@@ -11,11 +11,7 @@ using ProjectVG.Infrastructure.Network.DTOs.Chat;
 
 namespace ProjectVG.Domain.Chat.Service
 {
-    /// <summary>
-    /// 채팅 시스템의 메인 매니저
-    /// WebSocket 연결, 메시지 송수신, 음성 재생을 관리합니다.
-    /// </summary>
-    public class ChatManager : MonoBehaviour
+    public class ChatManager : Singleton<ChatManager>
     {
         [Header("Components")]
         [SerializeField] private WebSocketManager _webSocketManager;
@@ -33,7 +29,6 @@ namespace ProjectVG.Domain.Chat.Service
         private bool _isInitialized = false;
         private bool _isProcessing = false;
         
-        // 메시지 큐 관리
         private readonly Queue<ChatMessage> _messageQueue = new Queue<ChatMessage>();
         private readonly object _queueLock = new object();
         
@@ -44,14 +39,35 @@ namespace ProjectVG.Domain.Chat.Service
         public event Action<ChatMessage>? OnChatMessageReceived;
         public event Action<string>? OnError;
         
+        #region Unity Lifecycle
+        
+        protected override void Awake()
+        {
+            base.Awake();
+        }
+        
         private void Start()
         {
             Initialize();
         }
         
-        /// <summary>
-        /// ChatManager 초기화
-        /// </summary>
+        private void OnDestroy()
+        {
+            if (_webSocketManager != null)
+            {
+                _webSocketManager.OnChatMessageReceived -= HandleChatMessageReceived;
+            }
+            
+            if (_voiceManager != null)
+            {
+                _voiceManager.OnVoiceFinished -= OnVoiceFinished;
+            }
+        }
+        
+        #endregion
+        
+        #region Public Methods
+        
         public void Initialize()
         {
             if (_isInitialized)
@@ -59,14 +75,12 @@ namespace ProjectVG.Domain.Chat.Service
                 
             try
             {
-                // 컴포넌트 자동 찾기
                 if (_webSocketManager == null)
                     _webSocketManager = WebSocketManager.Instance;
                     
                 if (_voiceManager == null)
                     _voiceManager = VoiceManager.Instance;
                 
-                // 이벤트 구독
                 if (_webSocketManager != null)
                 {
                     _webSocketManager.OnChatMessageReceived += HandleChatMessageReceived;
@@ -88,10 +102,6 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        /// <summary>
-        /// 사용자 메시지 전송
-        /// </summary>
-        /// <param name="message">전송할 메시지</param>
         public async void SendUserMessage(string message)
         {
             if (!ValidateUserInput(message))
@@ -101,7 +111,6 @@ namespace ProjectVG.Domain.Chat.Service
             {
                 Debug.Log($"사용자 메시지 전송: {message}");
                 
-                // ChatApiService를 통해 HTTP API 호출
                 var chatService = ApiServiceManager.Instance.Chat;
                 var response = await chatService.SendChatAsync(
                     message: message,
@@ -109,8 +118,6 @@ namespace ProjectVG.Domain.Chat.Service
                     userId: _userId
                 );
 
-                // TODO : 메시지 출력
-                
                 if (response != null)
                 {
                     Debug.Log($"채팅 응답 수신: {response.Text}");
@@ -127,10 +134,6 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        /// <summary>
-        /// 채팅 메시지 처리 (큐 방식)
-        /// </summary>
-        /// <param name="chatMessage">수신된 채팅 메시지</param>
         public void ProcessCharacterMessage(ChatMessage chatMessage)
         {
             if (chatMessage == null)
@@ -141,12 +144,10 @@ namespace ProjectVG.Domain.Chat.Service
             
             if (!_enableMessageQueue)
             {
-                // 큐 비활성화 시 즉시 처리
                 ProcessMessageImmediately(chatMessage);
                 return;
             }
             
-            // 큐에 메시지 추가
             lock (_queueLock)
             {
                 if (_messageQueue.Count >= _maxQueueSize)
@@ -159,13 +160,22 @@ namespace ProjectVG.Domain.Chat.Service
                 Debug.Log($"메시지 큐에 추가됨: {chatMessage.Text} (큐 크기: {_messageQueue.Count})");
             }
             
-            // 큐 처리 시작
             ProcessMessageQueueAsync().Forget();
         }
         
-        /// <summary>
-        /// 메시지 큐 비동기 처리
-        /// </summary>
+        public void ClearMessageQueue()
+        {
+            lock (_queueLock)
+            {
+                _messageQueue.Clear();
+                Debug.Log("메시지 큐가 초기화되었습니다.");
+            }
+        }
+        
+        #endregion
+        
+        #region Private Methods
+        
         private async UniTaskVoid ProcessMessageQueueAsync()
         {
             if (_isProcessing)
@@ -205,10 +215,6 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        /// <summary>
-        /// 메시지 즉시 처리 (큐 비활성화 시 사용)
-        /// </summary>
-        /// <param name="chatMessage">처리할 메시지</param>
         private void ProcessMessageImmediately(ChatMessage chatMessage)
         {
             try
@@ -220,8 +226,6 @@ namespace ProjectVG.Domain.Chat.Service
                     _voiceManager.PlayVoice(chatMessage.VoiceData);
                 }
 
-                // TODO : 메시지 출력
-                
                 Debug.Log($"캐릭터 메시지 처리: {chatMessage.Text}");
             }
             catch (Exception ex)
@@ -231,10 +235,6 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        /// <summary>
-        /// 메시지 비동기 처리 (큐 활성화 시 사용)
-        /// </summary>
-        /// <param name="chatMessage">처리할 메시지</param>
         private async UniTask ProcessMessageImmediatelyAsync(ChatMessage chatMessage)
         {
             try
@@ -248,8 +248,6 @@ namespace ProjectVG.Domain.Chat.Service
                     await _voiceManager.PlayVoiceAsync(chatMessage.VoiceData);
                 }
 
-                // TODO : 메시지 출력
-
                 Debug.Log($"캐릭터 메시지 처리 완료: {chatMessage.Text}");
             }
             catch (Exception ex)
@@ -259,23 +257,6 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        /// <summary>
-        /// 메시지 큐 초기화
-        /// </summary>
-        public void ClearMessageQueue()
-        {
-            lock (_queueLock)
-            {
-                _messageQueue.Clear();
-                Debug.Log("메시지 큐가 초기화되었습니다.");
-            }
-        }
-        
-        /// <summary>
-        /// 사용자 입력 검증
-        /// </summary>
-        /// <param name="message">검증할 메시지</param>
-        /// <returns>유효성 여부</returns>
         private bool ValidateUserInput(string message)
         {
             if (string.IsNullOrWhiteSpace(message))
@@ -293,34 +274,16 @@ namespace ProjectVG.Domain.Chat.Service
             return true;
         }
         
-        /// <summary>
-        /// 음성 재생 완료 처리
-        /// </summary>
         private void OnVoiceFinished()
         {
             Debug.Log("음성 재생 완료");
         }
         
-        /// <summary>
-        /// WebSocket에서 채팅 메시지 수신 처리
-        /// </summary>
-        /// <param name="chatMessage">수신된 채팅 메시지</param>
         private void HandleChatMessageReceived(ChatMessage chatMessage)
         {
             ProcessCharacterMessage(chatMessage);
         }
-
-        private void OnDestroy()
-        {
-            if (_webSocketManager != null)
-            {
-                _webSocketManager.OnChatMessageReceived -= HandleChatMessageReceived;
-            }
-            
-            if (_voiceManager != null)
-            {
-                _voiceManager.OnVoiceFinished -= OnVoiceFinished;
-            }
-        }
+        
+        #endregion
     }
 } 

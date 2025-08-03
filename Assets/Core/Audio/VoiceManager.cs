@@ -25,37 +25,33 @@ namespace ProjectVG.Core.Audio
         public event Action<VoiceData> OnVoiceStarted;
         public event Action OnVoiceStopped;
         
+        #region Unity Lifecycle
+        
         protected override void Awake()
         {
             base.Awake();
-            InitializeVoiceSource();
+            Initialize();
         }
         
-        private void InitializeVoiceSource()
+        private void Update()
         {
-            if (_voiceSource == null)
+            if (_isPlaying && !_voiceSource.isPlaying && _voiceSource.clip != null)
             {
-                _voiceSource = gameObject.AddComponent<AudioSource>();
-                _voiceSource.playOnAwake = false;
-                _voiceSource.loop = false;
-                _voiceSource.volume = _volume;
+                _isPlaying = false;
+                OnVoiceFinished?.Invoke();
+                
+                Debug.Log("음성 재생 완료");
             }
-            
-            SetVolume(_volume);
         }
         
-        private void PrepareAudioSource()
+        private void OnDestroy()
         {
-            if (_voiceSource == null) return;
-            
-            if (_voiceSource.isPlaying)
-            {
-                _voiceSource.Stop();
-            }
-            
-            _voiceSource.volume = _volume;
-            _voiceSource.clip = null;
+            StopVoice();
         }
+        
+        #endregion
+        
+        #region Public Methods
         
         public async void PlayVoice(VoiceData voiceData)
         {
@@ -155,8 +151,6 @@ namespace ProjectVG.Core.Audio
             {
                 _voiceSource.volume = _volume;
             }
-            
-            Debug.Log($"음성 볼륨 설정: {_volume:F2}");
         }
         
         public void SetAutoPlay(bool autoPlay)
@@ -164,20 +158,36 @@ namespace ProjectVG.Core.Audio
             _autoPlay = autoPlay;
         }
         
-        private void Update()
+        #endregion
+        
+        #region Private Methods
+        
+        private void Initialize()
         {
-            if (_isPlaying && !_voiceSource.isPlaying && _voiceSource.clip != null)
+            if (_voiceSource == null)
             {
-                _isPlaying = false;
-                OnVoiceFinished?.Invoke();
-                
-                Debug.Log("음성 재생 완료");
+                _voiceSource = gameObject.AddComponent<AudioSource>();
+                _voiceSource.playOnAwake = false;
+                _voiceSource.loop = false;
+                _voiceSource.volume = _volume;
             }
+            
+            SetVolume(_volume);
         }
         
-        private void OnDestroy()
+        private void PrepareAudioSource()
         {
-            StopVoice();
+            if (_voiceSource == null) return;
+            
+            if (_voiceSource.isPlaying)
+            {
+                _voiceSource.Stop();
+            }
+            
+            _voiceSource.volume = _volume;
+            _voiceSource.clip = null;
         }
+        
+        #endregion
     }
 } 

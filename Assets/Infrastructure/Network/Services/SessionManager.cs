@@ -24,6 +24,8 @@ namespace ProjectVG.Infrastructure.Network.Services
         public event Action<string> OnSessionEnded;
         public event Action<string> OnSessionError;
         
+        #region Unity Lifecycle
+        
         protected override void Awake()
         {
             base.Awake();
@@ -33,6 +35,15 @@ namespace ProjectVG.Infrastructure.Network.Services
         {
             Initialize();
         }
+        
+        private void OnDestroy()
+        {
+            Shutdown();
+        }
+        
+        #endregion
+        
+        #region Public Methods
         
         public void Initialize()
         {
@@ -137,6 +148,20 @@ namespace ProjectVG.Infrastructure.Network.Services
             }
         }
         
+        public void Shutdown()
+        {
+            if (_webSocketManager != null)
+            {
+                _webSocketManager.OnConnected -= OnWebSocketConnected;
+                _webSocketManager.OnDisconnected -= OnWebSocketDisconnected;
+                _webSocketManager.OnError -= OnWebSocketError;
+            }
+        }
+        
+        #endregion
+        
+        #region Private Methods
+        
         private void OnWebSocketConnected()
         {
             Debug.Log("WebSocket 연결됨 - 세션 요청 준비");
@@ -154,19 +179,6 @@ namespace ProjectVG.Infrastructure.Network.Services
             OnSessionError?.Invoke($"WebSocket 에러: {error}");
         }
         
-        private void OnDestroy()
-        {
-            Shutdown();
-        }
-        
-        public void Shutdown()
-        {
-            if (_webSocketManager != null)
-            {
-                _webSocketManager.OnConnected -= OnWebSocketConnected;
-                _webSocketManager.OnDisconnected -= OnWebSocketDisconnected;
-                _webSocketManager.OnError -= OnWebSocketError;
-            }
-        }
+        #endregion
     }
 } 

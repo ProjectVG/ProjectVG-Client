@@ -7,10 +7,7 @@ using ProjectVG.Domain.Chat.View;
 
 namespace ProjectVG.Domain.Chat.Service
 {
-    /// <summary>
-    /// ChatBubbleUI들을 생성하고 관리하는 매니저 (기본 버전)
-    /// </summary>
-    public class ChatBubbleManager : MonoBehaviour
+    public class ChatBubbleManager : Singleton<ChatBubbleManager>
     {
         [Header("UI Components")]
         [SerializeField] private ScrollRect _scrollRect;
@@ -38,37 +35,25 @@ namespace ProjectVG.Domain.Chat.Service
         public event Action<ChatBubbleUI> OnBubbleDestroyed;
         public event Action OnAllBubblesCleared;
         
-        private void Awake()
+        #region Unity Lifecycle
+        
+        protected override void Awake()
         {
-            InitializeManager();
+            base.Awake();
+            Initialize();
         }
         
-        /// <summary>
-        /// 매니저 초기화
-        /// </summary>
-        private void InitializeManager()
+        private void OnDestroy()
         {
-            if (_bubbleContainer == null)
-            {
-                Debug.LogError("BubbleContainer가 설정되지 않았습니다! 인스펙터에서 설정해주세요.");
-                return;
-            }
-            
-            if (_chatBubblePrefab == null)
-            {
-                Debug.LogError("ChatBubblePrefab이 설정되지 않았습니다!");
-                return;
-            }
-            
-            Debug.Log("ChatBubbleManager 초기화 완료");
+            ClearAllBubbles();
         }
         
-        /// <summary>
-        /// 새로운 채팅 버블 생성
-        /// </summary>
+        #endregion
+        
+        #region Public Methods
+        
         public void CreateBubble(Actor actor, string text, float displayTime = -1f)
         {
-           
             try
             {
                 GameObject bubbleObject = Instantiate(_chatBubblePrefab, _bubbleContainer);
@@ -83,20 +68,17 @@ namespace ProjectVG.Domain.Chat.Service
                 
                 SetupCanvasGroup(bubbleObject);
                 
-                // 성능 최적화: 최대 버블 수 체크
                 if (_activeBubbles.Count >= _maxBubbles)
                 {
                     Debug.LogWarning($"최대 버블 수({_maxBubbles})에 도달했습니다. 가장 오래된 버블을 제거합니다.");
                     RemoveOldestBubble();
                 }
                 
-                // 자동 정리 체크
                 if (_autoCleanup && _activeBubbles.Count >= _cleanupThreshold)
                 {
                     CleanupOldBubbles();
                 }
                 
-                // 기존 버블들에 큐 애니메이션 적용
                 if (_enableQueueAnimation && _activeBubbles.Count > 0)
                 {
                     StartQueueAnimationForExistingBubbles();
@@ -119,92 +101,6 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        /// <summary>
-        /// 기존 버블들에 큐 애니메이션 적용
-        /// </summary>
-        private void StartQueueAnimationForExistingBubbles()
-        {
-            // 레이아웃 업데이트 후 애니메이션 시작
-            Canvas.ForceUpdateCanvases();
-            
-            for (int i = 0; i < _activeBubbles.Count; i++)
-            {
-                var bubble = _activeBubbles[i];
-                if (bubble != null && bubble.IsToastAnimationComplete)
-                {
-                    // 지연 시간을 다르게 적용하여 연쇄 효과 생성
-                    float delay = i * _queueAnimationDelay;
-                    StartCoroutine(QueueAnimationWithDelay(bubble, delay));
-                }
-            }
-        }
-        
-        /// <summary>
-        /// 지연 시간을 가진 큐 애니메이션
-        /// </summary>
-        private System.Collections.IEnumerator QueueAnimationWithDelay(ChatBubbleUI bubble, float delay)
-        {
-            yield return new WaitForSeconds(delay);
-            
-            if (bubble != null)
-            {
-                bubble.StartQueueSlideAnimation();
-            }
-        }
-        
-        /// <summary>
-        /// 버블 토스트 애니메이션 완료 처리
-        /// </summary>
-        private void OnBubbleToastAnimationComplete(ChatBubbleUI bubble)
-        {
-            Debug.Log($"버블 토스트 애니메이션 완료: {bubble.Actor}");
-            
-            // 스크롤을 맨 아래로 이동
-            if (_scrollRect != null)
-            {
-                Canvas.ForceUpdateCanvases();
-                _scrollRect.verticalNormalizedPosition = 0f;
-            }
-        }
-        
-        /// <summary>
-        /// 가장 오래된 버블 제거
-        /// </summary>
-        private void RemoveOldestBubble()
-        {
-            if (_activeBubbles.Count > 0)
-            {
-                var oldestBubble = _activeBubbles[0];
-                RemoveBubble(oldestBubble);
-                if (oldestBubble != null)
-                {
-                    Destroy(oldestBubble.gameObject);
-                }
-            }
-        }
-        
-        /// <summary>
-        /// 오래된 버블들 정리
-        /// </summary>
-        private void CleanupOldBubbles()
-        {
-            int bubblesToRemove = _activeBubbles.Count - _cleanupThreshold;
-            for (int i = 0; i < bubblesToRemove && i < _activeBubbles.Count; i++)
-            {
-                var bubble = _activeBubbles[0];
-                RemoveBubble(bubble);
-                if (bubble != null)
-                {
-                    Destroy(bubble.gameObject);
-                }
-            }
-            
-            Debug.Log($"오래된 버블 {bubblesToRemove}개 정리 완료");
-        }
-        
-        /// <summary>
-        /// 버블 제거
-        /// </summary>
         public void RemoveBubble(ChatBubbleUI bubble)
         {
             if (bubble == null) return;
@@ -229,9 +125,6 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        /// <summary>
-        /// 모든 버블 제거
-        /// </summary>
         public void ClearAllBubbles()
         {
             try
@@ -258,9 +151,92 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        /// <summary>
-        /// CanvasGroup 자동 설정
-        /// </summary>
+        #endregion
+        
+        #region Private Methods
+        
+        private void Initialize()
+        {
+            if (_bubbleContainer == null)
+            {
+                Debug.LogError("BubbleContainer가 설정되지 않았습니다! 인스펙터에서 설정해주세요.");
+                return;
+            }
+            
+            if (_chatBubblePrefab == null)
+            {
+                Debug.LogError("ChatBubblePrefab이 설정되지 않았습니다!");
+                return;
+            }
+            
+            Debug.Log("ChatBubbleManager 초기화 완료");
+        }
+        
+        private void StartQueueAnimationForExistingBubbles()
+        {
+            Canvas.ForceUpdateCanvases();
+            
+            for (int i = 0; i < _activeBubbles.Count; i++)
+            {
+                var bubble = _activeBubbles[i];
+                if (bubble != null && bubble.IsToastAnimationComplete)
+                {
+                    float delay = i * _queueAnimationDelay;
+                    StartCoroutine(QueueAnimationWithDelay(bubble, delay));
+                }
+            }
+        }
+        
+        private System.Collections.IEnumerator QueueAnimationWithDelay(ChatBubbleUI bubble, float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            
+            if (bubble != null)
+            {
+                bubble.StartQueueSlideAnimation();
+            }
+        }
+        
+        private void OnBubbleToastAnimationComplete(ChatBubbleUI bubble)
+        {
+            Debug.Log($"버블 토스트 애니메이션 완료: {bubble.Actor}");
+            
+            if (_scrollRect != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                _scrollRect.verticalNormalizedPosition = 0f;
+            }
+        }
+        
+        private void RemoveOldestBubble()
+        {
+            if (_activeBubbles.Count > 0)
+            {
+                var oldestBubble = _activeBubbles[0];
+                RemoveBubble(oldestBubble);
+                if (oldestBubble != null)
+                {
+                    Destroy(oldestBubble.gameObject);
+                }
+            }
+        }
+        
+        private void CleanupOldBubbles()
+        {
+            int bubblesToRemove = _activeBubbles.Count - _cleanupThreshold;
+            for (int i = 0; i < bubblesToRemove && i < _activeBubbles.Count; i++)
+            {
+                var bubble = _activeBubbles[0];
+                RemoveBubble(bubble);
+                if (bubble != null)
+                {
+                    Destroy(bubble.gameObject);
+                }
+            }
+            
+            Debug.Log($"오래된 버블 {bubblesToRemove}개 정리 완료");
+        }
+        
         private void SetupCanvasGroup(GameObject bubbleObject)
         {
             CanvasGroup canvasGroup = bubbleObject.GetComponent<CanvasGroup>();
@@ -273,9 +249,6 @@ namespace ProjectVG.Domain.Chat.Service
             canvasGroup.alpha = 0f;
         }
         
-        private void OnDestroy()
-        {
-            ClearAllBubbles();
-        }
+        #endregion
     }
 } 
