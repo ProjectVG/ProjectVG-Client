@@ -6,18 +6,17 @@ using UnityEngine.Networking;
 using Cysharp.Threading.Tasks;
 using System.Threading;
 using ProjectVG.Infrastructure.Network.Configs;
+using ProjectVG.Infrastructure.Network.DTOs.Chat;
+using ProjectVG.Infrastructure.Network.Services;
 using Newtonsoft.Json;
+using ProjectVG.Core.Managers;
+using ProjectVG.Core.Attributes;
 
 namespace ProjectVG.Infrastructure.Network.Http
 {
-    /// <summary>
-    /// HTTP API 클라이언트
-    /// UnityWebRequest를 사용하여 서버와 통신하며, UniTask 기반 비동기 처리를 지원합니다.
-    /// </summary>
-    public class HttpApiClient : MonoBehaviour
+    public class HttpApiClient : Singleton<HttpApiClient>, IManager
     {
         [Header("API Configuration")]
-        // NetworkConfig를 사용하여 설정을 관리합니다.
 
         private const string ACCEPT_HEADER = "application/json";
         private const string AUTHORIZATION_HEADER = "Authorization";
@@ -25,27 +24,25 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         private readonly Dictionary<string, string> defaultHeaders = new Dictionary<string, string>();
         private CancellationTokenSource cancellationTokenSource;
-
-        public static HttpApiClient Instance { get; private set; }
-
+        [Inject] private SessionManager _sessionManager;
+        
         #region Unity Lifecycle
-
-        private void Awake()
+        
+        protected override void Awake()
         {
-            InitializeSingleton();
+            base.Awake();
+            Initialize();
         }
 
         private void OnDestroy()
         {
-            Cleanup();
+            Shutdown();
         }
-
+        
         #endregion
-
-        #region Public API
-
-
-
+        
+        #region Public Methods
+        
         public void AddDefaultHeader(string key, string value)
         {
             defaultHeaders[key] = value;
@@ -58,22 +55,22 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         public async UniTask<T> GetAsync<T>(string endpoint, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
         {
-            var url = GetFullUrl(endpoint);
+            var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
             return await SendRequestAsync<T>(url, UnityWebRequest.kHttpVerbGET, null, headers, cancellationToken);
         }
 
-        public async UniTask<T> PostAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        public async UniTask<T> PostAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, CancellationToken cancellationToken = default)
         {
             var url = GetFullUrl(endpoint);
-            var jsonData = SerializeData(data);
+            var jsonData = SerializeData(data, requiresSession);
             LogRequestDetails("POST", url, jsonData);
             return await SendRequestAsync<T>(url, UnityWebRequest.kHttpVerbPOST, jsonData, headers, cancellationToken);
         }
 
-        public async UniTask<T> PutAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        public async UniTask<T> PutAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, CancellationToken cancellationToken = default)
         {
             var url = GetFullUrl(endpoint);
-            var jsonData = SerializeData(data);
+            var jsonData = SerializeData(data, requiresSession);
             return await SendRequestAsync<T>(url, UnityWebRequest.kHttpVerbPUT, jsonData, headers, cancellationToken);
         }
 
@@ -88,31 +85,24 @@ namespace ProjectVG.Infrastructure.Network.Http
             var url = GetFullUrl(endpoint);
             return await SendFileRequestAsync<T>(url, fileData, fileName, fieldName, headers, cancellationToken);
         }
+        
+        public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        {
+            var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
+            return await SendFormDataRequestAsync<T>(url, formData, headers, cancellationToken);
+        }
 
         public void Shutdown()
         {
             cancellationTokenSource?.Cancel();
+            cancellationTokenSource?.Dispose();
         }
-
+        
         #endregion
-
+        
         #region Private Methods
-
-        private void InitializeSingleton()
-        {
-            if (Instance == null)
-            {
-                Instance = this;
-                DontDestroyOnLoad(gameObject);
-                InitializeClient();
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
-        }
-
-        private void InitializeClient()
+        
+        private void Initialize()
         {
             cancellationTokenSource = new CancellationTokenSource();
             ApplyNetworkConfig();
@@ -136,10 +126,35 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             return NetworkConfig.GetFullApiUrl(endpoint);
         }
-
-        private string SerializeData(object data)
+        
+        private bool IsFullUrl(string url)
         {
-            return data != null ? JsonConvert.SerializeObject(data) : null;
+            return url.StartsWith("http://") || url.StartsWith("https://");
+        }
+
+        private string SerializeData(object data, bool requiresSession = false)
+        {
+            if (data == null) return null;
+            
+            var jsonData = JsonConvert.SerializeObject(data);
+            
+            if (requiresSession && data is ChatRequest chatRequest && string.IsNullOrEmpty(chatRequest.sessionId))
+            {
+                var sessionId = _sessionManager?.SessionId ?? "";
+                if (!string.IsNullOrEmpty(sessionId))
+                {
+                    var jsonObject = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonData);
+                    jsonObject["session_id"] = sessionId;
+                    jsonData = JsonConvert.SerializeObject(jsonObject);
+                    Debug.Log($"세션 ID 자동 주입: {sessionId}");
+                }
+                else
+                {
+                    Debug.LogWarning("세션 연결이 필요한 요청이지만 세션 ID를 획득할 수 없습니다.");
+                }
+            }
+            
+            return jsonData;
         }
 
         private void LogRequestDetails(string method, string url, string jsonData)
@@ -232,6 +247,57 @@ namespace ProjectVG.Infrastructure.Network.Http
             }
 
             throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, "최대 재시도 횟수 초과");
+        }
+        
+        private async UniTask<T> SendFormDataRequestAsync<T>(string url, Dictionary<string, object> formData, Dictionary<string, string> headers, CancellationToken cancellationToken)
+        {
+            var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
+
+            for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
+            {
+                try
+                {
+                    var form = new WWWForm();
+                    
+                    foreach (var kvp in formData)
+                    {
+                        if (kvp.Value is byte[] byteData)
+                        {
+                            form.AddBinaryData(kvp.Key, byteData, "file.wav");
+                        }
+                        else
+                        {
+                            form.AddField(kvp.Key, kvp.Value.ToString());
+                        }
+                    }
+                    
+                    using var request = UnityWebRequest.Post(url, form);
+                    SetupRequest(request, headers);
+                    request.timeout = (int)NetworkConfig.HttpTimeout;
+
+                    var operation = request.SendWebRequest();
+                    await operation.WithCancellation(combinedCancellationToken);
+
+                    if (request.result == UnityWebRequest.Result.Success)
+                    {
+                        return ParseResponse<T>(request);
+                    }
+                    else
+                    {
+                        await HandleFileUploadFailure(request, attempt, combinedCancellationToken);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (ex is not ApiException)
+                {
+                    await HandleFileUploadException(ex, attempt, combinedCancellationToken);
+                }
+            }
+
+            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 폼 데이터 업로드 실패", 0, "최대 재시도 횟수 초과");
         }
 
         private CancellationToken CreateCombinedCancellationToken(CancellationToken cancellationToken)
@@ -358,19 +424,10 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             return responseCode >= 500 || responseCode == 429;
         }
-
-        private void Cleanup()
-        {
-            cancellationTokenSource?.Cancel();
-            cancellationTokenSource?.Dispose();
-        }
-
+        
         #endregion
     }
 
-    /// <summary>
-    /// API 예외 클래스
-    /// </summary>
     public class ApiException : Exception
     {
         public long StatusCode { get; }

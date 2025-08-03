@@ -1,0 +1,344 @@
+#nullable enable
+using System;
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using ProjectVG.Domain.Chat.Service;
+using ProjectVG.Infrastructure.Network.Services;
+using ProjectVG.Core.Audio;
+
+namespace ProjectVG.Domain.Chat.View
+{
+    public class VoiceInputView : MonoBehaviour
+    {
+        [Header("UI Components")]
+        [SerializeField] private Button? _btnVoice;
+        [SerializeField] private Button? _btnVoiceStop;
+        [SerializeField] private TextMeshProUGUI? _txtVoiceStatus;
+        
+        [Header("Voice Settings")]
+        [SerializeField] private float _maxRecordingTime = 30f;
+        [SerializeField] private string _voiceStatusRecording = "녹음 중...";
+        [SerializeField] private string _voiceStatusProcessing = "음성을 텍스트로 변환 중...";
+        
+        private ChatManager? _chatManager;
+        private AudioRecorder? _audioRecorder;
+        private ISTTService? _sttService;
+        private bool _isRecording = false;
+        private float _recordingStartTime;
+        
+        public event Action<string>? OnVoiceMessageSent;
+        public event Action<string>? OnError;
+        
+        #region Unity Lifecycle
+        
+        private void Start()
+        {
+            Initialize();
+        }
+        
+        private void Update()
+        {
+            if (_isRecording && Time.time - _recordingStartTime > _maxRecordingTime)
+            {
+                StopVoiceRecording();
+            }
+        }
+        
+        private void OnDestroy()
+        {
+            if (_isRecording)
+            {
+                StopVoiceRecording();
+            }
+            
+            if (_audioRecorder != null)
+            {
+                _audioRecorder.OnRecordingStarted -= OnRecordingStarted;
+                _audioRecorder.OnRecordingStopped -= OnRecordingStopped;
+                _audioRecorder.OnRecordingCompleted -= OnRecordingCompleted;
+                _audioRecorder.OnError -= OnRecordingError;
+            }
+        }
+        
+        #endregion
+        
+        #region Public Methods
+        
+        private void Initialize()
+        {
+            SetupComponents();
+            SetupEventHandlers();
+            UpdateVoiceButtonState(false);
+            SetupChatManager();
+        }
+        
+        public void SetChatManager(ChatManager chatManager)
+        {
+            _chatManager = chatManager;
+        }
+        
+        public async void SendVoiceMessage(byte[] audioData)
+        {
+            if (audioData == null || audioData.Length == 0)
+            {
+                OnError?.Invoke("음성 데이터가 비어있습니다.");
+                return;
+            }
+                
+            try
+            {
+                UpdateVoiceStatus(_voiceStatusProcessing);
+                
+                string transcribedText = await ConvertSpeechToText(audioData);
+                
+                if (!string.IsNullOrWhiteSpace(transcribedText))
+                {
+                    _chatManager?.SendUserMessage(transcribedText);
+                    OnVoiceMessageSent?.Invoke(transcribedText);
+                }
+                else
+                {
+                    OnError?.Invoke("음성을 텍스트로 변환할 수 없습니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"음성 메시지 전송 실패: {ex.Message}");
+                OnError?.Invoke($"음성 메시지 전송 실패: {ex.Message}");
+            }
+            finally
+            {
+                UpdateVoiceStatus(string.Empty);
+            }
+        }
+        
+        public void StartVoiceRecording()
+        {
+            if (_isRecording)
+                return;
+                
+            if (_audioRecorder == null)
+            {
+                OnError?.Invoke("AudioRecorder가 없습니다.");
+                return;
+            }
+                
+            try
+            {
+                _isRecording = true;
+                _recordingStartTime = Time.time;
+                UpdateVoiceButtonState(true);
+                UpdateVoiceStatus(_voiceStatusRecording);
+                
+                bool success = _audioRecorder.StartRecording();
+                if (!success)
+                {
+                    StopVoiceRecording();
+                }
+                
+                Debug.Log("음성 녹음 시작");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"음성 녹음 시작 실패: {ex.Message}");
+                OnError?.Invoke($"음성 녹음 시작 실패: {ex.Message}");
+                StopVoiceRecording();
+            }
+        }
+        
+        public void StopVoiceRecording()
+        {
+            if (!_isRecording)
+                return;
+                
+            if (_audioRecorder == null)
+            {
+                Debug.LogError("AudioRecorder가 없습니다.");
+                return;
+            }
+                
+            try
+            {
+                _isRecording = false;
+                UpdateVoiceButtonState(false);
+                UpdateVoiceStatus(string.Empty);
+                
+                AudioClip? recordedClip = _audioRecorder.StopRecording();
+                if (recordedClip != null)
+                {
+                    byte[] audioData = _audioRecorder.AudioClipToBytes(recordedClip);
+                    if (audioData.Length > 0)
+                    {
+                        SendVoiceMessage(audioData);
+                    }
+                }
+                
+                Debug.Log("음성 녹음 중지");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"음성 녹음 중지 실패: {ex.Message}");
+                OnError?.Invoke($"음성 녹음 중지 실패: {ex.Message}");
+            }
+        }
+        
+        #endregion
+        
+        #region Private Methods
+        
+        private void SetupComponents()
+        {
+            if (_btnVoice == null)
+            {
+                _btnVoice = transform.Find("BtnVoice")?.GetComponent<Button>();
+                if (_btnVoice == null)
+                {
+                    Debug.LogWarning("VoiceInputView: BtnVoice 버튼을 찾을 수 없습니다.");
+                }
+            }
+                
+            if (_btnVoiceStop == null)
+            {
+                _btnVoiceStop = transform.Find("BtnVoiceStop")?.GetComponent<Button>();
+                if (_btnVoiceStop == null)
+                {
+                    Debug.LogWarning("VoiceInputView: BtnVoiceStop 버튼을 찾을 수 없습니다.");
+                }
+            }
+                
+            if (_txtVoiceStatus == null)
+            {
+                _txtVoiceStatus = transform.Find("TxtVoiceStatus")?.GetComponent<TextMeshProUGUI>();
+                if (_txtVoiceStatus == null)
+                {
+                    Debug.LogWarning("VoiceInputView: TxtVoiceStatus 텍스트를 찾을 수 없습니다.");
+                }
+            }
+                
+            if (_audioRecorder == null)
+            {
+                _audioRecorder = AudioRecorder.Instance;
+                if (_audioRecorder == null)
+                {
+                    _audioRecorder = gameObject.AddComponent<AudioRecorder>();
+                    Debug.Log("VoiceInputView: AudioRecorder 컴포넌트를 자동으로 추가했습니다.");
+                }
+            }
+                
+            if (_sttService == null)
+            {
+                _sttService = new STTService();
+                if (_sttService == null)
+                {
+                    Debug.LogError("VoiceInputView: STTService를 생성할 수 없습니다.");
+                }
+            }
+        }
+        
+        private void SetupEventHandlers()
+        {
+            if (_btnVoice != null)
+                _btnVoice.onClick.AddListener(OnVoiceButtonClicked);
+                
+            if (_btnVoiceStop != null)
+                _btnVoiceStop.onClick.AddListener(OnVoiceStopButtonClicked);
+                
+            if (_audioRecorder != null)
+            {
+                _audioRecorder.OnRecordingStarted += OnRecordingStarted;
+                _audioRecorder.OnRecordingStopped += OnRecordingStopped;
+                _audioRecorder.OnRecordingCompleted += OnRecordingCompleted;
+                _audioRecorder.OnError += OnRecordingError;
+            }
+        }
+        
+        private void SetupChatManager()
+        {
+            if (_chatManager == null)
+            {
+                _chatManager = FindAnyObjectByType<ChatManager>();
+                if (_chatManager == null)
+                {
+                    Debug.LogWarning("VoiceInputView: ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");
+                }
+            }
+        }
+        
+        private void UpdateVoiceButtonState(bool isRecording)
+        {
+            if (_btnVoice != null)
+                _btnVoice.gameObject.SetActive(!isRecording);
+                
+            if (_btnVoiceStop != null)
+                _btnVoiceStop.gameObject.SetActive(isRecording);
+        }
+        
+        private void UpdateVoiceStatus(string status)
+        {
+            if (_txtVoiceStatus != null)
+            {
+                _txtVoiceStatus.text = status;
+                _txtVoiceStatus.gameObject.SetActive(!string.IsNullOrEmpty(status));
+            }
+        }
+        
+        private async System.Threading.Tasks.Task<string> ConvertSpeechToText(byte[] audioData)
+        {
+            if (_sttService == null)
+            {
+                Debug.LogError("STT 서비스가 없습니다.");
+                return string.Empty;
+            }
+            
+            try
+            {
+                if (!_sttService.IsAvailable)
+                {
+                    await _sttService.InitializeAsync();
+                }
+                
+                string transcribedText = await _sttService.ConvertSpeechToTextAsync(audioData);
+                return transcribedText;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"STT 변환 실패: {ex.Message}");
+                throw;
+            }
+        }
+        
+        private void OnVoiceButtonClicked()
+        {
+            StartVoiceRecording();
+        }
+        
+        private void OnVoiceStopButtonClicked()
+        {
+            StopVoiceRecording();
+        }
+        
+        private void OnRecordingStarted()
+        {
+            Debug.Log("녹음 시작됨");
+        }
+        
+        private void OnRecordingStopped()
+        {
+            Debug.Log("녹음 중지됨");
+        }
+        
+        private void OnRecordingCompleted(AudioClip audioClip)
+        {
+            Debug.Log($"녹음 완료: {audioClip.length}초");
+        }
+        
+        private void OnRecordingError(string error)
+        {
+            Debug.LogError($"녹음 오류: {error}");
+            OnError?.Invoke(error);
+        }
+        
+        #endregion
+    }
+} 

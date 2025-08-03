@@ -37,16 +37,15 @@ namespace ProjectVG.Infrastructure.Network.Services
             var serverRequest = CreateServerRequest(request);
             LogRequestDetails(serverRequest);
             
-            return await _httpClient.PostAsync<ChatResponse>(CHAT_ENDPOINT, serverRequest, cancellationToken: cancellationToken);
+            return await _httpClient.PostAsync<ChatResponse>(CHAT_ENDPOINT, serverRequest, requiresSession: true, cancellationToken: cancellationToken);
         }
 
         /// <summary>
-        /// 간편한 채팅 요청 (기본값 사용)
+        /// 간편한 채팅 요청
         /// </summary>
         /// <param name="message">메시지</param>
         /// <param name="characterId">캐릭터 ID</param>
         /// <param name="userId">사용자 ID</param>
-        /// <param name="sessionId">세션 ID (선택사항)</param>
         /// <param name="actor">액터 (선택사항)</param>
         /// <param name="cancellationToken">취소 토큰</param>
         /// <returns>채팅 응답</returns>
@@ -54,11 +53,10 @@ namespace ProjectVG.Infrastructure.Network.Services
             string message, 
             string characterId, 
             string userId, 
-            string sessionId = null, 
             string actor = null,
             CancellationToken cancellationToken = default)
         {
-            var request = CreateSimpleRequest(message, characterId, userId, sessionId, actor);
+            var request = CreateSimpleRequest(message, characterId, userId, actor);
             return await SendChatAsync(request, cancellationToken);
         }
 
@@ -110,11 +108,11 @@ namespace ProjectVG.Infrastructure.Network.Services
             };
         }
 
-        private ChatRequest CreateSimpleRequest(string message, string characterId, string userId, string sessionId, string actor)
+        private ChatRequest CreateSimpleRequest(string message, string characterId, string userId, string actor)
         {
             return new ChatRequest
             {
-                sessionId = sessionId,
+                sessionId = "", // HttpApiClient에서 자동 주입
                 message = message,
                 characterId = characterId,
                 userId = userId,

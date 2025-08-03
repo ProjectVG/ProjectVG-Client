@@ -1,24 +1,24 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using UnityEngine;
-using UnityEngine.Networking;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Configs;
+using ProjectVG.Infrastructure.Network.DTOs.Chat;
+using ProjectVG.Infrastructure.Network.Services;
+using ProjectVG.Domain.Chat.Model;
+using ProjectVG.Core.Managers;
+using ProjectVG.Core.Attributes;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ProjectVG.Infrastructure.Network.WebSocket
 {
-    /// <summary>
-    /// WebSocket 연결 및 메시지 관리자
-    /// 강제된 JSON 형식 {type: "xxx", data: {...}}을 사용합니다.
-    /// </summary>
-    public class WebSocketManager : MonoBehaviour
+    public class WebSocketManager : Singleton<WebSocketManager>, IManager
     {
         private INativeWebSocket _nativeWebSocket;
         private CancellationTokenSource _cancellationTokenSource;
         
-        // 메시지 버퍼링을 위한 필드
         private readonly StringBuilder _messageBuffer = new StringBuilder();
         private readonly object _bufferLock = new object();
         
@@ -26,60 +26,42 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         private bool _isConnecting = false;
         private int _reconnectAttempts = 0;
         private string _sessionId;
-
-        public static WebSocketManager Instance { get; private set; }
+        private bool _autoReconnect = true;
+        private float _reconnectDelay = 5f;
+        private int _maxReconnectAttempts = 10;
+        private float _maxReconnectDelay = 60f;
+        private bool _useExponentialBackoff = true;
         
-        // 이벤트
+        [Inject] private SessionManager _sessionManager;
+
         public event Action OnConnected;
         public event Action OnDisconnected;
         public event Action<string> OnError;
-        public event Action<string> OnSessionIdReceived;
-        public event Action<string> OnChatMessageReceived;
+        public event Action<ChatMessage> OnChatMessageReceived;
 
         public bool IsConnected => _isConnected;
         public bool IsConnecting => _isConnecting;
         public string SessionId => _sessionId;
-
-        private void Awake()
+        public bool AutoReconnect => _autoReconnect;
+        public int ReconnectAttempts => _reconnectAttempts;
+        
+        #region Unity Lifecycle
+        
+        protected override void Awake()
         {
-            if (Instance == null)
-            {
-                Instance = this;
-                DontDestroyOnLoad(gameObject);
-                InitializeManager();
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
+            base.Awake();
+            Initialize();
         }
 
         private void OnDestroy()
         {
-            DisconnectAsync().Forget();
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource?.Dispose();
+            Shutdown();
         }
-
-        private void InitializeManager()
-        {
-            _cancellationTokenSource = new CancellationTokenSource();
-            InitializeNativeWebSocket();
-        }
-
-        private void InitializeNativeWebSocket()
-        {
-            _nativeWebSocket = WebSocketFactory.Create();
-            
-            _nativeWebSocket.OnConnected += OnNativeConnected;
-            _nativeWebSocket.OnDisconnected += OnNativeDisconnected;
-            _nativeWebSocket.OnError += OnNativeError;
-            _nativeWebSocket.OnMessageReceived += OnNativeMessageReceived;
-        }
-
-        /// <summary>
-        /// WebSocket 연결
-        /// </summary>
+        
+        #endregion
+        
+        #region Public Methods
+        
         public async UniTask<bool> ConnectAsync(string sessionId = null, CancellationToken cancellationToken = default)
         {
             if (_isConnected || _isConnecting)
@@ -132,9 +114,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
         }
 
-        /// <summary>
-        /// WebSocket 연결 해제
-        /// </summary>
         public async UniTask DisconnectAsync()
         {
             if (!_isConnected)
@@ -150,57 +129,70 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 await _nativeWebSocket.DisconnectAsync();
             }
 
-            Debug.Log("WebSocket 연결 해제");
+            Debug.Log("[WebSocket] 연결 해제");
             OnDisconnected?.Invoke();
         }
-
-        /// <summary>
-        /// 메시지 전송
-        /// </summary>
-        public async UniTask<bool> SendMessageAsync(string type, object data, CancellationToken cancellationToken = default)
+        
+        public void SetAutoReconnect(bool enabled)
         {
-            if (!_isConnected)
-            {
-                Debug.LogWarning("WebSocket이 연결되지 않았습니다.");
-                return false;
-            }
-
-            try
-            {
-                var message = new WebSocketMessage
-                {
-                    type = type,
-                    data = data
-                };
-                
-                var jsonMessage = JsonUtility.ToJson(message);
-                return await _nativeWebSocket.SendMessageAsync(jsonMessage, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"메시지 전송 실패: {ex.Message}");
-                return false;
-            }
+            _autoReconnect = enabled;
+            Debug.Log($"[WebSocket] 자동 재연결 설정: {enabled}");
+        }
+        
+        public void SetReconnectSettings(int maxAttempts, float delay, float maxDelay = 60f, bool useExponentialBackoff = true)
+        {
+            _maxReconnectAttempts = maxAttempts;
+            _reconnectDelay = delay;
+            _maxReconnectDelay = maxDelay;
+            _useExponentialBackoff = useExponentialBackoff;
+            Debug.Log($"[WebSocket] 재연결 설정 변경: 최대시도={maxAttempts}, 기본지연={delay}초, 최대지연={maxDelay}초, 지수백오프={useExponentialBackoff}");
         }
 
-        /// <summary>
-        /// 채팅 메시지 전송
-        /// </summary>
-        public async UniTask<bool> SendChatMessageAsync(string message, CancellationToken cancellationToken = default)
+        public async UniTask<bool> SendMessageAsync(string type, string data)
         {
-            var chatData = new ChatData
-            {
-                message = message,
-                sessionId = _sessionId,
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            };
-
-            return await SendMessageAsync("chat", chatData, cancellationToken);
+            throw new NotImplementedException();
         }
 
-        /// <summary>
-        /// WebSocket URL 생성
-        /// </summary>
+        public void LogConnectionStatus()
+        {
+            Debug.Log($"[WebSocket] 연결 상태: {(_isConnected ? "연결됨" : "연결안됨")}");
+            Debug.Log($"[WebSocket] 연결 중: {(_isConnecting ? "예" : "아니오")}");
+            Debug.Log($"[WebSocket] 자동 재연결: {(_autoReconnect ? "활성화" : "비활성화")}");
+            Debug.Log($"[WebSocket] 재연결 시도: {_reconnectAttempts}/{_maxReconnectAttempts}");
+            Debug.Log($"[WebSocket] 지수 백오프: {(_useExponentialBackoff ? "활성화" : "비활성화")}");
+            Debug.Log($"[WebSocket] 최대 메시지 크기: {NetworkConfig.MaxMessageSize / 1024}KB");
+            Debug.Log($"[WebSocket] 수신 버퍼 크기: {NetworkConfig.ReceiveBufferSize / 1024}KB");
+        }
+
+        public void Shutdown()
+        {
+            _autoReconnect = false;
+            DisconnectAsync().Forget();
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
+        }
+        
+        #endregion
+        
+        #region Private Methods
+        
+        private void Initialize()
+        {
+            _cancellationTokenSource = new CancellationTokenSource();
+            InitializeNativeWebSocket();
+            StartConnectionMonitoring();
+        }
+
+        private void InitializeNativeWebSocket()
+        {
+            _nativeWebSocket = WebSocketFactory.Create();
+            
+            _nativeWebSocket.OnConnected += OnNativeConnected;
+            _nativeWebSocket.OnDisconnected += OnNativeDisconnected;
+            _nativeWebSocket.OnError += OnNativeError;
+            _nativeWebSocket.OnMessageReceived += OnNativeMessageReceived;
+        }
+
         private string GetWebSocketUrl(string sessionId = null)
         {
             string baseUrl = NetworkConfig.GetWebSocketUrl();
@@ -213,32 +205,45 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             return baseUrl;
         }
 
-        /// <summary>
-        /// 자동 재연결 시도
-        /// </summary>
         private async UniTaskVoid TryReconnectAsync()
         {
-            bool autoReconnect = NetworkConfig.AutoReconnect;
-            int maxReconnectAttempts = NetworkConfig.MaxReconnectAttempts;
-            float reconnectDelay = NetworkConfig.ReconnectDelay;
-            
-            if (!autoReconnect || _reconnectAttempts >= maxReconnectAttempts)
+            if (!_autoReconnect || _reconnectAttempts >= _maxReconnectAttempts)
             {
+                Debug.LogWarning($"[WebSocket] 재연결 시도 횟수 초과: {_reconnectAttempts}/{_maxReconnectAttempts}");
                 return;
             }
 
             _reconnectAttempts++;
-            Debug.Log($"WebSocket 재연결 시도 {_reconnectAttempts}/{maxReconnectAttempts}");
             
-            await UniTask.Delay(TimeSpan.FromSeconds(reconnectDelay));
+            float delay = _reconnectDelay;
+            if (_useExponentialBackoff)
+            {
+                delay = Mathf.Min(_reconnectDelay * Mathf.Pow(2, _reconnectAttempts - 1), _maxReconnectDelay);
+            }
+            
+            Debug.Log($"[WebSocket] 재연결 시도 {_reconnectAttempts}/{_maxReconnectAttempts} (지연: {delay:F1}초)");
+            
+            await UniTask.Delay(TimeSpan.FromSeconds(delay));
             
             if (!_isConnected)
             {
-                ConnectAsync(_sessionId).Forget();
+                await ConnectAsync(_sessionId);
             }
         }
-
-        #region Native WebSocket Event Handlers
+        
+        private async UniTaskVoid StartConnectionMonitoring()
+        {
+            while (!_cancellationTokenSource.Token.IsCancellationRequested)
+            {
+                await UniTask.Delay(TimeSpan.FromSeconds(30), cancellationToken: _cancellationTokenSource.Token);
+                
+                if (!_isConnected && !_isConnecting && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts)
+                {
+                    Debug.Log("[WebSocket] 연결 상태 확인 - 재연결 시도");
+                    await ConnectAsync(_sessionId);
+                }
+            }
+        }
 
         private void OnNativeConnected()
         {
@@ -246,7 +251,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _isConnecting = false;
             _reconnectAttempts = 0;
             
-            Debug.Log("WebSocket 연결 성공");
+            Debug.Log("[WebSocket] 연결 성공");
             OnConnected?.Invoke();
         }
 
@@ -255,8 +260,13 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _isConnected = false;
             _isConnecting = false;
             
+            Debug.Log("[WebSocket] 연결 해제됨");
             OnDisconnected?.Invoke();
-            TryReconnectAsync().Forget();
+            
+            if (_autoReconnect)
+            {
+                TryReconnectAsync().Forget();
+            }
         }
 
         private void OnNativeError(string error)
@@ -280,10 +290,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 Debug.LogError($"원시 메시지: {message}");
             }
         }
-        
-        /// <summary>
-        /// 메시지 버퍼링 및 완전한 JSON 메시지 처리
-        /// </summary>
+
         private void ProcessBufferedMessage(string message)
         {
             lock (_bufferLock)
@@ -291,12 +298,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 _messageBuffer.Append(message);
                 string bufferedMessage = _messageBuffer.ToString();
                 
-                Debug.Log($"버퍼링된 메시지 길이: {bufferedMessage.Length}");
-                
                 if (IsCompleteJsonMessage(bufferedMessage))
                 {
-                    Debug.Log("완전한 JSON 메시지 감지됨. 처리 시작.");
-                    
                     if (IsValidJsonMessage(bufferedMessage))
                     {
                         ProcessMessage(bufferedMessage);
@@ -307,18 +310,10 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                     }
                     
                     _messageBuffer.Clear();
-                    Debug.Log("메시지 처리 완료. 버퍼 초기화됨.");
-                }
-                else
-                {
-                    Debug.Log($"불완전한 메시지. 버퍼에 누적 중... (현재 길이: {bufferedMessage.Length})");
                 }
             }
         }
         
-        /// <summary>
-        /// 완전한 JSON 메시지인지 확인
-        /// </summary>
         private bool IsCompleteJsonMessage(string message)
         {
             if (string.IsNullOrEmpty(message))
@@ -346,15 +341,9 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 }
             }
             
-            bool isComplete = openBraces > 0 && openBraces == closeBraces;
-            Debug.Log($"JSON 완성도 체크: 열린괄호={openBraces}, 닫힌괄호={closeBraces}, 완성={isComplete}");
-            
-            return isComplete;
+            return openBraces > 0 && openBraces == closeBraces;
         }
         
-        /// <summary>
-        /// JSON 형식인지 확인
-        /// </summary>
         private bool IsValidJsonMessage(string message)
         {
             if (string.IsNullOrEmpty(message))
@@ -371,32 +360,28 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             return false;
         }
 
-        /// <summary>
-        /// 메시지 타입에 따른 처리
-        /// </summary>
         private void ProcessMessage(string message)
         {
             try
             {
-                var webSocketMessage = JsonUtility.FromJson<WebSocketMessage>(message);
-                if (webSocketMessage == null)
-                {
-                    Debug.LogError("WebSocket 메시지 파싱 실패");
-                    return;
-                }
+                var jsonObject = JObject.Parse(message);
+                string messageType = jsonObject["type"]?.ToString();
+                JToken dataToken = jsonObject["data"];
+                
+                Debug.Log($"[WebSocket] \n" +
+                    $"Type : {messageType} \n" +
+                    $"Data : {dataToken} \n");
 
-                Debug.Log($"메시지 타입: {webSocketMessage.type}");
-
-                switch (webSocketMessage.type)
+                switch (messageType)
                 {
-                    case "session_id":
-                        ProcessSessionIdMessage(webSocketMessage.data);
+                    case "session":
+                        ProcessSessionMessage(dataToken.ToString(Formatting.None));
                         break;
                     case "chat":
-                        ProcessChatMessage(webSocketMessage.data);
+                        ProcessChatMessage(dataToken.ToString(Formatting.None));
                         break;
                     default:
-                        Debug.LogWarning($"알 수 없는 메시지 타입: {webSocketMessage.type}");
+                        Debug.LogWarning($"알 수 없는 메시지 타입: {messageType}");
                         break;
                 }
             }
@@ -406,77 +391,58 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
         }
 
-        /// <summary>
-        /// 세션 ID 메시지 처리
-        /// </summary>
-        private void ProcessSessionIdMessage(object data)
+        private void ProcessSessionMessage(string data)
         {
             try
             {
-                var sessionIdData = JsonUtility.FromJson<SessionIdData>(JsonUtility.ToJson(data));
-                if (sessionIdData != null)
+                if (_sessionManager != null)
                 {
-                    _sessionId = sessionIdData.session_id;
-                    Debug.Log($"세션 ID 수신: {sessionIdData.session_id}");
-                    OnSessionIdReceived?.Invoke(sessionIdData.session_id);
+                    _sessionManager.HandleSessionMessage(data);
+                }
+                else
+                {
+                    Debug.LogWarning("SessionManager가 없어서 세션 메시지를 처리할 수 없습니다.");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"세션 ID 메시지 처리 중 오류: {ex.Message}");
+                Debug.LogError($"세션 메시지 처리 중 오류: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// 채팅 메시지 처리
-        /// </summary>
-        private void ProcessChatMessage(object data)
+        private void ProcessChatMessage(string data)
         {
             try
             {
-                var chatData = JsonUtility.FromJson<ChatData>(JsonUtility.ToJson(data));
-                if (chatData != null)
+                Debug.Log($"[WebSocket] ProcessChatMessage - 원시 데이터: {data}");
+                
+                var chatResponse = JsonConvert.DeserializeObject<ChatResponse>(data);
+                if (chatResponse == null)
                 {
-                    Debug.Log($"채팅 메시지 수신: {chatData.message}");
-                    OnChatMessageReceived?.Invoke(chatData.message);
+                    Debug.LogError("ChatResponse 파싱 실패");
+                    return;
                 }
+
+                Debug.Log($"[WebSocket] ChatResponse 파싱 성공: Type={chatResponse.Type}, SessionId={chatResponse.SessionId}");
+
+                var chatMessage = ChatMessage.FromChatResponse(chatResponse);
+                if (chatMessage == null)
+                {
+                    Debug.LogError("ChatMessage 변환 실패");
+                    return;
+                }
+
+                Debug.Log($"[WebSocket] ChatMessage 변환 성공: SessionId={chatMessage.SessionId}, HasText={chatMessage.HasTextData()}, HasAudio={chatMessage.HasVoiceData()}");
+                
+                OnChatMessageReceived?.Invoke(chatMessage);
             }
             catch (Exception ex)
             {
                 Debug.LogError($"채팅 메시지 처리 중 오류: {ex.Message}");
+                Debug.LogError($"원시 데이터: {data}");
             }
         }
-
+        
         #endregion
-    }
-
-    /// <summary>
-    /// WebSocket 메시지 기본 구조
-    /// </summary>
-    [Serializable]
-    public class WebSocketMessage
-    {
-        public string type;
-        public object data;
-    }
-
-    /// <summary>
-    /// 세션 ID 데이터
-    /// </summary>
-    [Serializable]
-    public class SessionIdData
-    {
-        public string session_id;
-    }
-
-    /// <summary>
-    /// 채팅 데이터
-    /// </summary>
-    [Serializable]
-    public class ChatData
-    {
-        public string message;
-        public string sessionId;
-        public long timestamp;
     }
 } 

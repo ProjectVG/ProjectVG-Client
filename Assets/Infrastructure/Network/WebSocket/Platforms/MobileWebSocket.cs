@@ -121,6 +121,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                 {
                     // TODO : 네이티브 WebSocket 메시지 수신
                     // TODO : 실제 구현 시 네이티브 플러그인에서 메시지 수신
+                    // TODO : 오디오 데이터를 포함한 큰 메시지를 처리하기 위해 최소 1MB 버퍼 사용 권장
                     await UniTask.Delay(100); 
                 }
             }
