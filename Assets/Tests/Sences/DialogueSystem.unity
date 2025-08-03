@@ -1146,6 +1146,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _webSocketManager: {fileID: 0}
   _voiceManager: {fileID: 329593229}
+  _chatBubbleManager: {fileID: 0}
   _characterId: 44444444-4444-4444-4444-444444444444
   _userId: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
   _enableMessageQueue: 1
@@ -3294,9 +3295,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bebe894334d166c44b4b4e1c755d03ae, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _scrollRect: {fileID: 0}
-  _gridLayoutGroup: {fileID: 0}
-  _contentSizeFitter: {fileID: 0}
+  _scrollRect: {fileID: 1980053886}
+  _gridLayoutGroup: {fileID: 47325970}
+  _contentSizeFitter: {fileID: 47325969}
   _chatBubblePrefab: {fileID: 3575337311992857127, guid: 7151716ef12e2424d866e4db41b1f6f9, type: 3}
   _bubbleContainer: {fileID: 47325968}
   _enableQueueAnimation: 1

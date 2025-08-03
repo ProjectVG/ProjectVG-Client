@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,16 +8,16 @@ using ProjectVG.Domain.Chat.View;
 
 namespace ProjectVG.Domain.Chat.Service
 {
-    public class ChatBubbleManager : Singleton<ChatBubbleManager>
+    public class ChatBubbleManager : MonoBehaviour
     {
         [Header("UI Components")]
-        [SerializeField] private ScrollRect _scrollRect;
-        [SerializeField] private GridLayoutGroup _gridLayoutGroup;
-        [SerializeField] private ContentSizeFitter _contentSizeFitter;
+        [SerializeField] private ScrollRect? _scrollRect;
+        [SerializeField] private GridLayoutGroup? _gridLayoutGroup;
+        [SerializeField] private ContentSizeFitter? _contentSizeFitter;
         
         [Header("Bubble Settings")]
-        [SerializeField] private GameObject _chatBubblePrefab;
-        [SerializeField] private Transform _bubbleContainer;
+        [SerializeField] private GameObject? _chatBubblePrefab;
+        [SerializeField] private Transform? _bubbleContainer;
         
         [Header("Queue Animation Settings")]
         [SerializeField] private bool _enableQueueAnimation = true;
@@ -31,15 +32,14 @@ namespace ProjectVG.Domain.Chat.Service
         
         public int ActiveBubbleCount => _activeBubbles.Count;
         
-        public event Action<ChatBubbleUI> OnBubbleCreated;
-        public event Action<ChatBubbleUI> OnBubbleDestroyed;
-        public event Action OnAllBubblesCleared;
+        public event Action<ChatBubbleUI>? OnBubbleCreated;
+        public event Action<ChatBubbleUI>? OnBubbleDestroyed;
+        public event Action? OnAllBubblesCleared;
         
         #region Unity Lifecycle
         
-        protected override void Awake()
+        private void Awake()
         {
-            base.Awake();
             Initialize();
         }
         
@@ -54,15 +54,22 @@ namespace ProjectVG.Domain.Chat.Service
         
         public void CreateBubble(Actor actor, string text, float displayTime = -1f)
         {
+            if (_chatBubblePrefab == null || _bubbleContainer == null)
+            {
+                Debug.LogError("ChatBubblePrefab 또는 BubbleContainer가 설정되지 않았습니다!");
+                return;
+            }
+            
             try
             {
-                GameObject bubbleObject = Instantiate(_chatBubblePrefab, _bubbleContainer);
-                ChatBubbleUI bubbleUI = bubbleObject.GetComponent<ChatBubbleUI>();
+                GameObject? bubbleObject = Instantiate(_chatBubblePrefab, _bubbleContainer);
+                ChatBubbleUI? bubbleUI = bubbleObject?.GetComponent<ChatBubbleUI>();
                 
                 if (bubbleUI == null)
                 {
                     Debug.LogError("ChatBubbleUI 컴포넌트를 찾을 수 없습니다!");
-                    Destroy(bubbleObject);
+                    if (bubbleObject != null)
+                        Destroy(bubbleObject);
                     return;
                 }
                 
@@ -101,17 +108,14 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        public void RemoveBubble(ChatBubbleUI bubble)
+        public void RemoveBubble(ChatBubbleUI? bubble)
         {
             if (bubble == null) return;
             
             try
             {
-                if (bubble != null)
-                {
-                    bubble.OnBubbleDestroyed -= OnBubbleDestroyed;
-                    bubble.OnToastAnimationComplete -= OnBubbleToastAnimationComplete;
-                }
+                bubble.OnBubbleDestroyed -= OnBubbleDestroyed;
+                bubble.OnToastAnimationComplete -= OnBubbleToastAnimationComplete;
                 
                 _activeBubbles.Remove(bubble);
                 
@@ -187,7 +191,7 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        private System.Collections.IEnumerator QueueAnimationWithDelay(ChatBubbleUI bubble, float delay)
+        private System.Collections.IEnumerator QueueAnimationWithDelay(ChatBubbleUI? bubble, float delay)
         {
             yield return new WaitForSeconds(delay);
             
@@ -197,8 +201,10 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-        private void OnBubbleToastAnimationComplete(ChatBubbleUI bubble)
+        private void OnBubbleToastAnimationComplete(ChatBubbleUI? bubble)
         {
+            if (bubble == null) return;
+            
             Debug.Log($"버블 토스트 애니메이션 완료: {bubble.Actor}");
             
             if (_scrollRect != null)
@@ -237,9 +243,11 @@ namespace ProjectVG.Domain.Chat.Service
             Debug.Log($"오래된 버블 {bubblesToRemove}개 정리 완료");
         }
         
-        private void SetupCanvasGroup(GameObject bubbleObject)
+        private void SetupCanvasGroup(GameObject? bubbleObject)
         {
-            CanvasGroup canvasGroup = bubbleObject.GetComponent<CanvasGroup>();
+            if (bubbleObject == null) return;
+            
+            CanvasGroup? canvasGroup = bubbleObject.GetComponent<CanvasGroup>();
             if (canvasGroup == null)
             {
                 canvasGroup = bubbleObject.AddComponent<CanvasGroup>();

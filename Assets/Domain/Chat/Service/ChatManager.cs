@@ -8,6 +8,7 @@ using ProjectVG.Domain.Chat.Model;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
+using ProjectVG.Domain.Chat.Service;
 
 namespace ProjectVG.Domain.Chat.Service
 {
@@ -16,6 +17,7 @@ namespace ProjectVG.Domain.Chat.Service
         [Header("Components")]
         [SerializeField] private WebSocketManager _webSocketManager;
         [SerializeField] private VoiceManager _voiceManager;
+        [SerializeField] private ChatBubbleManager _chatBubbleManager;
         
         [Header("Chat Settings")]
         [SerializeField] private string _characterId = "44444444-4444-4444-4444-444444444444";
@@ -80,6 +82,9 @@ namespace ProjectVG.Domain.Chat.Service
                     
                 if (_voiceManager == null)
                     _voiceManager = VoiceManager.Instance;
+                    
+                if (_chatBubbleManager == null)
+                    _chatBubbleManager = FindObjectOfType<ChatBubbleManager>();
                 
                 if (_webSocketManager != null)
                 {
@@ -110,6 +115,12 @@ namespace ProjectVG.Domain.Chat.Service
             try
             {
                 Debug.Log($"사용자 메시지 전송: {message}");
+                
+                // 사용자 메시지를 버블로 표시
+                if (_chatBubbleManager != null)
+                {
+                    _chatBubbleManager.CreateBubble(Actor.User, message);
+                }
                 
                 var chatService = ApiServiceManager.Instance.Chat;
                 var response = await chatService.SendChatAsync(
@@ -221,6 +232,12 @@ namespace ProjectVG.Domain.Chat.Service
             {
                 OnChatMessageReceived?.Invoke(chatMessage);
                 
+                // 캐릭터 메시지를 버블로 표시
+                if (_chatBubbleManager != null && !string.IsNullOrEmpty(chatMessage.Text))
+                {
+                    _chatBubbleManager.CreateBubble(Actor.Character, chatMessage.Text);
+                }
+                
                 if (chatMessage.VoiceData != null && _voiceManager != null)
                 {
                     _voiceManager.PlayVoice(chatMessage.VoiceData);
@@ -242,6 +259,12 @@ namespace ProjectVG.Domain.Chat.Service
                 OnChatMessageReceived?.Invoke(chatMessage);
 
                 Debug.Log($"캐릭터 메시지 처리 시작: {chatMessage.Text}");
+                
+                // 캐릭터 메시지를 버블로 표시
+                if (_chatBubbleManager != null && !string.IsNullOrEmpty(chatMessage.Text))
+                {
+                    _chatBubbleManager.CreateBubble(Actor.Character, chatMessage.Text);
+                }
                 
                 if (chatMessage.VoiceData != null && _voiceManager != null)
                 {
