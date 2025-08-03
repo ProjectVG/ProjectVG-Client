@@ -30,6 +30,10 @@ public abstract class Singleton<T> : MonoBehaviour where T : MonoBehaviour
         }
 
         _instance = this as T;
-        DontDestroyOnLoad(gameObject); // 필요 없다면 파생 클래스에서 override 후 제거
+        
+        // 에디터에서는 DontDestroyOnLoad를 사용하지 않음
+        #if !UNITY_EDITOR
+        DontDestroyOnLoad(gameObject);
+        #endif
     }
 }
