@@ -28,7 +28,8 @@ MonoBehaviour:
   autoReconnect: 1
   heartbeatInterval: 30
   enableHeartbeat: 1
-  maxMessageSize: 65536
+  maxMessageSize: 1048576
+  receiveBufferSize: 1048576
   messageTimeout: 10
   enableMessageLogging: 1
   wsMessageType: json

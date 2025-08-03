@@ -190,7 +190,7 @@ namespace ProjectVG.Infrastructure.Network.Http
                 if (!string.IsNullOrEmpty(sessionId))
                 {
                     var jsonObject = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonData);
-                    jsonObject["sessionId"] = sessionId;
+                    jsonObject["session_id"] = sessionId;
                     jsonData = JsonConvert.SerializeObject(jsonObject);
                     Debug.Log($"세션 ID 자동 주입: {sessionId}");
                 }

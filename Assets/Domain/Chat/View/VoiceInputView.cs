@@ -10,14 +10,11 @@ using ProjectVG.Core.Audio;
 namespace ProjectVG.Domain.Chat.View
 {
     /// <summary>
-    /// 채팅 입력 UI 컴포넌트
-    /// 텍스트 입력과 음성 입력을 지원합니다.
+    /// 음성 입력 UI 컴포넌트
     /// </summary>
-    public class ChatInputView : MonoBehaviour
+    public class VoiceInputView : MonoBehaviour
     {
         [Header("UI Components")]
-        [SerializeField] private TMP_InputField _inputField;
-        [SerializeField] private Button _btnSend;
         [SerializeField] private Button _btnVoice;
         [SerializeField] private Button _btnVoiceStop;
         [SerializeField] private TextMeshProUGUI _txtVoiceStatus;
@@ -33,7 +30,6 @@ namespace ProjectVG.Domain.Chat.View
         private bool _isRecording = false;
         private float _recordingStartTime;
         
-        public event Action<string>? OnTextMessageSent;
         public event Action<string>? OnVoiceMessageSent;
         public event Action<string>? OnError;
         
@@ -43,42 +39,68 @@ namespace ProjectVG.Domain.Chat.View
         }
         
         /// <summary>
-        /// ChatInputView 초기화
+        /// VoiceInputView 초기화
         /// </summary>
         public void Initialize()
         {
             SetupComponents();
             SetupEventHandlers();
             UpdateVoiceButtonState(false);
+            SetupChatManager();
         }
+        
+        #region 초기화 설정
         
         /// <summary>
         /// 컴포넌트 설정
         /// </summary>
         private void SetupComponents()
         {
-            if (_inputField == null)
-                _inputField = GetComponentInChildren<TMP_InputField>();
-                
-            if (_btnSend == null)
-                _btnSend = transform.Find("BtnSend")?.GetComponent<Button>();
-                
             if (_btnVoice == null)
+            {
                 _btnVoice = transform.Find("BtnVoice")?.GetComponent<Button>();
+                if (_btnVoice == null)
+                {
+                    Debug.LogWarning("VoiceInputView: BtnVoice 버튼을 찾을 수 없습니다.");
+                }
+            }
                 
             if (_btnVoiceStop == null)
+            {
                 _btnVoiceStop = transform.Find("BtnVoiceStop")?.GetComponent<Button>();
+                if (_btnVoiceStop == null)
+                {
+                    Debug.LogWarning("VoiceInputView: BtnVoiceStop 버튼을 찾을 수 없습니다.");
+                }
+            }
                 
             if (_txtVoiceStatus == null)
+            {
                 _txtVoiceStatus = transform.Find("TxtVoiceStatus")?.GetComponent<TextMeshProUGUI>();
+                if (_txtVoiceStatus == null)
+                {
+                    Debug.LogWarning("VoiceInputView: TxtVoiceStatus 텍스트를 찾을 수 없습니다.");
+                }
+            }
                 
-            // AudioRecorder는 싱글톤으로 가져오기
             if (_audioRecorder == null)
+            {
                 _audioRecorder = AudioRecorder.Instance;
+                if (_audioRecorder == null)
+                {
+                    _audioRecorder = gameObject.AddComponent<AudioRecorder>();
+                    Debug.Log("VoiceInputView: AudioRecorder 컴포넌트를 자동으로 추가했습니다.");
+                }
+            }
                 
-            // STT 서비스 초기화
             if (_sttService == null)
+            {
                 _sttService = new STTService();
+                if (_sttService == null)
+                {
+                    Debug.LogError("VoiceInputView: STTService를 생성할 수 없습니다.");
+                }
+            }
         }
         
         /// <summary>
@@ -86,19 +108,12 @@ namespace ProjectVG.Domain.Chat.View
         /// </summary>
         private void SetupEventHandlers()
         {
-            if (_btnSend != null)
-                _btnSend.onClick.AddListener(OnSendButtonClicked);
-                
             if (_btnVoice != null)
                 _btnVoice.onClick.AddListener(OnVoiceButtonClicked);
                 
             if (_btnVoiceStop != null)
                 _btnVoiceStop.onClick.AddListener(OnVoiceStopButtonClicked);
                 
-            if (_inputField != null)
-                _inputField.onSubmit.AddListener(OnInputFieldSubmitted);
-                
-            // AudioRecorder 이벤트 구독
             if (_audioRecorder != null)
             {
                 _audioRecorder.OnRecordingStarted += OnRecordingStarted;
@@ -118,32 +133,25 @@ namespace ProjectVG.Domain.Chat.View
         }
         
         /// <summary>
-        /// 텍스트 메시지 전송
+        /// ChatManager 자동 설정 (null인 경우 자동 생성)
         /// </summary>
-        /// <param name="message">전송할 메시지</param>
-        public void SendTextMessage(string message)
+        public void SetupChatManager()
         {
-            if (string.IsNullOrWhiteSpace(message))
-                return;
-                
-            try
+            if (_chatManager == null)
             {
-                if (_chatManager != null)
+                _chatManager = FindObjectOfType<ChatManager>();
+                if (_chatManager == null)
                 {
-                    _chatManager.SendUserMessage(message);
+                    Debug.LogWarning("VoiceInputView: ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");
                 }
-                
-                OnTextMessageSent?.Invoke(message);
-                ClearInput();
-                
-                Debug.Log($"텍스트 메시지 전송: {message}");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"텍스트 메시지 전송 실패: {ex.Message}");
-                OnError?.Invoke($"메시지 전송 실패: {ex.Message}");
+                else
+                {
+                    Debug.Log("VoiceInputView: ChatManager를 자동으로 찾아서 설정했습니다.");
+                }
             }
         }
+        
+        #endregion
         
         /// <summary>
         /// 음성 메시지 전송
@@ -158,12 +166,15 @@ namespace ProjectVG.Domain.Chat.View
             {
                 UpdateVoiceStatus(_voiceStatusProcessing);
                 
-                // STT 서비스를 통해 음성을 텍스트로 변환
                 string transcribedText = await ConvertSpeechToText(audioData);
                 
                 if (!string.IsNullOrWhiteSpace(transcribedText))
                 {
-                    SendTextMessage(transcribedText);
+                    if (_chatManager != null)
+                    {
+                        _chatManager.SendUserMessage(transcribedText);
+                    }
+                    
                     OnVoiceMessageSent?.Invoke(transcribedText);
                 }
                 else
@@ -204,7 +215,6 @@ namespace ProjectVG.Domain.Chat.View
                 UpdateVoiceButtonState(true);
                 UpdateVoiceStatus(_voiceStatusRecording);
                 
-                // AudioRecorder를 통해 음성 녹음 시작
                 bool success = _audioRecorder.StartRecording();
                 if (!success)
                 {
@@ -243,7 +253,6 @@ namespace ProjectVG.Domain.Chat.View
                 UpdateVoiceButtonState(false);
                 UpdateVoiceStatus(string.Empty);
                 
-                // AudioRecorder를 통해 음성 녹음 중지
                 AudioClip recordedClip = _audioRecorder.StopRecording();
                 if (recordedClip != null)
                 {
@@ -263,17 +272,7 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        /// <summary>
-        /// 입력 필드 초기화
-        /// </summary>
-        public void ClearInput()
-        {
-            if (_inputField != null)
-            {
-                _inputField.text = string.Empty;
-                _inputField.ActivateInputField();
-            }
-        }
+        #region UI 업데이트
         
         /// <summary>
         /// 음성 버튼 상태 업데이트
@@ -301,8 +300,12 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
+        #endregion
+        
+        #region 음성 처리
+        
         /// <summary>
-        /// 음성을 텍스트로 변환 (STT 서비스 호출)
+        /// 음성을 텍스트로 변환
         /// </summary>
         /// <param name="audioData">음성 데이터</param>
         /// <returns>변환된 텍스트</returns>
@@ -316,13 +319,11 @@ namespace ProjectVG.Domain.Chat.View
             
             try
             {
-                // STT 서비스 초기화 (필요한 경우)
                 if (!_sttService.IsAvailable)
                 {
                     await _sttService.InitializeAsync();
                 }
                 
-                // 음성을 텍스트로 변환
                 string transcribedText = await _sttService.ConvertSpeechToTextAsync(audioData);
                 return transcribedText;
             }
@@ -333,16 +334,9 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        /// <summary>
-        /// 전송 버튼 클릭 처리
-        /// </summary>
-        private void OnSendButtonClicked()
-        {
-            if (_inputField != null && !string.IsNullOrWhiteSpace(_inputField.text))
-            {
-                SendTextMessage(_inputField.text);
-            }
-        }
+        #endregion
+        
+        #region 이벤트 핸들러
         
         /// <summary>
         /// 음성 버튼 클릭 처리
@@ -358,15 +352,6 @@ namespace ProjectVG.Domain.Chat.View
         private void OnVoiceStopButtonClicked()
         {
             StopVoiceRecording();
-        }
-        
-        /// <summary>
-        /// 입력 필드 제출 처리
-        /// </summary>
-        /// <param name="text">입력된 텍스트</param>
-        private void OnInputFieldSubmitted(string text)
-        {
-            SendTextMessage(text);
         }
         
         /// <summary>
@@ -404,9 +389,10 @@ namespace ProjectVG.Domain.Chat.View
             OnError?.Invoke(error);
         }
         
+        #endregion
+        
         private void Update()
         {
-            // 녹음 시간 제한 체크
             if (_isRecording && Time.time - _recordingStartTime > _maxRecordingTime)
             {
                 StopVoiceRecording();
@@ -420,7 +406,6 @@ namespace ProjectVG.Domain.Chat.View
                 StopVoiceRecording();
             }
             
-            // 이벤트 구독 해제
             if (_audioRecorder != null)
             {
                 _audioRecorder.OnRecordingStarted -= OnRecordingStarted;

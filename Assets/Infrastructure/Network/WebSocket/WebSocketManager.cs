@@ -174,6 +174,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             Debug.Log($"[WebSocket] 자동 재연결: {(_autoReconnect ? "활성화" : "비활성화")}");
             Debug.Log($"[WebSocket] 재연결 시도: {_reconnectAttempts}/{_maxReconnectAttempts}");
             Debug.Log($"[WebSocket] 지수 백오프: {(_useExponentialBackoff ? "활성화" : "비활성화")}");
+            Debug.Log($"[WebSocket] 최대 메시지 크기: {NetworkConfig.MaxMessageSize / 1024}KB");
+            Debug.Log($"[WebSocket] 수신 버퍼 크기: {NetworkConfig.ReceiveBufferSize / 1024}KB");
         }
 
         #region Private Initialization
@@ -377,15 +379,17 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 string messageType = jsonObject["type"]?.ToString();
                 JToken dataToken = jsonObject["data"];
                 
-                Debug.Log($"[WebSocket] {messageType}: {dataToken}");
+                Debug.Log($"[WebSocket] \n" +
+                    $"Type : {messageType} \n" +
+                    $"Data : {dataToken} \n");
 
                 switch (messageType)
                 {
                     case "session":
-                        ProcessSessionMessage(dataToken.ToString());
+                        ProcessSessionMessage(dataToken.ToString(Formatting.None));
                         break;
                     case "chat":
-                        ProcessChatMessage(dataToken.ToString());
+                        ProcessChatMessage(dataToken.ToString(Formatting.None));
                         break;
                     default:
                         Debug.LogWarning($"알 수 없는 메시지 타입: {messageType}");
@@ -421,14 +425,16 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             try
             {
-                var chatResponse = JsonUtility.FromJson<ChatResponse>(data);
+                Debug.Log($"[WebSocket] ProcessChatMessage - 원시 데이터: {data}");
+                
+                var chatResponse = JsonConvert.DeserializeObject<ChatResponse>(data);
                 if (chatResponse == null)
                 {
                     Debug.LogError("ChatResponse 파싱 실패");
                     return;
                 }
 
-                Debug.Log($"ChatResponse 파싱 성공: Type={chatResponse.Type}, SessionId={chatResponse.SessionId}");
+                Debug.Log($"[WebSocket] ChatResponse 파싱 성공: Type={chatResponse.Type}, SessionId={chatResponse.SessionId}");
 
                 var chatMessage = ChatMessage.FromChatResponse(chatResponse);
                 if (chatMessage == null)
@@ -437,7 +443,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                     return;
                 }
 
-                Debug.Log($"ChatMessage 변환 성공: SessionId={chatMessage.SessionId}, HasText={chatMessage.HasTextData()}, HasAudio={chatMessage.HasVoiceData()}");
+                Debug.Log($"[WebSocket] ChatMessage 변환 성공: SessionId={chatMessage.SessionId}, HasText={chatMessage.HasTextData()}, HasAudio={chatMessage.HasVoiceData()}");
                 
                 OnChatMessageReceived?.Invoke(chatMessage);
             }

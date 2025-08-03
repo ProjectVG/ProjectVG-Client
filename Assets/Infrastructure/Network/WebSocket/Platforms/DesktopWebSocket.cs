@@ -5,6 +5,7 @@ using Cysharp.Threading.Tasks;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
+using ProjectVG.Infrastructure.Network.Configs;
 
 namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
 {
@@ -118,7 +119,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
 
         private async Task ReceiveLoopAsync()
         {
-            var buffer = new byte[4096];
+            var buffer = new byte[NetworkConfig.ReceiveBufferSize];
             
             try
             {

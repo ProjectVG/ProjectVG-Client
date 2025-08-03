@@ -21,8 +21,8 @@ namespace ProjectVG.Domain.Chat.Service
         [SerializeField] private VoiceManager _voiceManager;
         
         [Header("Chat Settings")]
-        [SerializeField] private string _characterId = "test-character";
-        [SerializeField] private string _userId = "test-user";
+        [SerializeField] private string _characterId = "44444444-4444-4444-4444-444444444444";
+        [SerializeField] private string _userId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
         
         private bool _isConnected = false;
         private bool _isInitialized = false;

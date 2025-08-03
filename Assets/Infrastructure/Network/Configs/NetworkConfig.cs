@@ -32,7 +32,8 @@ namespace ProjectVG.Infrastructure.Network.Configs
         [SerializeField] private bool autoReconnect = true;
         [SerializeField] private float heartbeatInterval = 30f;
         [SerializeField] private bool enableHeartbeat = true;
-        [SerializeField] private int maxMessageSize = 65536; // 64KB
+        [SerializeField] private int maxMessageSize = 1048576;
+        [SerializeField] private int receiveBufferSize = 1048576;
         [SerializeField] private float messageTimeout = 10f;
         [SerializeField] private bool enableMessageLogging = true;
         [SerializeField] private string wsMessageType = "json"; // "json" 또는 "binary"
@@ -196,6 +197,11 @@ namespace ProjectVG.Infrastructure.Network.Configs
         /// 최대 메시지 크기
         /// </summary>
         public static int MaxMessageSize => Instance.maxMessageSize;
+        
+        /// <summary>
+        /// 수신 버퍼 크기
+        /// </summary>
+        public static int ReceiveBufferSize => Instance.receiveBufferSize;
         
         /// <summary>
         /// 메시지 타임아웃
@@ -388,7 +394,8 @@ namespace ProjectVG.Infrastructure.Network.Configs
             instance.autoReconnect = true;
             instance.heartbeatInterval = 30f;
             instance.enableHeartbeat = true;
-            instance.maxMessageSize = 65536;
+            instance.maxMessageSize = 1048576;
+            instance.receiveBufferSize = 1048576;
             instance.messageTimeout = 10f;
             instance.enableMessageLogging = true;
             instance.userAgent = "ProjectVG-Client/1.0";
