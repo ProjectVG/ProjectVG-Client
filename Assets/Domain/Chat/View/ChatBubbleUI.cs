@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections;
 using UnityEngine;
@@ -15,11 +16,11 @@ namespace ProjectVG.Domain.Chat.View
     public class ChatBubbleUI : MonoBehaviour
     {
         [Header("UI Components")]
-        [SerializeField] private RectTransform _rectTransform;
-        [SerializeField] private TextMeshProUGUI _textComponent;
-        [SerializeField] private Image _backgroundImage;
+        [SerializeField] private RectTransform? _rectTransform;
+        [SerializeField] private TextMeshProUGUI? _textComponent;
+        [SerializeField] private Image? _backgroundImage;
         
-        private CanvasGroup _canvasGroup;
+        private CanvasGroup? _canvasGroup;
         
         [Header("Animation Settings")]
         [SerializeField] private float _slideInDuration = 0.25f;
@@ -52,31 +53,31 @@ namespace ProjectVG.Domain.Chat.View
         [SerializeField] private Color _characterBubbleColor = Color.gray;
         
         [Header("Layout Settings")]
-        [SerializeField] private ContentSizeFitter _contentSizeFitter;
-        [SerializeField] private LayoutElement _layoutElement;
+        [SerializeField] private ContentSizeFitter? _contentSizeFitter;
+        [SerializeField] private LayoutElement? _layoutElement;
         
         private Actor _actor;
-        private string _fullText;
+        private string _fullText = string.Empty;
         private float _displayTime;
         
         private bool _isInitialized = false;
         private bool _isAnimating = false;
         private bool _isTyping = false;
         private float _typingProgress = 0f;
-        private Coroutine _typingCoroutine;
-        private Coroutine _animationCoroutine;
+        private Coroutine? _typingCoroutine;
+        private Coroutine? _animationCoroutine;
         
-        private ChatBubbleManager _manager;
+        private ChatBubbleManager? _manager;
         
         // 애니메이션 관련 변수들
         private Vector3 _originalPosition;
         private Vector3 _originalScale;
         private bool _isToastAnimationComplete = false;
         
-        public event Action<ChatBubbleUI> OnBubbleCreated;
-        public event Action<ChatBubbleUI> OnBubbleTypingComplete;
-        public event Action<ChatBubbleUI> OnBubbleDestroyed;
-        public event Action<ChatBubbleUI> OnToastAnimationComplete;
+        public event Action<ChatBubbleUI>? OnBubbleCreated;
+        public event Action<ChatBubbleUI>? OnBubbleTypingComplete;
+        public event Action<ChatBubbleUI>? OnBubbleDestroyed;
+        public event Action<ChatBubbleUI>? OnToastAnimationComplete;
         
         public Actor Actor => _actor;
         public string Text => _fullText;
@@ -109,7 +110,7 @@ namespace ProjectVG.Domain.Chat.View
         
         #region Public Methods
         
-        public void Initialize(Actor actor, string text, float displayTime, ChatBubbleManager manager = null)
+        public void Initialize(Actor actor, string text, float displayTime, ChatBubbleManager? manager = null)
         {
             _actor = actor;
             _fullText = text;
@@ -119,8 +120,8 @@ namespace ProjectVG.Domain.Chat.View
             ApplyStyle();
             
             Canvas.ForceUpdateCanvases();
-            _originalPosition = _rectTransform.localPosition;
-            _originalScale = _rectTransform.localScale;
+            _originalPosition = _rectTransform?.localPosition ?? Vector3.zero;
+            _originalScale = _rectTransform?.localScale ?? Vector3.one;
             
             StartToastAnimation();
             
@@ -243,7 +244,7 @@ namespace ProjectVG.Domain.Chat.View
         
         private CanvasGroup GetOrCreateCanvasGroup()
         {
-            CanvasGroup canvasGroup = GetComponent<CanvasGroup>();
+            CanvasGroup? canvasGroup = GetComponent<CanvasGroup>();
             if (canvasGroup == null)
             {
                 canvasGroup = gameObject.AddComponent<CanvasGroup>();
@@ -299,7 +300,7 @@ namespace ProjectVG.Domain.Chat.View
         
         private void StartToastAnimation()
         {
-            if (_isAnimating) return;
+            if (_isAnimating || _rectTransform == null) return;
             
             _isAnimating = true;
             Debug.Log($"ChatBubbleUI 토스트 애니메이션 시작: {_actor} - {_fullText}");
@@ -316,10 +317,11 @@ namespace ProjectVG.Domain.Chat.View
         
         private void InitializeAnimation()
         {
-            if (_canvasGroup != null)
-            {
-                _canvasGroup.alpha = 0f;
-            }
+            if (_canvasGroup == null) return;
+            
+            _canvasGroup.alpha = 0f;
+            
+            if (_rectTransform == null) return;
             
             Vector3 startPosition = _originalPosition;
             startPosition.y -= _toastBounceHeight;
@@ -332,6 +334,8 @@ namespace ProjectVG.Domain.Chat.View
         
         private IEnumerator ToastBounceAnimation()
         {
+            if (_rectTransform == null) yield break;
+            
             float elapsed = 0f;
             float duration = _toastBounceDuration;
             
@@ -417,6 +421,8 @@ namespace ProjectVG.Domain.Chat.View
         
         private IEnumerator QueueSlideAnimation()
         {
+            if (_rectTransform == null) yield break;
+            
             Vector3 startPosition = _rectTransform.localPosition;
             
             Canvas.ForceUpdateCanvases();
@@ -469,6 +475,8 @@ namespace ProjectVG.Domain.Chat.View
         
         private IEnumerator TypeText()
         {
+            if (_textComponent == null) yield break;
+            
             int totalCharacters = _fullText.Length;
             int currentCharacter = 0;
             

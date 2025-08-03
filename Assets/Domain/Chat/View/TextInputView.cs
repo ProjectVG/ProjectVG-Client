@@ -10,10 +10,11 @@ namespace ProjectVG.Domain.Chat.View
     public class TextInputView : MonoBehaviour
     {
         [Header("UI Components")]
-        [SerializeField] private TMP_InputField _inputField;
-        [SerializeField] private Button _btnSend;
+        [SerializeField] private TMP_InputField? _inputField;
+        [SerializeField] private Button? _btnSend;
         
         private ChatManager? _chatManager;
+        private bool _isProcessingSubmit = false;
         
         public event Action<string>? OnTextMessageSent;
         public event Action<string>? OnError;
@@ -29,7 +30,7 @@ namespace ProjectVG.Domain.Chat.View
         
         #region Public Methods
         
-        public void Initialize()
+        private void Initialize()
         {
             SetupComponents();
             SetupEventHandlers();
@@ -44,15 +45,14 @@ namespace ProjectVG.Domain.Chat.View
         public void SendTextMessage(string message)
         {
             if (string.IsNullOrWhiteSpace(message))
+            {
+                OnError?.Invoke("빈 메시지는 전송할 수 없습니다.");
                 return;
+            }
                 
             try
             {
-                if (_chatManager != null)
-                {
-                    _chatManager.SendUserMessage(message);
-                }
-                
+                _chatManager?.SendUserMessage(message);
                 OnTextMessageSent?.Invoke(message);
                 ClearInput();
                 
@@ -71,6 +71,18 @@ namespace ProjectVG.Domain.Chat.View
             {
                 _inputField.text = string.Empty;
                 _inputField.ActivateInputField();
+            }
+        }
+        
+        private void SetupChatManager()
+        {
+            if (_chatManager == null)
+            {
+                _chatManager = FindAnyObjectByType<ChatManager>();
+                if (_chatManager == null)
+                {
+                    Debug.LogWarning("TextInputView: ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");
+                }
             }
         }
         
@@ -108,22 +120,6 @@ namespace ProjectVG.Domain.Chat.View
                 _inputField.onSubmit.AddListener(OnInputFieldSubmitted);
         }
         
-        public void SetupChatManager()
-        {
-            if (_chatManager == null)
-            {
-                _chatManager = FindAnyObjectByType<ChatManager>();
-                if (_chatManager == null)
-                {
-                    Debug.LogWarning("TextInputView: ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");
-                }
-                else
-                {
-                    Debug.Log("TextInputView: ChatManager를 자동으로 찾아서 설정했습니다.");
-                }
-            }
-        }
-        
         private void OnSendButtonClicked()
         {
             if (_inputField != null && !string.IsNullOrWhiteSpace(_inputField.text))
@@ -134,7 +130,24 @@ namespace ProjectVG.Domain.Chat.View
         
         private void OnInputFieldSubmitted(string text)
         {
+            if (_isProcessingSubmit) 
+            {
+                Debug.Log($"TextInputView: 중복 호출 방지됨 - '{text}'");
+                return;
+            }
+            
+            _isProcessingSubmit = true;
+            Debug.Log($"TextInputView: OnInputFieldSubmitted 호출됨 - '{text}'");
             SendTextMessage(text);
+            
+            // 다음 프레임에서 플래그 리셋
+            StartCoroutine(ResetSubmitFlag());
+        }
+        
+        private System.Collections.IEnumerator ResetSubmitFlag()
+        {
+            yield return null;
+            _isProcessingSubmit = false;
         }
         
         #endregion

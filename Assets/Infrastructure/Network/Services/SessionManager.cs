@@ -45,36 +45,6 @@ namespace ProjectVG.Infrastructure.Network.Services
         
         #region Public Methods
         
-        public void Initialize()
-        {
-            if (_isInitialized)
-                return;
-                
-            try
-            {
-                if (_webSocketManager == null)
-                {
-                    _webSocketManager = WebSocketManager.Instance;
-                    if (_webSocketManager == null)
-                    {
-                        throw new InvalidOperationException("WebSocketManager.Instance가 null입니다. WebSocketManager가 먼저 초기화되어야 합니다.");
-                    }
-                }
-                
-                _webSocketManager.OnConnected += OnWebSocketConnected;
-                _webSocketManager.OnDisconnected += OnWebSocketDisconnected;
-                _webSocketManager.OnError += OnWebSocketError;
-                
-                _isInitialized = true;
-                Debug.Log("SessionManager 초기화 완료 - WebSocketManager와 강하게 결합됨");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"SessionManager 초기화 실패: {ex.Message}");
-                OnSessionError?.Invoke($"SessionManager 초기화 실패: {ex.Message}");
-            }
-        }
-        
         public async UniTask<string> GetSessionIdAsync()
         {
             if (string.IsNullOrEmpty(_sessionId) || !_isSessionConnected)
@@ -157,11 +127,37 @@ namespace ProjectVG.Infrastructure.Network.Services
                 _webSocketManager.OnError -= OnWebSocketError;
             }
         }
-        
+
         #endregion
-        
+
         #region Private Methods
-        
+
+        private void Initialize()
+        {
+            if (_isInitialized)
+                return;
+
+            try {
+                if (_webSocketManager == null) {
+                    _webSocketManager = WebSocketManager.Instance;
+                    if (_webSocketManager == null) {
+                        throw new InvalidOperationException("[SessionManager] WebSocketManager Instance가 null입니다. WebSocketManager가 먼저 초기화되어야 합니다.");
+                    }
+                }
+
+                _webSocketManager.OnConnected += OnWebSocketConnected;
+                _webSocketManager.OnDisconnected += OnWebSocketDisconnected;
+                _webSocketManager.OnError += OnWebSocketError;
+
+                _isInitialized = true;
+                Debug.Log("[SessionManager] SessionManager 초기화 완료");
+            }
+            catch (Exception ex) {
+                Debug.LogError($"[SessionManager] SessionManager 초기화 실패: {ex.Message}");
+                OnSessionError?.Invoke($"[SessionManager] SessionManager 초기화 실패: {ex.Message}");
+            }
+        }
+
         private void OnWebSocketConnected()
         {
             Debug.Log("WebSocket 연결됨 - 세션 요청 준비");

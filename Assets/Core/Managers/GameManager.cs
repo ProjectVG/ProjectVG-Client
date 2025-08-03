@@ -236,7 +236,7 @@ namespace ProjectVG.Core.Managers
             
             if (_sessionManager != null)
             {
-                _sessionManager.Initialize();
+
             }
             
             if (_httpApiClient != null)

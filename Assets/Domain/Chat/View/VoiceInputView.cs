@@ -12,17 +12,17 @@ namespace ProjectVG.Domain.Chat.View
     public class VoiceInputView : MonoBehaviour
     {
         [Header("UI Components")]
-        [SerializeField] private Button _btnVoice;
-        [SerializeField] private Button _btnVoiceStop;
-        [SerializeField] private TextMeshProUGUI _txtVoiceStatus;
+        [SerializeField] private Button? _btnVoice;
+        [SerializeField] private Button? _btnVoiceStop;
+        [SerializeField] private TextMeshProUGUI? _txtVoiceStatus;
         
         [Header("Voice Settings")]
         [SerializeField] private float _maxRecordingTime = 30f;
         [SerializeField] private string _voiceStatusRecording = "녹음 중...";
         [SerializeField] private string _voiceStatusProcessing = "음성을 텍스트로 변환 중...";
         
-        private ChatManager _chatManager;
-        private AudioRecorder _audioRecorder;
+        private ChatManager? _chatManager;
+        private AudioRecorder? _audioRecorder;
         private ISTTService? _sttService;
         private bool _isRecording = false;
         private float _recordingStartTime;
@@ -65,7 +65,7 @@ namespace ProjectVG.Domain.Chat.View
         
         #region Public Methods
         
-        public void Initialize()
+        private void Initialize()
         {
             SetupComponents();
             SetupEventHandlers();
@@ -81,7 +81,10 @@ namespace ProjectVG.Domain.Chat.View
         public async void SendVoiceMessage(byte[] audioData)
         {
             if (audioData == null || audioData.Length == 0)
+            {
+                OnError?.Invoke("음성 데이터가 비어있습니다.");
                 return;
+            }
                 
             try
             {
@@ -91,11 +94,7 @@ namespace ProjectVG.Domain.Chat.View
                 
                 if (!string.IsNullOrWhiteSpace(transcribedText))
                 {
-                    if (_chatManager != null)
-                    {
-                        _chatManager.SendUserMessage(transcribedText);
-                    }
-                    
+                    _chatManager?.SendUserMessage(transcribedText);
                     OnVoiceMessageSent?.Invoke(transcribedText);
                 }
                 else
@@ -121,7 +120,6 @@ namespace ProjectVG.Domain.Chat.View
                 
             if (_audioRecorder == null)
             {
-                Debug.LogError("AudioRecorder가 없습니다.");
                 OnError?.Invoke("AudioRecorder가 없습니다.");
                 return;
             }
@@ -136,9 +134,7 @@ namespace ProjectVG.Domain.Chat.View
                 bool success = _audioRecorder.StartRecording();
                 if (!success)
                 {
-                    _isRecording = false;
-                    UpdateVoiceButtonState(false);
-                    UpdateVoiceStatus(string.Empty);
+                    StopVoiceRecording();
                 }
                 
                 Debug.Log("음성 녹음 시작");
@@ -168,7 +164,7 @@ namespace ProjectVG.Domain.Chat.View
                 UpdateVoiceButtonState(false);
                 UpdateVoiceStatus(string.Empty);
                 
-                AudioClip recordedClip = _audioRecorder.StopRecording();
+                AudioClip? recordedClip = _audioRecorder.StopRecording();
                 if (recordedClip != null)
                 {
                     byte[] audioData = _audioRecorder.AudioClipToBytes(recordedClip);
@@ -257,18 +253,14 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        public void SetupChatManager()
+        private void SetupChatManager()
         {
             if (_chatManager == null)
             {
-                _chatManager = FindObjectOfType<ChatManager>();
+                _chatManager = FindAnyObjectByType<ChatManager>();
                 if (_chatManager == null)
                 {
                     Debug.LogWarning("VoiceInputView: ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");
-                }
-                else
-                {
-                    Debug.Log("VoiceInputView: ChatManager를 자동으로 찾아서 설정했습니다.");
                 }
             }
         }
