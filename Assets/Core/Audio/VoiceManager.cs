@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using ProjectVG.Domain.Chat.Model;
+using Cysharp.Threading.Tasks;
 
 namespace ProjectVG.Core.Audio
 {
@@ -56,16 +57,37 @@ namespace ProjectVG.Core.Audio
                 _voiceSource = gameObject.AddComponent<AudioSource>();
                 _voiceSource.playOnAwake = false;
                 _voiceSource.loop = false;
+                _voiceSource.volume = _volume; // 초기 볼륨을 설정된 볼륨으로
             }
             
             SetVolume(_volume);
         }
         
         /// <summary>
+        /// 재생 전 AudioSource 완전 정리
+        /// </summary>
+        private void PrepareAudioSource()
+        {
+            if (_voiceSource == null) return;
+            
+            // 이전 재생 완전 중지
+            if (_voiceSource.isPlaying)
+            {
+                _voiceSource.Stop();
+            }
+            
+            // 볼륨을 설정된 값으로 초기화
+            _voiceSource.volume = _volume;
+            
+            // 클립 완전 정리
+            _voiceSource.clip = null;
+        }
+        
+        /// <summary>
         /// VoiceData를 사용하여 음성을 재생합니다.
         /// </summary>
         /// <param name="voiceData">재생할 VoiceData</param>
-        public void PlayVoice(VoiceData voiceData)
+        public async void PlayVoice(VoiceData voiceData)
         {
             if (voiceData == null || !voiceData.IsPlayable())
             {
@@ -73,9 +95,14 @@ namespace ProjectVG.Core.Audio
                 return;
             }
             
+            PrepareAudioSource();
+            
+            // 재생 전 짧은 대기 (터짐 방지)
+            await UniTask.Delay(50); // 50ms 대기
+            
             _currentVoice = voiceData;
             _voiceSource.clip = voiceData.AudioClip;
-            _voiceSource.volume = _volume;
+            _voiceSource.volume = _volume; // 고정 볼륨 설정
             
             if (_autoPlay)
             {
@@ -84,6 +111,43 @@ namespace ProjectVG.Core.Audio
                 OnVoiceStarted?.Invoke(voiceData);
                 
                 Debug.Log($"음성 재생 시작: {voiceData.Format}, 길이: {voiceData.Length:F2}초");
+            }
+        }
+        
+        /// <summary>
+        /// VoiceData를 재생하고 완료될 때까지 기다립니다.
+        /// </summary>
+        /// <param name="voiceData">재생할 VoiceData</param>
+        /// <returns>재생 완료까지 기다리는 UniTask</returns>
+        public async UniTask PlayVoiceAsync(VoiceData voiceData)
+        {
+            if (voiceData == null || !voiceData.IsPlayable())
+            {
+                Debug.LogWarning("재생할 수 있는 VoiceData가 없습니다.");
+                return;
+            }
+            
+            PrepareAudioSource();
+            
+            // 재생 전 짧은 대기 (터짐 방지)
+            await UniTask.Delay(50); // 50ms 대기
+            
+            _currentVoice = voiceData;
+            _voiceSource.clip = voiceData.AudioClip;
+            _voiceSource.volume = _volume; // 고정 볼륨 설정
+            
+            if (_autoPlay)
+            {
+                _voiceSource.Play();
+                _isPlaying = true;
+                OnVoiceStarted?.Invoke(voiceData);
+                
+                Debug.Log($"음성 재생 시작: {voiceData.Format}, 길이: {voiceData.Length:F2}초");
+                
+                // 재생 완료까지 대기
+                await UniTask.WaitUntil(() => !_isPlaying);
+                
+                Debug.Log("음성 재생 완료 (Async)");
             }
         }
         
@@ -137,7 +201,11 @@ namespace ProjectVG.Core.Audio
         public void SetVolume(float volume)
         {
             _volume = Mathf.Clamp01(volume);
-            _voiceSource.volume = _volume;
+            
+            if (_voiceSource != null)
+            {
+                _voiceSource.volume = _volume;
+            }
             
             Debug.Log($"음성 볼륨 설정: {_volume:F2}");
         }
