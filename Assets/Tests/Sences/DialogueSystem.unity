@@ -788,6 +788,53 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 299865877}
   m_CullTransparentMesh: 1
+--- !u!1 &329593228
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 329593230}
+  - component: {fileID: 329593229}
+  m_Layer: 0
+  m_Name: Voice Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &329593229
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 329593228}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c790fc11dc6c5c4eaa90ee37fd0f53b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _voiceSource: {fileID: 0}
+  _volume: 1
+  _autoPlay: 1
+--- !u!4 &329593230
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 329593228}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 934.7036, y: 535.1225, z: -5.883249}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &455022388
 GameObject:
   m_ObjectHideFlags: 0
@@ -1079,7 +1126,7 @@ GameObject:
   - component: {fileID: 701508192}
   - component: {fileID: 701508191}
   m_Layer: 0
-  m_Name: ChatManager
+  m_Name: Chat Manager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1098,7 +1145,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _webSocketManager: {fileID: 0}
-  _voiceManager: {fileID: 0}
+  _voiceManager: {fileID: 329593229}
+  _characterId: 44444444-4444-4444-4444-444444444444
+  _userId: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
+  _enableMessageQueue: 1
+  _maxQueueSize: 100
 --- !u!4 &701508192
 Transform:
   m_ObjectHideFlags: 0
@@ -1701,7 +1752,7 @@ GameObject:
   - component: {fileID: 1108792592}
   - component: {fileID: 1108792591}
   m_Layer: 0
-  m_Name: ChatManager
+  m_Name: Game Manager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3380,3 +3431,4 @@ SceneRoots:
   - {fileID: 1108792592}
   - {fileID: 701508192}
   - {fileID: 455022390}
+  - {fileID: 329593230}

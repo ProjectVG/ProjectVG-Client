@@ -213,10 +213,8 @@ namespace ProjectVG.Domain.Chat.Service
         {
             try
             {
-                // 이벤트 발생
                 OnChatMessageReceived?.Invoke(chatMessage);
                 
-                // 음성 데이터가 있으면 재생
                 if (chatMessage.VoiceData != null && _voiceManager != null)
                 {
                     _voiceManager.PlayVoice(chatMessage.VoiceData);
@@ -241,24 +239,16 @@ namespace ProjectVG.Domain.Chat.Service
         {
             try
             {
-                // 이벤트 발생
                 OnChatMessageReceived?.Invoke(chatMessage);
 
-                // TODO : 메시지 출력
                 Debug.Log($"캐릭터 메시지 처리 시작: {chatMessage.Text}");
                 
-                // 음성 데이터가 있으면 재생 (재생 완료까지 대기)
                 if (chatMessage.VoiceData != null && _voiceManager != null)
                 {
-                    Debug.Log($"음성 재생 시작: {chatMessage.Text}");
                     await _voiceManager.PlayVoiceAsync(chatMessage.VoiceData);
-                    Debug.Log($"음성 재생 완료: {chatMessage.Text}");
                 }
-                else
-                {
-                    // 음성이 없는 경우 기본 대기 시간 (텍스트 표시 시간)
-                    await UniTask.Delay(2000); // 2초 대기
-                }
+
+                // TODO : 메시지 출력
 
                 Debug.Log($"캐릭터 메시지 처리 완료: {chatMessage.Text}");
             }
