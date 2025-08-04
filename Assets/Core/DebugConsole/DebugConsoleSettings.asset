@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2892f0b4a3a1cc84c90a2faf02d08b93, type: 3}
+  m_Name: DebugConsoleSettings
+  m_EditorClassIdentifier: 
+  _maxLogLines: 1000
+  _autoScroll: 1
+  _showTimestamp: 1
+  _showLogType: 1
+  _autoClearOldLogs: 1
+  _logRetentionTime: 300
+  _maxVisibleLogs: 500
+  _enableFiltering: 1
+  _defaultFilterKeyword: 
+  _fontSize: 12
+  _logColor: {r: 1, g: 1, b: 1, a: 1}
+  _warningColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  _errorColor: {r: 1, g: 0, b: 0, a: 1}
