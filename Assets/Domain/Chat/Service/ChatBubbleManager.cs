@@ -56,7 +56,7 @@ namespace ProjectVG.Domain.Chat.Service
         {
             if (_chatBubblePrefab == null || _bubbleContainer == null)
             {
-                Debug.LogError("ChatBubblePrefab 또는 BubbleContainer가 설정되지 않았습니다!");
+                Debug.LogError("[ChatBubbleManager] ChatBubblePrefab 또는 BubbleContainer가 설정되지 않았습니다!");
                 return;
             }
             
@@ -67,7 +67,7 @@ namespace ProjectVG.Domain.Chat.Service
                 
                 if (bubbleUI == null)
                 {
-                    Debug.LogError("ChatBubbleUI 컴포넌트를 찾을 수 없습니다!");
+                    Debug.LogError("[ChatBubbleManager] ChatBubbleUI 컴포넌트를 찾을 수 없습니다!");
                     if (bubbleObject != null)
                         Destroy(bubbleObject);
                     return;
@@ -77,7 +77,7 @@ namespace ProjectVG.Domain.Chat.Service
                 
                 if (_activeBubbles.Count >= _maxBubbles)
                 {
-                    Debug.LogWarning($"최대 버블 수({_maxBubbles})에 도달했습니다. 가장 오래된 버블을 제거합니다.");
+                    Debug.LogWarning($"[ChatBubbleManager] 최대 버블 수({_maxBubbles})에 도달했습니다. 가장 오래된 버블을 제거합니다.");
                     RemoveOldestBubble();
                 }
                 
@@ -99,12 +99,10 @@ namespace ProjectVG.Domain.Chat.Service
                 _activeBubbles.Add(bubbleUI);
                 
                 OnBubbleCreated?.Invoke(bubbleUI);
-                
-                Debug.Log($"새로운 버블 생성: {actor} - {text}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"버블 생성 실패: {ex.Message}");
+                Debug.LogError($"[ChatBubbleManager] 버블 생성 실패: {ex.Message}");
             }
         }
         
@@ -120,12 +118,10 @@ namespace ProjectVG.Domain.Chat.Service
                 _activeBubbles.Remove(bubble);
                 
                 OnBubbleDestroyed?.Invoke(bubble);
-                
-                Debug.Log("버블 제거 완료");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"버블 제거 실패: {ex.Message}");
+                Debug.LogError($"[ChatBubbleManager] 버블 제거 실패: {ex.Message}");
             }
         }
         
@@ -146,12 +142,10 @@ namespace ProjectVG.Domain.Chat.Service
                 _activeBubbles.Clear();
                 
                 OnAllBubblesCleared?.Invoke();
-                
-                Debug.Log("모든 버블 제거 완료");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"모든 버블 제거 실패: {ex.Message}");
+                Debug.LogError($"[ChatBubbleManager] 모든 버블 제거 실패: {ex.Message}");
             }
         }
         
@@ -163,17 +157,17 @@ namespace ProjectVG.Domain.Chat.Service
         {
             if (_bubbleContainer == null)
             {
-                Debug.LogError("BubbleContainer가 설정되지 않았습니다! 인스펙터에서 설정해주세요.");
+                Debug.LogError("[ChatBubbleManager] BubbleContainer가 설정되지 않았습니다! 인스펙터에서 설정해주세요.");
                 return;
             }
             
             if (_chatBubblePrefab == null)
             {
-                Debug.LogError("ChatBubblePrefab이 설정되지 않았습니다!");
+                Debug.LogError("[ChatBubbleManager] ChatBubblePrefab이 설정되지 않았습니다!");
                 return;
             }
             
-            Debug.Log("ChatBubbleManager 초기화 완료");
+            Debug.Log("[ChatBubbleManager] 초기화 완료");
         }
         
         private void StartQueueAnimationForExistingBubbles()
@@ -205,7 +199,6 @@ namespace ProjectVG.Domain.Chat.Service
         {
             if (bubble == null) return;
             
-            Debug.Log($"버블 토스트 애니메이션 완료: {bubble.Actor}");
             
             if (_scrollRect != null)
             {
@@ -239,8 +232,6 @@ namespace ProjectVG.Domain.Chat.Service
                     Destroy(bubble.gameObject);
                 }
             }
-            
-            Debug.Log($"오래된 버블 {bubblesToRemove}개 정리 완료");
         }
         
         private void SetupCanvasGroup(GameObject? bubbleObject)
@@ -251,7 +242,7 @@ namespace ProjectVG.Domain.Chat.Service
             if (canvasGroup == null)
             {
                 canvasGroup = bubbleObject.AddComponent<CanvasGroup>();
-                Debug.Log($"ChatBubble에 CanvasGroup이 자동으로 추가되었습니다: {bubbleObject.name}");
+                Debug.Log($"[ChatBubbleManager] ChatBubble에 CanvasGroup이 자동으로 추가되었습니다: {bubbleObject.name}");
             }
             
             canvasGroup.alpha = 0f;
