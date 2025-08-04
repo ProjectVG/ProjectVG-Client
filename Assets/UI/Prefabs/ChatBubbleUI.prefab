@@ -95,7 +95,17 @@ MonoBehaviour:
   _slideInDuration: 0.5
   _slideOutDuration: 0.3
   _typingSpeed: 0.05
-  _maintainDuration: 3
+  _enableAutoDestroy: 1
+  _defaultDisplayTime: 3
+  _toastBounceDuration: 0.3
+  _toastBounceHeight: 20
+  _toastBounceScale: 1.1
+  _queueSlideDuration: 0.2
+  _queueSlideDistance: 10
+  _enableBounceEffect: 1
+  _enableScaleEffect: 1
+  _bounceEasing: 0
+  _queueEasing: 1
   _userBubbleColor: {r: 0.72828406, g: 0.9145165, b: 0.9245283, a: 1}
   _characterBubbleColor: {r: 0.8962264, g: 0.875089, b: 0.875089, a: 1}
   _contentSizeFitter: {fileID: 0}
@@ -167,8 +177,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 30927a58b1be6fe418e6eacbf0e593c2, type: 2}
+  m_sharedMaterial: {fileID: -7107498392211080374, guid: 30927a58b1be6fe418e6eacbf0e593c2, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
