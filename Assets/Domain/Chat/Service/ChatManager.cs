@@ -98,11 +98,11 @@ namespace ProjectVG.Domain.Chat.Service
                 
                 _isInitialized = true;
                 _isConnected = true;
-                Debug.Log("ChatManager 초기화 완료");
+                Debug.Log("[ChatManager] 초기화 완료");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"ChatManager 초기화 실패: {ex.Message}");
+                Debug.LogError($"[ChatManager] 초기화 실패: {ex.Message}");
                 OnError?.Invoke($"초기화 실패: {ex.Message}");
             }
         }
@@ -114,9 +114,6 @@ namespace ProjectVG.Domain.Chat.Service
                 
             try
             {
-                Debug.Log($"사용자 메시지 전송: {message}");
-                
-                // 사용자 메시지를 버블로 표시
                 if (_chatBubbleManager != null)
                 {
                     _chatBubbleManager.CreateBubble(Actor.User, message);
@@ -129,18 +126,14 @@ namespace ProjectVG.Domain.Chat.Service
                     userId: _userId
                 );
 
-                if (response != null)
+                if (response == null)
                 {
-                    Debug.Log($"채팅 응답 수신: {response.Text}");
-                }
-                else
-                {
-                    Debug.LogWarning("채팅 응답이 null입니다.");
+                    Debug.LogWarning("[ChatManager] 채팅 응답이 null입니다.");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"메시지 전송 실패: {ex.Message}");
+                Debug.LogError($"[ChatManager] 메시지 전송 실패: {ex.Message}");
                 OnError?.Invoke($"메시지 전송 실패: {ex.Message}");
             }
         }
@@ -149,7 +142,7 @@ namespace ProjectVG.Domain.Chat.Service
         {
             if (chatMessage == null)
             {
-                Debug.LogWarning("빈 채팅 메시지를 받았습니다.");
+                Debug.LogWarning("[ChatManager] 빈 채팅 메시지를 받았습니다.");
                 return;
             }
             
@@ -163,12 +156,11 @@ namespace ProjectVG.Domain.Chat.Service
             {
                 if (_messageQueue.Count >= _maxQueueSize)
                 {
-                    Debug.LogWarning($"메시지 큐가 가득 찼습니다. (최대: {_maxQueueSize})");
+                    Debug.LogWarning($"[ChatManager] 메시지 큐가 가득 찼습니다. (최대: {_maxQueueSize})");
                     return;
                 }
                 
                 _messageQueue.Enqueue(chatMessage);
-                Debug.Log($"메시지 큐에 추가됨: {chatMessage.Text} (큐 크기: {_messageQueue.Count})");
             }
             
             ProcessMessageQueueAsync().Forget();
@@ -179,7 +171,6 @@ namespace ProjectVG.Domain.Chat.Service
             lock (_queueLock)
             {
                 _messageQueue.Clear();
-                Debug.Log("메시지 큐가 초기화되었습니다.");
             }
         }
         
@@ -217,7 +208,7 @@ namespace ProjectVG.Domain.Chat.Service
             }
             catch (Exception ex)
             {
-                Debug.LogError($"메시지 큐 처리 중 오류: {ex.Message}");
+                Debug.LogError($"[ChatManager] 메시지 큐 처리 중 오류: {ex.Message}");
                 OnError?.Invoke($"메시지 큐 처리 실패: {ex.Message}");
             }
             finally
@@ -242,12 +233,10 @@ namespace ProjectVG.Domain.Chat.Service
                 {
                     _voiceManager.PlayVoice(chatMessage.VoiceData);
                 }
-
-                Debug.Log($"캐릭터 메시지 처리: {chatMessage.Text}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"캐릭터 메시지 처리 실패: {ex.Message}");
+                Debug.LogError($"[ChatManager] 캐릭터 메시지 처리 실패: {ex.Message}");
                 OnError?.Invoke($"메시지 처리 실패: {ex.Message}");
             }
         }
@@ -257,10 +246,7 @@ namespace ProjectVG.Domain.Chat.Service
             try
             {
                 OnChatMessageReceived?.Invoke(chatMessage);
-
-                Debug.Log($"캐릭터 메시지 처리 시작: {chatMessage.Text}");
                 
-                // 캐릭터 메시지를 버블로 표시
                 if (_chatBubbleManager != null && !string.IsNullOrEmpty(chatMessage.Text))
                 {
                     _chatBubbleManager.CreateBubble(Actor.Character, chatMessage.Text);
@@ -270,12 +256,10 @@ namespace ProjectVG.Domain.Chat.Service
                 {
                     await _voiceManager.PlayVoiceAsync(chatMessage.VoiceData);
                 }
-
-                Debug.Log($"캐릭터 메시지 처리 완료: {chatMessage.Text}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"캐릭터 메시지 처리 실패: {ex.Message}");
+                Debug.LogError($"[ChatManager] 캐릭터 메시지 처리 실패: {ex.Message}");
                 OnError?.Invoke($"메시지 처리 실패: {ex.Message}");
             }
         }
@@ -284,13 +268,13 @@ namespace ProjectVG.Domain.Chat.Service
         {
             if (string.IsNullOrWhiteSpace(message))
             {
-                Debug.LogWarning("빈 메시지는 전송할 수 없습니다.");
+                Debug.LogWarning("[ChatManager] 빈 메시지는 전송할 수 없습니다.");
                 return false;
             }
             
             if (message.Length > 1000)
             {
-                Debug.LogWarning("메시지가 너무 깁니다. (최대 1000자)");
+                Debug.LogWarning("[ChatManager] 메시지가 너무 깁니다. (최대 1000자)");
                 return false;
             }
             
@@ -299,7 +283,6 @@ namespace ProjectVG.Domain.Chat.Service
         
         private void OnVoiceFinished()
         {
-            Debug.Log("음성 재생 완료");
         }
         
         private void HandleChatMessageReceived(ChatMessage chatMessage)

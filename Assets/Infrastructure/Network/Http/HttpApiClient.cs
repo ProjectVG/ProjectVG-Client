@@ -63,7 +63,6 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             var url = GetFullUrl(endpoint);
             var jsonData = SerializeData(data, requiresSession);
-            LogRequestDetails("POST", url, jsonData);
             return await SendRequestAsync<T>(url, UnityWebRequest.kHttpVerbPOST, jsonData, headers, cancellationToken);
         }
 
@@ -111,7 +110,6 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         private void ApplyNetworkConfig()
         {
-            Debug.Log($"NetworkConfig 적용: {NetworkConfig.CurrentEnvironment} 환경");
         }
 
         private void SetupDefaultHeaders()
@@ -146,11 +144,10 @@ namespace ProjectVG.Infrastructure.Network.Http
                     var jsonObject = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonData);
                     jsonObject["session_id"] = sessionId;
                     jsonData = JsonConvert.SerializeObject(jsonObject);
-                    Debug.Log($"세션 ID 자동 주입: {sessionId}");
                 }
                 else
                 {
-                    Debug.LogWarning("세션 연결이 필요한 요청이지만 세션 ID를 획득할 수 없습니다.");
+                    Debug.LogWarning("[HttpApiClient] 세션 연결이 필요한 요청이지만 세션 ID를 획득할 수 없습니다.");
                 }
             }
             
@@ -159,22 +156,11 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         private void LogRequestDetails(string method, string url, string jsonData)
         {
-            Debug.Log($"HTTP {method} 요청 URL: {url}");
-            if (!string.IsNullOrEmpty(jsonData))
-            {
-                Debug.Log($"HTTP 요청 데이터: {jsonData}");
-            }
         }
 
         private async UniTask<T> SendRequestAsync<T>(string url, string method, string jsonData, Dictionary<string, string> headers, CancellationToken cancellationToken)
         {
             var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
-
-            Debug.Log($"HTTP 요청 시작: {method} {url}");
-            if (!string.IsNullOrEmpty(jsonData))
-            {
-                Debug.Log($"HTTP 요청 데이터: {jsonData}");
-            }
 
             for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
             {
@@ -182,13 +168,11 @@ namespace ProjectVG.Infrastructure.Network.Http
                 {
                     using var request = CreateRequest(url, method, jsonData, headers);
                     
-                    Debug.Log($"HTTP 요청 전송 중... (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1})");
                     var operation = request.SendWebRequest();
                     await operation.WithCancellation(combinedCancellationToken);
 
                     if (request.result == UnityWebRequest.Result.Success)
                     {
-                        Debug.Log($"HTTP 요청 성공: {request.responseCode}");
                         return ParseResponse<T>(request);
                     }
                     else
@@ -308,11 +292,10 @@ namespace ProjectVG.Infrastructure.Network.Http
         private async UniTask HandleRequestFailure(UnityWebRequest request, int attempt, CancellationToken cancellationToken)
         {
             var error = new ApiException(request.error, request.responseCode, request.downloadHandler?.text);
-            Debug.LogError($"HTTP 요청 실패: {request.result}, 상태코드: {request.responseCode}, 오류: {request.error}");
             
             if (ShouldRetry(request.responseCode) && attempt < NetworkConfig.MaxRetryCount)
             {
-                Debug.LogWarning($"API 요청 실패 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {error.Message}");
+                Debug.LogWarning($"[HttpApiClient] API 요청 실패 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {error.Message}");
                 await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
                 return;
             }
@@ -324,7 +307,7 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             if (attempt < NetworkConfig.MaxRetryCount)
             {
-                Debug.LogWarning($"API 요청 예외 발생 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {ex.Message}");
+                Debug.LogWarning($"[HttpApiClient] API 요청 예외 발생 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {ex.Message}");
                 await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
                 return;
             }
@@ -337,7 +320,7 @@ namespace ProjectVG.Infrastructure.Network.Http
             
             if (ShouldRetry(request.responseCode) && attempt < NetworkConfig.MaxRetryCount)
             {
-                Debug.LogWarning($"파일 업로드 실패 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {error.Message}");
+                Debug.LogWarning($"[HttpApiClient] 파일 업로드 실패 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {error.Message}");
                 await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
                 return;
             }
@@ -349,7 +332,7 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             if (attempt < NetworkConfig.MaxRetryCount)
             {
-                Debug.LogWarning($"파일 업로드 예외 발생 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {ex.Message}");
+                Debug.LogWarning($"[HttpApiClient] 파일 업로드 예외 발생 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {ex.Message}");
                 await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
                 return;
             }

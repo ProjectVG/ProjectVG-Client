@@ -124,8 +124,6 @@ namespace ProjectVG.Infrastructure.Network.Services
 
         private void LogRequestDetails(ChatRequest request)
         {
-            Debug.Log($"채팅 요청 엔드포인트: {CHAT_ENDPOINT}");
-            Debug.Log($"서버로 전송할 JSON: {JsonConvert.SerializeObject(request)}");
         }
 
         #endregion

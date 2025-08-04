@@ -40,8 +40,6 @@ namespace ProjectVG.Core.Audio
             {
                 _isPlaying = false;
                 OnVoiceFinished?.Invoke();
-                
-                Debug.Log("음성 재생 완료");
             }
         }
         
@@ -58,7 +56,7 @@ namespace ProjectVG.Core.Audio
         {
             if (voiceData == null || !voiceData.IsPlayable())
             {
-                Debug.LogWarning("재생할 수 있는 VoiceData가 없습니다.");
+                Debug.LogWarning("[VoiceManager] 재생할 수 있는 VoiceData가 없습니다.");
                 return;
             }
             
@@ -75,8 +73,6 @@ namespace ProjectVG.Core.Audio
                 _voiceSource.Play();
                 _isPlaying = true;
                 OnVoiceStarted?.Invoke(voiceData);
-                
-                Debug.Log($"음성 재생 시작: {voiceData.Format}, 길이: {voiceData.Length:F2}초");
             }
         }
         
@@ -84,7 +80,7 @@ namespace ProjectVG.Core.Audio
         {
             if (voiceData == null || !voiceData.IsPlayable())
             {
-                Debug.LogWarning("재생할 수 있는 VoiceData가 없습니다.");
+                Debug.LogWarning("[VoiceManager] 재생할 수 있는 VoiceData가 없습니다.");
                 return;
             }
             
@@ -102,11 +98,7 @@ namespace ProjectVG.Core.Audio
                 _isPlaying = true;
                 OnVoiceStarted?.Invoke(voiceData);
                 
-                Debug.Log($"음성 재생 시작: {voiceData.Format}, 길이: {voiceData.Length:F2}초");
-                
                 await UniTask.WaitUntil(() => !_isPlaying);
-                
-                Debug.Log("음성 재생 완료 (Async)");
             }
         }
         
@@ -117,8 +109,6 @@ namespace ProjectVG.Core.Audio
                 _voiceSource.Stop();
                 _isPlaying = false;
                 OnVoiceStopped?.Invoke();
-                
-                Debug.Log("음성 재생 중지");
             }
         }
         
@@ -128,8 +118,6 @@ namespace ProjectVG.Core.Audio
             {
                 _voiceSource.Pause();
                 _isPlaying = false;
-                
-                Debug.Log("음성 재생 일시정지");
             }
         }
         
@@ -139,8 +127,6 @@ namespace ProjectVG.Core.Audio
             {
                 _voiceSource.UnPause();
                 _isPlaying = true;
-                
-                Debug.Log("음성 재생 재개");
             }
         }
         

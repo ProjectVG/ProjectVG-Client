@@ -18,7 +18,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             _httpClient = HttpApiClient.Instance;
             if (_httpClient == null)
             {
-                Debug.LogError("HttpApiClient.Instance가 null입니다. HttpApiClient가 생성되지 않았습니다.");
+                Debug.LogError("[CharacterApiService] HttpApiClient.Instance가 null입니다. HttpApiClient가 생성되지 않았습니다.");
             }
         }
 
@@ -31,7 +31,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         {
             if (_httpClient == null)
             {
-                Debug.LogError("HttpApiClient가 null입니다. 초기화를 확인해주세요.");
+                Debug.LogError("[CharacterApiService] HttpApiClient가 null입니다. 초기화를 확인해주세요.");
                 return null;
             }
             
@@ -48,7 +48,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         {
             if (_httpClient == null)
             {
-                Debug.LogError("HttpApiClient가 null입니다. 초기화를 확인해주세요.");
+                Debug.LogError("[CharacterApiService] HttpApiClient가 null입니다. 초기화를 확인해주세요.");
                 return null;
             }
             

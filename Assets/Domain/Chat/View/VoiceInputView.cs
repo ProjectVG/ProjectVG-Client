@@ -104,7 +104,7 @@ namespace ProjectVG.Domain.Chat.View
             }
             catch (Exception ex)
             {
-                Debug.LogError($"음성 메시지 전송 실패: {ex.Message}");
+                Debug.LogError($"[VoiceInputView] 음성 메시지 전송 실패: {ex.Message}");
                 OnError?.Invoke($"음성 메시지 전송 실패: {ex.Message}");
             }
             finally
@@ -136,12 +136,10 @@ namespace ProjectVG.Domain.Chat.View
                 {
                     StopVoiceRecording();
                 }
-                
-                Debug.Log("음성 녹음 시작");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"음성 녹음 시작 실패: {ex.Message}");
+                Debug.LogError($"[VoiceInputView] 음성 녹음 시작 실패: {ex.Message}");
                 OnError?.Invoke($"음성 녹음 시작 실패: {ex.Message}");
                 StopVoiceRecording();
             }
@@ -154,7 +152,7 @@ namespace ProjectVG.Domain.Chat.View
                 
             if (_audioRecorder == null)
             {
-                Debug.LogError("AudioRecorder가 없습니다.");
+                Debug.LogError("[VoiceInputView] AudioRecorder가 없습니다.");
                 return;
             }
                 
@@ -173,12 +171,10 @@ namespace ProjectVG.Domain.Chat.View
                         SendVoiceMessage(audioData);
                     }
                 }
-                
-                Debug.Log("음성 녹음 중지");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"음성 녹음 중지 실패: {ex.Message}");
+                Debug.LogError($"[VoiceInputView] 음성 녹음 중지 실패: {ex.Message}");
                 OnError?.Invoke($"음성 녹음 중지 실패: {ex.Message}");
             }
         }
@@ -194,7 +190,7 @@ namespace ProjectVG.Domain.Chat.View
                 _btnVoice = transform.Find("BtnVoice")?.GetComponent<Button>();
                 if (_btnVoice == null)
                 {
-                    Debug.LogWarning("VoiceInputView: BtnVoice 버튼을 찾을 수 없습니다.");
+                    Debug.LogWarning("[VoiceInputView] BtnVoice 버튼을 찾을 수 없습니다.");
                 }
             }
                 
@@ -203,7 +199,7 @@ namespace ProjectVG.Domain.Chat.View
                 _btnVoiceStop = transform.Find("BtnVoiceStop")?.GetComponent<Button>();
                 if (_btnVoiceStop == null)
                 {
-                    Debug.LogWarning("VoiceInputView: BtnVoiceStop 버튼을 찾을 수 없습니다.");
+                    Debug.LogWarning("[VoiceInputView] BtnVoiceStop 버튼을 찾을 수 없습니다.");
                 }
             }
                 
@@ -212,7 +208,7 @@ namespace ProjectVG.Domain.Chat.View
                 _txtVoiceStatus = transform.Find("TxtVoiceStatus")?.GetComponent<TextMeshProUGUI>();
                 if (_txtVoiceStatus == null)
                 {
-                    Debug.LogWarning("VoiceInputView: TxtVoiceStatus 텍스트를 찾을 수 없습니다.");
+                    Debug.LogWarning("[VoiceInputView] TxtVoiceStatus 텍스트를 찾을 수 없습니다.");
                 }
             }
                 
@@ -222,7 +218,6 @@ namespace ProjectVG.Domain.Chat.View
                 if (_audioRecorder == null)
                 {
                     _audioRecorder = gameObject.AddComponent<AudioRecorder>();
-                    Debug.Log("VoiceInputView: AudioRecorder 컴포넌트를 자동으로 추가했습니다.");
                 }
             }
                 
@@ -231,7 +226,7 @@ namespace ProjectVG.Domain.Chat.View
                 _sttService = new STTService();
                 if (_sttService == null)
                 {
-                    Debug.LogError("VoiceInputView: STTService를 생성할 수 없습니다.");
+                    Debug.LogError("[VoiceInputView] STTService를 생성할 수 없습니다.");
                 }
             }
         }
@@ -260,7 +255,7 @@ namespace ProjectVG.Domain.Chat.View
                 _chatManager = FindAnyObjectByType<ChatManager>();
                 if (_chatManager == null)
                 {
-                    Debug.LogWarning("VoiceInputView: ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");
+                    Debug.LogWarning("[VoiceInputView] ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");
                 }
             }
         }
@@ -287,7 +282,7 @@ namespace ProjectVG.Domain.Chat.View
         {
             if (_sttService == null)
             {
-                Debug.LogError("STT 서비스가 없습니다.");
+                Debug.LogError("[VoiceInputView] STT 서비스가 없습니다.");
                 return string.Empty;
             }
             
@@ -303,7 +298,7 @@ namespace ProjectVG.Domain.Chat.View
             }
             catch (Exception ex)
             {
-                Debug.LogError($"STT 변환 실패: {ex.Message}");
+                Debug.LogError($"[VoiceInputView] STT 변환 실패: {ex.Message}");
                 throw;
             }
         }
@@ -320,22 +315,19 @@ namespace ProjectVG.Domain.Chat.View
         
         private void OnRecordingStarted()
         {
-            Debug.Log("녹음 시작됨");
         }
         
         private void OnRecordingStopped()
         {
-            Debug.Log("녹음 중지됨");
         }
         
         private void OnRecordingCompleted(AudioClip audioClip)
         {
-            Debug.Log($"녹음 완료: {audioClip.length}초");
         }
         
         private void OnRecordingError(string error)
         {
-            Debug.LogError($"녹음 오류: {error}");
+            Debug.LogError($"[VoiceInputView] 녹음 오류: {error}");
             OnError?.Invoke(error);
         }
         
