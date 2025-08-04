@@ -59,18 +59,14 @@ namespace ProjectVG.Infrastructure.Network.Services
         {
             if (_webSocketManager == null || !_webSocketManager.IsConnected)
             {
-                Debug.LogWarning("WebSocket이 연결되지 않았습니다. 연결을 시도합니다.");
+                Debug.LogWarning("[SessionManager] WebSocket이 연결되지 않았습니다. 연결을 시도합니다.");
                 await _webSocketManager.ConnectAsync();
             }
             
-            if (_webSocketManager.IsConnected)
-            {
-                Debug.Log("WebSocket 연결 완료 - 세션 ID 자동 수신 대기 중");
-            }
-            else
+            if (!_webSocketManager.IsConnected)
             {
                 string error = "WebSocket 연결 실패";
-                Debug.LogError(error);
+                Debug.LogError($"[SessionManager] {error}");
                 OnSessionError?.Invoke(error);
             }
         }
@@ -83,7 +79,6 @@ namespace ProjectVG.Infrastructure.Network.Services
                 _sessionId = "";
                 _isSessionConnected = false;
                 
-                Debug.Log($"세션 종료: {oldSessionId}");
                 OnSessionEnded?.Invoke(oldSessionId);
             }
         }
@@ -100,20 +95,19 @@ namespace ProjectVG.Infrastructure.Network.Services
                     _sessionId = sessionId;
                     _isSessionConnected = true;
                     
-                    Debug.Log($"[Session] 시작: {_sessionId}");
                     OnSessionStarted?.Invoke(_sessionId);
                 }
                 else
                 {
                     string error = $"세션 응답 데이터가 유효하지 않습니다.";
-                    Debug.LogError(error);
+                    Debug.LogError($"[SessionManager] {error}");
                     OnSessionError?.Invoke(error);
                 }
             }
             catch (Exception ex)
             {
                 string error = $"세션 메시지 처리 중 오류: {ex.Message}";
-                Debug.LogError(error);
+                Debug.LogError($"[SessionManager] {error}");
                 OnSessionError?.Invoke(error);
             }
         }
@@ -150,7 +144,6 @@ namespace ProjectVG.Infrastructure.Network.Services
                 _webSocketManager.OnError += OnWebSocketError;
 
                 _isInitialized = true;
-                Debug.Log("[SessionManager] SessionManager 초기화 완료");
             }
             catch (Exception ex) {
                 Debug.LogError($"[SessionManager] SessionManager 초기화 실패: {ex.Message}");
@@ -160,18 +153,16 @@ namespace ProjectVG.Infrastructure.Network.Services
 
         private void OnWebSocketConnected()
         {
-            Debug.Log("WebSocket 연결됨 - 세션 요청 준비");
         }
         
         private void OnWebSocketDisconnected()
         {
             _isSessionConnected = false;
-            Debug.Log("WebSocket 연결 해제됨");
         }
         
         private void OnWebSocketError(string error)
         {
-            Debug.LogError($"WebSocket 에러: {error}");
+            Debug.LogError($"[SessionManager] WebSocket 에러: {error}");
             OnSessionError?.Invoke($"WebSocket 에러: {error}");
         }
         

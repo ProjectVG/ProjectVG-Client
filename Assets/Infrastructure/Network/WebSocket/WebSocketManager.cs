@@ -66,7 +66,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             if (_isConnected || _isConnecting)
             {
-                Debug.LogWarning("이미 연결 중이거나 연결되어 있습니다.");
+                Debug.LogWarning("[WebSocket] 이미 연결 중이거나 연결되어 있습니다.");
                 return _isConnected;
             }
 
@@ -78,7 +78,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 var combinedCancellationToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cancellationTokenSource.Token).Token;
                 
                 var wsUrl = GetWebSocketUrl(sessionId);
-                Debug.Log($"WebSocket 연결 시도: {wsUrl}");
+                Debug.Log($"[WebSocket] 연결 시도: {wsUrl}");
 
                 var success = await _nativeWebSocket.ConnectAsync(wsUrl, combinedCancellationToken);
                 
@@ -87,7 +87,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                     _isConnected = true;
                     _isConnecting = false;
                     _reconnectAttempts = 0;
-                    Debug.Log("WebSocket 연결 성공");
+                    Debug.Log("[WebSocket] 연결 성공");
                     return true;
                 }
                 else
@@ -98,13 +98,13 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
             catch (OperationCanceledException)
             {
-                Debug.Log("WebSocket 연결이 취소되었습니다.");
+                Debug.Log("[WebSocket] 연결이 취소되었습니다.");
                 return false;
             }
             catch (Exception ex)
             {
                 var error = $"WebSocket 연결 중 예외 발생: {ex.Message}";
-                Debug.LogError(error);
+                Debug.LogError($"[WebSocket] {error}");
                 OnError?.Invoke(error);
                 return false;
             }
@@ -129,14 +129,12 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 await _nativeWebSocket.DisconnectAsync();
             }
 
-            Debug.Log("[WebSocket] 연결 해제");
             OnDisconnected?.Invoke();
         }
         
         public void SetAutoReconnect(bool enabled)
         {
             _autoReconnect = enabled;
-            Debug.Log($"[WebSocket] 자동 재연결 설정: {enabled}");
         }
         
         public void SetReconnectSettings(int maxAttempts, float delay, float maxDelay = 60f, bool useExponentialBackoff = true)
@@ -145,7 +143,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _reconnectDelay = delay;
             _maxReconnectDelay = maxDelay;
             _useExponentialBackoff = useExponentialBackoff;
-            Debug.Log($"[WebSocket] 재연결 설정 변경: 최대시도={maxAttempts}, 기본지연={delay}초, 최대지연={maxDelay}초, 지수백오프={useExponentialBackoff}");
         }
 
         public async UniTask<bool> SendMessageAsync(string type, string data)
@@ -155,13 +152,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 
         public void LogConnectionStatus()
         {
-            Debug.Log($"[WebSocket] 연결 상태: {(_isConnected ? "연결됨" : "연결안됨")}");
-            Debug.Log($"[WebSocket] 연결 중: {(_isConnecting ? "예" : "아니오")}");
-            Debug.Log($"[WebSocket] 자동 재연결: {(_autoReconnect ? "활성화" : "비활성화")}");
-            Debug.Log($"[WebSocket] 재연결 시도: {_reconnectAttempts}/{_maxReconnectAttempts}");
-            Debug.Log($"[WebSocket] 지수 백오프: {(_useExponentialBackoff ? "활성화" : "비활성화")}");
-            Debug.Log($"[WebSocket] 최대 메시지 크기: {NetworkConfig.MaxMessageSize / 1024}KB");
-            Debug.Log($"[WebSocket] 수신 버퍼 크기: {NetworkConfig.ReceiveBufferSize / 1024}KB");
+            Debug.Log($"[WebSocket] 연결 상태: {(_isConnected ? "연결됨" : "연결안됨")}, 연결 중: {(_isConnecting ? "예" : "아니오")}, 재연결 시도: {_reconnectAttempts}/{_maxReconnectAttempts}");
         }
 
         public void Shutdown()
@@ -221,8 +212,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 delay = Mathf.Min(_reconnectDelay * Mathf.Pow(2, _reconnectAttempts - 1), _maxReconnectDelay);
             }
             
-            Debug.Log($"[WebSocket] 재연결 시도 {_reconnectAttempts}/{_maxReconnectAttempts} (지연: {delay:F1}초)");
-            
             await UniTask.Delay(TimeSpan.FromSeconds(delay));
             
             if (!_isConnected)
@@ -239,7 +228,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 
                 if (!_isConnected && !_isConnecting && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts)
                 {
-                    Debug.Log("[WebSocket] 연결 상태 확인 - 재연결 시도");
                     await ConnectAsync(_sessionId);
                 }
             }
@@ -251,7 +239,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _isConnecting = false;
             _reconnectAttempts = 0;
             
-            Debug.Log("[WebSocket] 연결 성공");
+            Debug.Log("[WebSocket] 세션이 연결되었습니다.");
             OnConnected?.Invoke();
         }
 
@@ -260,7 +248,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _isConnected = false;
             _isConnecting = false;
             
-            Debug.Log("[WebSocket] 연결 해제됨");
+            Debug.LogWarning("[WebSocket] 세션이 끊어졌습니다. 재연결을 시도합니다.");
             OnDisconnected?.Invoke();
             
             if (_autoReconnect)
@@ -281,13 +269,16 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             try
             {
-                Debug.Log($"메시지 수신: {message?.Length ?? 0} bytes");
+                int messageLength = message?.Length ?? 0;
+                string truncatedMessage = message?.Length > 50 ? message.Substring(0, 50) + "..." : message ?? "";
+                
+                Debug.Log($"[WebSocket] 메시지 수신: {messageLength} bytes - {truncatedMessage}");
                 ProcessBufferedMessage(message);
             }
             catch (Exception ex)
             {
-                Debug.LogError($"메시지 파싱 실패: {ex.Message}");
-                Debug.LogError($"원시 메시지: {message}");
+                Debug.LogError($"[WebSocket] 메시지 파싱 실패: {ex.Message}");
+                Debug.LogError($"[WebSocket] 원시 메시지: {message}");
             }
         }
 
@@ -306,7 +297,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                     }
                     else
                     {
-                        Debug.LogWarning("JSON 형식이 아닌 메시지가 수신됨");
+                        Debug.LogWarning("[WebSocket] JSON 형식이 아닌 메시지가 수신됨");
                     }
                     
                     _messageBuffer.Clear();
@@ -367,10 +358,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 var jsonObject = JObject.Parse(message);
                 string messageType = jsonObject["type"]?.ToString();
                 JToken dataToken = jsonObject["data"];
-                
-                Debug.Log($"[WebSocket] \n" +
-                    $"Type : {messageType} \n" +
-                    $"Data : {dataToken} \n");
 
                 switch (messageType)
                 {
@@ -381,13 +368,13 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                         ProcessChatMessage(dataToken.ToString(Formatting.None));
                         break;
                     default:
-                        Debug.LogWarning($"알 수 없는 메시지 타입: {messageType}");
+                        Debug.LogWarning($"[WebSocket] 알 수 없는 메시지 타입: {messageType}");
                         break;
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"메시지 처리 중 오류: {ex.Message}");
+                Debug.LogError($"[WebSocket] 메시지 처리 중 오류: {ex.Message}");
             }
         }
 
@@ -401,12 +388,12 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 }
                 else
                 {
-                    Debug.LogWarning("SessionManager가 없어서 세션 메시지를 처리할 수 없습니다.");
+                    Debug.LogWarning("[WebSocket] SessionManager가 없어서 세션 메시지를 처리할 수 없습니다.");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"세션 메시지 처리 중 오류: {ex.Message}");
+                Debug.LogError($"[WebSocket] 세션 메시지 처리 중 오류: {ex.Message}");
             }
         }
 
@@ -414,32 +401,26 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             try
             {
-                Debug.Log($"[WebSocket] ProcessChatMessage - 원시 데이터: {data}");
-                
                 var chatResponse = JsonConvert.DeserializeObject<ChatResponse>(data);
                 if (chatResponse == null)
                 {
-                    Debug.LogError("ChatResponse 파싱 실패");
+                    Debug.LogError("[WebSocket] ChatResponse 파싱 실패");
                     return;
                 }
-
-                Debug.Log($"[WebSocket] ChatResponse 파싱 성공: Type={chatResponse.Type}, SessionId={chatResponse.SessionId}");
 
                 var chatMessage = ChatMessage.FromChatResponse(chatResponse);
                 if (chatMessage == null)
                 {
-                    Debug.LogError("ChatMessage 변환 실패");
+                    Debug.LogError("[WebSocket] ChatMessage 변환 실패");
                     return;
                 }
-
-                Debug.Log($"[WebSocket] ChatMessage 변환 성공: SessionId={chatMessage.SessionId}, HasText={chatMessage.HasTextData()}, HasAudio={chatMessage.HasVoiceData()}");
                 
                 OnChatMessageReceived?.Invoke(chatMessage);
             }
             catch (Exception ex)
             {
-                Debug.LogError($"채팅 메시지 처리 중 오류: {ex.Message}");
-                Debug.LogError($"원시 데이터: {data}");
+                Debug.LogError($"[WebSocket] 채팅 메시지 처리 중 오류: {ex.Message}");
+                Debug.LogError($"[WebSocket] 원시 데이터: {data}");
             }
         }
         

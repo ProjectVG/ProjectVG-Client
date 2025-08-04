@@ -19,9 +19,15 @@ MonoBehaviour:
   _autoClearOldLogs: 1
   _logRetentionTime: 300
   _maxVisibleLogs: 500
+  _logInBackground: 1
+  _enableMobileInput: 1
+  _mobileTouchCount: 3
+  _poolSize: 100
+  _useObjectPooling: 1
+  _initializePoolOnStart: 0
   _enableFiltering: 1
   _defaultFilterKeyword: 
-  _fontSize: 12
+  _fontSize: 14
   _logColor: {r: 1, g: 1, b: 1, a: 1}
   _warningColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   _errorColor: {r: 1, g: 0, b: 0, a: 1}

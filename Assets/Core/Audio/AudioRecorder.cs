@@ -58,13 +58,13 @@ namespace ProjectVG.Core.Audio
         {
             if (_isRecording)
             {
-                Debug.LogWarning("이미 녹음 중입니다.");
+                Debug.LogWarning("[AudioRecorder] 이미 녹음 중입니다.");
                 return false;
             }
             
             if (!IsRecordingAvailable)
             {
-                Debug.LogError("마이크가 사용 불가능합니다.");
+                Debug.LogError("[AudioRecorder] 마이크가 사용 불가능합니다.");
                 OnError?.Invoke("마이크가 사용 불가능합니다.");
                 return false;
             }
@@ -78,13 +78,12 @@ namespace ProjectVG.Core.Audio
                 _recordingClip = Microphone.Start(null, false, _maxRecordingLength, _sampleRate);
                 
                 OnRecordingStarted?.Invoke();
-                Debug.Log("음성 녹음 시작");
                 
                 return true;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"녹음 시작 실패: {ex.Message}");
+                Debug.LogError($"[AudioRecorder] 녹음 시작 실패: {ex.Message}");
                 OnError?.Invoke($"녹음 시작 실패: {ex.Message}");
                 _isRecording = false;
                 return false;
@@ -95,7 +94,7 @@ namespace ProjectVG.Core.Audio
         {
             if (!_isRecording)
             {
-                Debug.LogWarning("녹음 중이 아닙니다.");
+                Debug.LogWarning("[AudioRecorder] 녹음 중이 아닙니다.");
                 return null;
             }
             
@@ -112,13 +111,12 @@ namespace ProjectVG.Core.Audio
                 }
                 
                 OnRecordingStopped?.Invoke();
-                Debug.Log("음성 녹음 중지");
                 
                 return _recordingClip;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"녹음 중지 실패: {ex.Message}");
+                Debug.LogError($"[AudioRecorder] 녹음 중지 실패: {ex.Message}");
                 OnError?.Invoke($"녹음 중지 실패: {ex.Message}");
                 _isRecording = false;
                 return null;
@@ -146,7 +144,7 @@ namespace ProjectVG.Core.Audio
             }
             catch (Exception ex)
             {
-                Debug.LogError($"AudioClip을 byte 배열로 변환 실패: {ex.Message}");
+                Debug.LogError($"[AudioRecorder] AudioClip을 byte 배열로 변환 실패: {ex.Message}");
                 return new byte[0];
             }
         }
@@ -174,7 +172,7 @@ namespace ProjectVG.Core.Audio
             int recordedLength = Microphone.GetPosition(null);
             if (recordedLength <= 0)
             {
-                Debug.LogWarning("녹음된 데이터가 없습니다.");
+                Debug.LogWarning("[AudioRecorder] 녹음된 데이터가 없습니다.");
                 return;
             }
             

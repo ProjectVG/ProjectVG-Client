@@ -56,11 +56,10 @@ namespace ProjectVG.Domain.Chat.View
                 OnTextMessageSent?.Invoke(message);
                 ClearInput();
                 
-                Debug.Log($"텍스트 메시지 전송: {message}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"텍스트 메시지 전송 실패: {ex.Message}");
+                Debug.LogError($"[TextInputView] 텍스트 메시지 전송 실패: {ex.Message}");
                 OnError?.Invoke($"메시지 전송 실패: {ex.Message}");
             }
         }
@@ -81,7 +80,7 @@ namespace ProjectVG.Domain.Chat.View
                 _chatManager = FindAnyObjectByType<ChatManager>();
                 if (_chatManager == null)
                 {
-                    Debug.LogWarning("TextInputView: ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");
+                    Debug.LogWarning("[TextInputView] ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");
                 }
             }
         }
@@ -97,7 +96,7 @@ namespace ProjectVG.Domain.Chat.View
                 _inputField = GetComponentInChildren<TMP_InputField>();
                 if (_inputField == null)
                 {
-                    Debug.LogWarning("TextInputView: TMP_InputField를 찾을 수 없습니다.");
+                    Debug.LogWarning("[TextInputView] TMP_InputField를 찾을 수 없습니다.");
                 }
             }
                 
@@ -106,7 +105,7 @@ namespace ProjectVG.Domain.Chat.View
                 _btnSend = transform.Find("BtnSend")?.GetComponent<Button>();
                 if (_btnSend == null)
                 {
-                    Debug.LogWarning("TextInputView: BtnSend 버튼을 찾을 수 없습니다.");
+                    Debug.LogWarning("[TextInputView] BtnSend 버튼을 찾을 수 없습니다.");
                 }
             }
         }
@@ -132,12 +131,10 @@ namespace ProjectVG.Domain.Chat.View
         {
             if (_isProcessingSubmit) 
             {
-                Debug.Log($"TextInputView: 중복 호출 방지됨 - '{text}'");
                 return;
             }
             
             _isProcessingSubmit = true;
-            Debug.Log($"TextInputView: OnInputFieldSubmitted 호출됨 - '{text}'");
             SendTextMessage(text);
             
             // 다음 프레임에서 플래그 리셋

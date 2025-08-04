@@ -34,7 +34,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             _chatService = new ChatApiService();
             _characterService = new CharacterApiService();
             
-            Debug.Log("API 서비스 재초기화 완료");
+            Debug.Log("[ApiServiceManager] API 서비스 재초기화 완료");
         }
         
         #endregion
@@ -46,7 +46,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             _chatService = new ChatApiService();
             _characterService = new CharacterApiService();
             
-            Debug.Log("API 서비스 매니저 초기화 완료");
+            Debug.Log("[ApiServiceManager] API 서비스 매니저 초기화 완료");
         }
         
         #endregion

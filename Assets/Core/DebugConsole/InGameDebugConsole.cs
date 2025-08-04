@@ -28,8 +28,6 @@ namespace ProjectVG.Core.Utils
         private Queue<GameObject> _objectPool = new Queue<GameObject>();
         private bool _isConsoleVisible = false;
         private float _lastCleanupTime = 0f;
-        private bool _isProcessingLogs = false;
-        private Coroutine? _backgroundProcessingCoroutine;
         
         [System.Serializable]
         public class LogEntry
@@ -62,11 +60,6 @@ namespace ProjectVG.Core.Utils
         void OnDestroy()
         {
             Application.logMessageReceived -= OnLogMessageReceived;
-            
-            if (_backgroundProcessingCoroutine != null)
-            {
-                StopCoroutine(_backgroundProcessingCoroutine);
-            }
         }
         
         void Update()
@@ -165,23 +158,12 @@ namespace ProjectVG.Core.Utils
                 _logEntries.RemoveAt(0);
             }
             
-            if (_backgroundProcessingCoroutine != null)
-            {
-                StopCoroutine(_backgroundProcessingCoroutine);
-            }
-            _backgroundProcessingCoroutine = StartCoroutine(ProcessLogsInBackground());
+            UpdateLogDisplay();
         }
         
         private void UpdateLogDisplay()
         {
             if (_logContentParent == null) return;
-                
-
-            if (_isProcessingLogs)
-            {
-                StartCoroutine(UpdateLogDisplayWhenReady());
-                return;
-            }
             
             ClearLogEntryObjects();
             
@@ -201,58 +183,6 @@ namespace ProjectVG.Core.Utils
             if (_settings?.AutoScroll == true && _scrollRect != null)
             {
                 StartCoroutine(ScrollToBottomCoroutine());
-            }
-        }
-        
-        private System.Collections.IEnumerator UpdateLogDisplayWhenReady()
-        {
-            while (_isProcessingLogs)
-            {
-                yield return null;
-            }
-            
-            UpdateLogDisplay();
-        }
-        
-        private System.Collections.IEnumerator ProcessLogsInBackground()
-        {
-            _isProcessingLogs = true;
-            
-            yield return new WaitForEndOfFrame();
-            
-            if (_settings?.AutoClearOldLogs == true)
-            {
-                CleanupOldLogs();
-            }
-            
-            if (_settings?.UseObjectPooling == true)
-            {
-                ManageObjectPool();
-            }
-            
-            yield return new WaitForEndOfFrame();
-            
-            _isProcessingLogs = false;
-            
-            if (_isConsoleVisible)
-            {
-                UpdateLogDisplay();
-            }
-        }
-        
-        private void ManageObjectPool()
-        {
-            if (_objectPool.Count > _settings?.PoolSize)
-            {
-                int excessCount = _objectPool.Count - _settings.PoolSize;
-                for (int i = 0; i < excessCount && _objectPool.Count > 0; i++)
-                {
-                    var obj = _objectPool.Dequeue();
-                    if (obj != null)
-                    {
-                        Destroy(obj);
-                    }
-                }
             }
         }
         
@@ -423,18 +353,9 @@ namespace ProjectVG.Core.Utils
                 {
                     InitializeObjectPool();
                 }
-                StartCoroutine(UpdateConsoleWhenReady());
+                
+                UpdateLogDisplay();
             }
-        }
-        
-        private System.Collections.IEnumerator UpdateConsoleWhenReady()
-        {
-            while (_isProcessingLogs)
-            {
-                yield return null;
-            }
-            
-            UpdateLogDisplay();
         }
         
         public void ClearLogs()
@@ -457,10 +378,7 @@ namespace ProjectVG.Core.Utils
         private void OnFilterChanged(string filterText)
         {
             _filterKeyword = filterText;
-            if (_isConsoleVisible)
-            {
-                StartCoroutine(UpdateFilterWhenReady());
-            }
+            UpdateLogDisplay();
         }
         
         public void SetFilter(string keyword)
@@ -470,19 +388,6 @@ namespace ProjectVG.Core.Utils
             {
                 _filterInput.text = keyword;
             }
-            if (_isConsoleVisible)
-            {
-                StartCoroutine(UpdateFilterWhenReady());
-            }
-        }
-        
-        private System.Collections.IEnumerator UpdateFilterWhenReady()
-        {
-            while (_isProcessingLogs)
-            {
-                yield return null;
-            }
-            
             UpdateLogDisplay();
         }
         
@@ -502,6 +407,10 @@ namespace ProjectVG.Core.Utils
                 }
             }
             
+            if (removedCount > 0)
+            {
+                UpdateLogDisplay();
+            }
         }
         
         public List<LogEntry> GetLogEntries()
@@ -510,6 +419,8 @@ namespace ProjectVG.Core.Utils
         }
         
 
+        
+        // 스크롤 관련 메서드들
         public void ScrollToTop()
         {
             if (_scrollRect != null)

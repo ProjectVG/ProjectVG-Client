@@ -42,12 +42,11 @@ namespace ProjectVG.Infrastructure.Network.Services
                     _isConnected = healthResponse.Status == "healthy" && healthResponse.ModelLoaded == true;
                     _isInitialized = true;
                     
-                    Debug.Log($"STT 서비스 초기화 완료: {_isConnected} (모델 로딩: {healthResponse.ModelLoaded})");
                     return _isConnected;
                 }
                 else
                 {
-                    Debug.LogError("STT 서버 상태 확인 실패");
+                    Debug.LogError("[STTService] STT 서버 상태 확인 실패");
                     _isConnected = false;
                     _isInitialized = false;
                     return false;
@@ -55,7 +54,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"STT 서비스 초기화 실패: {ex.Message}");
+                Debug.LogError($"[STTService] STT 서비스 초기화 실패: {ex.Message}");
                 _isConnected = false;
                 _isInitialized = false;
                 return false;
@@ -101,18 +100,17 @@ namespace ProjectVG.Infrastructure.Network.Services
                 
                 if (response != null && !string.IsNullOrEmpty(response.Text))
                 {
-                    Debug.Log($"STT 변환 성공: {response.Text} (언어: {response.Language}, 확률: {response.LanguageProbability}, 처리시간: {response.ProcessingTime}초)");
                     return response.Text;
                 }
                 else
                 {
-                    Debug.LogError("STT 변환 실패: 응답이 비어있습니다.");
+                    Debug.LogError("[STTService] STT 변환 실패: 응답이 비어있습니다.");
                     throw new Exception("음성 변환 실패: 응답이 비어있습니다.");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"STT 변환 중 오류 발생: {ex.Message}");
+                Debug.LogError($"[STTService] STT 변환 중 오류 발생: {ex.Message}");
                 throw;
             }
         }

@@ -52,13 +52,8 @@ namespace ProjectVG.Core.Managers
         
         public async void InitializeGame()
         {
-            if (_isInitialized)
-            {
-                Debug.LogWarning("게임이 이미 초기화되었습니다.");
-                return;
-            }
             
-            Debug.Log("게임 초기화 시작...");
+            Debug.Log("[GameManager] 초기화 시작");
             
             try
             {
@@ -67,12 +62,12 @@ namespace ProjectVG.Core.Managers
                 await TryConnectSessionAsync();
                 
                 _isInitialized = true;
-                Debug.Log("게임 초기화 완료");
+                Debug.Log("[GameManager] 초기화 완료");
                 OnGameInitialized?.Invoke();
             }
             catch (Exception ex)
             {
-                string error = $"게임 초기화 실패: {ex.Message}";
+                string error = $"[GameManager] 초기화 실패: {ex.Message}";
                 Debug.LogError(error);
                 OnInitializationError?.Invoke(error);
             }
@@ -82,30 +77,30 @@ namespace ProjectVG.Core.Managers
         {
             if (_sessionManager == null)
             {
-                Debug.LogError("SessionManager가 초기화되지 않았습니다.");
+                Debug.LogError("[GameManager] SessionManager가 초기화되지 않았습니다.");
                 return false;
             }
             
             try
             {
-                Debug.Log("세션 연결 시도 중...");
+                Debug.Log("[GameManager] 세션 연결 시도");
                 
                 if (_webSocketManager != null && !_webSocketManager.IsConnected)
                 {
                     bool webSocketConnected = await _webSocketManager.ConnectAsync();
                     if (!webSocketConnected)
                     {
-                        Debug.LogError("WebSocket 연결 실패");
+                        Debug.LogError("[GameManager] WebSocket 연결 실패");
                         return false;
                     }
                 }
                 
-                Debug.Log("WebSocket 연결 완료 - 세션 ID 자동 수신 대기 중");
+                Debug.Log("[GameManager] WebSocket 연결 완료");
                 return true;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"세션 연결 중 오류 발생: {ex.Message}");
+                Debug.LogError($"[GameManager] 세션 연결 오류: {ex.Message}");
                 return false;
             }
         }
@@ -114,7 +109,7 @@ namespace ProjectVG.Core.Managers
         {
             if (!_isInitialized) return;
             
-            Debug.Log("게임 종료 처리 시작...");
+            Debug.Log("[GameManager] 종료 처리 시작");
             
             for (int i = _managers.Count - 1; i >= 0; i--)
             {
@@ -124,14 +119,14 @@ namespace ProjectVG.Core.Managers
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"매니저 종료 중 오류: {ex.Message}");
+                    Debug.LogError($"[GameManager] 매니저 종료 오류: {ex.Message}");
                 }
             }
             
             _managers.Clear();
             _isInitialized = false;
             
-            Debug.Log("게임 종료 처리 완료");
+            Debug.Log("[GameManager] 종료 처리 완료");
         }
         
         public bool AreManagersReady()
@@ -149,13 +144,13 @@ namespace ProjectVG.Core.Managers
         [ContextMenu("Log Manager Status")]
         public void LogManagerStatus()
         {
-            Debug.Log("=== 매니저 상태 ===");
-            Debug.Log($"GameManager 초기화: {_isInitialized}");
-            Debug.Log($"WebSocketManager: {(_webSocketManager != null ? "존재함" : "없음")}");
-            Debug.Log($"SessionManager: {(_sessionManager != null ? "존재함" : "없음")}");
-            Debug.Log($"HttpApiClient: {(_httpApiClient != null ? "존재함" : "없음")}");
-            Debug.Log($"매니저 준비 상태: {(AreManagersReady() ? "준비됨" : "미준비")}");
-            Debug.Log($"세션 연결 상태: {(IsSessionConnected() ? "연결됨" : "미연결")}");
+            Debug.Log("[GameManager] === 매니저 상태 ===");
+            Debug.Log($"[GameManager] 초기화: {(_isInitialized ? "완료" : "미완료")}");
+            Debug.Log($"[GameManager] WebSocketManager: {(_webSocketManager != null ? "준비됨" : "없음")}");
+            Debug.Log($"[GameManager] SessionManager: {(_sessionManager != null ? "준비됨" : "없음")}");
+            Debug.Log($"[GameManager] HttpApiClient: {(_httpApiClient != null ? "준비됨" : "없음")}");
+            Debug.Log($"[GameManager] 전체 준비: {(AreManagersReady() ? "완료" : "미완료")}");
+            Debug.Log($"[GameManager] 세션 연결: {(IsSessionConnected() ? "연결됨" : "미연결")}");
         }
         
         #endregion
@@ -181,7 +176,7 @@ namespace ProjectVG.Core.Managers
             if (_webSocketManager != null)
             {
                 _managers.Add(_webSocketManager);
-                Debug.Log("WebSocketManager 초기화 완료");
+                Debug.Log("[GameManager] WebSocketManager 초기화 완료");
             }
             else
             {
@@ -201,7 +196,7 @@ namespace ProjectVG.Core.Managers
             if (_sessionManager != null)
             {
                 _managers.Add(_sessionManager);
-                Debug.Log("SessionManager 초기화 완료");
+                Debug.Log("[GameManager] SessionManager 초기화 완료");
             }
             else
             {
@@ -221,7 +216,7 @@ namespace ProjectVG.Core.Managers
             if (_httpApiClient != null)
             {
                 _managers.Add(_httpApiClient);
-                Debug.Log("HttpApiClient 초기화 완료");
+                Debug.Log("[GameManager] HttpApiClient 초기화 완료");
             }
             else
             {
@@ -242,13 +237,13 @@ namespace ProjectVG.Core.Managers
             if (_httpApiClient != null)
             {
                 container.InjectDependencies(_httpApiClient);
-                Debug.Log("HttpApiClient에 의존성 주입 완료");
+                Debug.Log("[GameManager] HttpApiClient 의존성 주입 완료");
             }
             
             if (_webSocketManager != null)
             {
                 container.InjectDependencies(_webSocketManager);
-                Debug.Log("WebSocketManager에 의존성 주입 완료");
+                Debug.Log("[GameManager] WebSocketManager 의존성 주입 완료");
             }
         }
         
