@@ -11,8 +11,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
 {
     /// <summary>
     /// 데스크톱 플랫폼용 WebSocket 구현체
-    /// System.Net.WebSockets.ClientWebSocket을 사용합니다.
-    /// JSON 메시지만 처리합니다.
     /// </summary>
     public class DesktopWebSocket : INativeWebSocket
     {

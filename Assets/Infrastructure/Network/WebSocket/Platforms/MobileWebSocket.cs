@@ -336,14 +336,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                         {
                             receivedMessage = IOSWebSocket_ReceiveMessage(_nativeWebSocketId);
                         }
-                        else if (Application.isEditor)
-                        {
-                            // 에디터에서는 테스트 메시지 시뮬레이션
-                            if (UnityEngine.Random.Range(0, 100) < 5) // 5% 확률로 메시지 수신
-                            {
-                                receivedMessage = $"{{\"type\":\"test\",\"data\":\"Editor test message at {DateTime.Now:HH:mm:ss}\"}}";
-                            }
-                        }
                         
                         if (!string.IsNullOrEmpty(receivedMessage))
                         {

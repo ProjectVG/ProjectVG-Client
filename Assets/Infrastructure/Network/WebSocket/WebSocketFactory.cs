@@ -15,7 +15,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             #if UNITY_WEBGL && !UNITY_EDITOR
                 return new WebGLWebSocket();
-            #elif UNITY_IOS || UNITY_ANDROID
+            #elif (UNITY_IOS || UNITY_ANDROID) && !UNITY_EDITOR
                 return new MobileWebSocket();
             #else
                 return new DesktopWebSocket();
