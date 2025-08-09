@@ -11,17 +11,14 @@ namespace ProjectVG.Core.Managers
     public class InitializationManager : MonoBehaviour
     {
         private InitializationPhase _currentPhase = InitializationPhase.NotStarted;
-        private float _initializationProgress = 0f;
         private bool _isInitialized = false;
         private bool _isInitializing = false;
         
         public InitializationPhase CurrentPhase => _currentPhase;
-        public float InitializationProgress => _initializationProgress;
         public bool IsInitialized => _isInitialized;
         public bool IsInitializing => _isInitializing;
         
-        public event Action<InitializationPhase> OnPhaseChanged;
-        public event Action<float> OnProgressChanged;
+        // 필요한 이벤트만 유지 (외부에서 구독 가능)
         public event Action OnInitializationCompleted;
         public event Action<string> OnInitializationError;
         
@@ -34,6 +31,8 @@ namespace ProjectVG.Core.Managers
         {
             _managerRegistry = managerRegistry;
             _dependencyManager = dependencyManager;
+            
+            Debug.Log("[InitializationManager] 초기화 완료");
         }
         
         public async UniTask InitializeAsync()
@@ -61,23 +60,19 @@ namespace ProjectVG.Core.Managers
             
             try
             {
-                SetPhase(InitializationPhase.InitializingManagers);
-                UpdateProgress(0f);
-
+                _currentPhase = InitializationPhase.InitializingManagers;
                 await InitializeManagersAsync();
-                UpdateProgress(0.4f);
 
-                SetPhase(InitializationPhase.ConnectingToServer);
+                _currentPhase = InitializationPhase.ConnectingToServer;
                 await ConnectToServerAsync();
-                UpdateProgress(0.8f);
 
-                SetPhase(InitializationPhase.LoadingResources);
+                _currentPhase = InitializationPhase.LoadingResources;
                 await LoadResourcesAsync();
-                UpdateProgress(1f);
 
-                SetPhase(InitializationPhase.Completed);
-                _isInitialized = true;
+                _currentPhase = InitializationPhase.Completed;
+                UpdateLoadingProgress("INITIALIZATION", "게임 준비 완료", 1.0f);
                 
+                _isInitialized = true;
                 OnInitializationCompleted?.Invoke();
             }
             catch (Exception ex)
@@ -92,16 +87,7 @@ namespace ProjectVG.Core.Managers
             }
         }
         
-        public InitializationStatus GetStatus()
-        {
-            return new InitializationStatus
-            {
-                IsManagersInitialized = _isInitialized,
-                IsServerConnected = _managerRegistry?.IsSessionConnected() ?? false,
-                CurrentPhase = _currentPhase,
-                Progress = _initializationProgress
-            };
-        }
+        // GetStatus 제거됨 - public 프로퍼티로 직접 접근
         
         #endregion
         
@@ -111,9 +97,17 @@ namespace ProjectVG.Core.Managers
         {
             if (_managerRegistry == null)
                 throw new InvalidOperationException("ManagerRegistry가 설정되지 않았습니다.");
-                
+            
+            // 전체 진행률: 0~20% (매니저 초기화 + 의존성 주입)
+            UpdateLoadingProgress("INITIALIZATION", "시스템 매니저 초기화 중...", 0.05f);
+            
             _managerRegistry.InitializeAllManagers();
+            
+            UpdateLoadingProgress("INITIALIZATION", "매니저 등록 중...", 0.12f);
+            
             _dependencyManager?.SetupDependencies(_managerRegistry);
+
+            UpdateLoadingProgress("INITIALIZATION", "의존성 주입 완료", 0.20f);
             
             // DI 완료 후 SessionManager 초기화
             if (_managerRegistry.SessionManager != null)
@@ -131,34 +125,55 @@ namespace ProjectVG.Core.Managers
             var sessionManager = _managerRegistry.SessionManager;
             if (sessionManager == null)
                 throw new InvalidOperationException("SessionManager가 초기화되지 않았습니다.");
-                
+            
+            // 전체 진행률: 20~60% (네트워크 연결 + 세션 생성)
+            UpdateLoadingProgress("INITIALIZATION", "네트워크 연결 중...", 0.30f);
+            
+            // 세션 연결 시도
+            UpdateLoadingProgress("INITIALIZATION", "세션 생성 중...", 0.45f);
+            
             bool connected = await sessionManager.EnsureConnectionAsync();
             if (!connected)
             {
                 throw new InvalidOperationException("세션 연결에 실패했습니다.");
             }
             
+            UpdateLoadingProgress("INITIALIZATION", "세션 생성 완료", 0.60f);
             Debug.Log("[InitializationManager] 서버 연결 완료");
         }
         
         private async UniTask LoadResourcesAsync()
         {
+            // 전체 진행률: 60~90% (리소스 로딩)
+            UpdateLoadingProgress("INITIALIZATION", "리소스 스캔 중...", 0.65f);
             
-            //await UniTask.Delay(500);
+            // 시뮬레이션: 실제 리소스 로딩
+            await UniTask.Delay(100);
+            UpdateLoadingProgress("INITIALIZATION", "필수 에셋 로딩 중...", 0.75f);
+            
+            await UniTask.Delay(100);
+            UpdateLoadingProgress("INITIALIZATION", "리소스 로딩 완료", 0.90f);
+            
             Debug.Log("[InitializationManager] 리소스 로딩 완료");
         }
         
-        private void SetPhase(InitializationPhase phase)
+        // SetPhase, UpdateProgress 제거됨 - LoadingManager가 UI 업데이트 담당
+        
+        
+        /// <summary>
+        /// LoadingManager에 작업 진행상황을 업데이트하는 메서드 (싱글톤 사용)
+        /// </summary>
+        private void UpdateLoadingProgress(string taskName, string description, float progress)
         {
-            _currentPhase = phase;
-            Debug.Log($"[InitializationManager] 초기화 단계: {phase}");
-            OnPhaseChanged?.Invoke(phase);
-        }
-
-        private void UpdateProgress(float progress)
-        {
-            _initializationProgress = progress;
-            OnProgressChanged?.Invoke(progress);
+            var loadingManager = ProjectVG.Core.Loading.LoadingManager.Instance;
+            if (loadingManager != null)
+            {
+                loadingManager.UpdateTask(taskName, description, progress);
+            }
+            else
+            {
+                Debug.LogWarning("[InitializationManager] LoadingManager 싱글톤 인스턴스를 찾을 수 없습니다.");
+            }
         }
         
         #endregion

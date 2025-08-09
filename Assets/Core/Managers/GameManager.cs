@@ -29,14 +29,15 @@ namespace ProjectVG.Core.Managers
         [SerializeField] private bool _autoInitializeOnStart = true;
         [SerializeField] private bool _createManagersIfNotExist = true;
         
+        // 핵심 상태만 노출
         public bool IsInitialized => _initializationManager?.IsInitialized ?? false;
         public InitializationPhase CurrentPhase => _initializationManager?.CurrentPhase ?? InitializationPhase.NotStarted;
-        public float InitializationProgress => _initializationManager?.InitializationProgress ?? 0f;
+        
+        // 매니저 접근 (필요시에만)
         public WebSocketManager WebSocketManager => _managerRegistry?.WebSocketManager;
         public SessionManager SessionManager => _managerRegistry?.SessionManager;
-        public HttpApiClient HttpApiClient => _managerRegistry?.HttpApiClient;
-        public AudioManager AudioManager => _managerRegistry?.AudioManager;
         
+        // 필요한 이벤트만 전달
         public event Action OnGameInitialized
         {
             add => _initializationManager.OnInitializationCompleted += value;
@@ -47,16 +48,6 @@ namespace ProjectVG.Core.Managers
             add => _initializationManager.OnInitializationError += value;
             remove => _initializationManager.OnInitializationError -= value;
         }
-        public event Action<InitializationPhase> OnPhaseChanged
-        {
-            add => _initializationManager.OnPhaseChanged += value;
-            remove => _initializationManager.OnPhaseChanged -= value;
-        }
-        public event Action<float> OnProgressChanged
-        {
-            add => _initializationManager.OnProgressChanged += value;
-            remove => _initializationManager.OnProgressChanged -= value;
-        }
         
         #region Unity Lifecycle
         
@@ -65,7 +56,8 @@ namespace ProjectVG.Core.Managers
             base.Awake();
             InitializeComponents();
             
-            if (_autoInitializeOnStart) {
+            if (_autoInitializeOnStart) 
+            {
                 InitializeGame();
             }
         }
@@ -114,67 +106,24 @@ namespace ProjectVG.Core.Managers
             await _initializationManager.InitializeAsync();
         }
         
-        public async UniTask<bool> TryConnectSessionAsync()
-        {
-            if (_managerRegistry?.SessionManager == null)
-            {
-                Debug.LogError("[GameManager] SessionManager가 설정되지 않았습니다.");
-                return false;
-            }
-            
-            return await _managerRegistry.SessionManager.EnsureConnectionAsync();
-        }
+        // TryConnectSessionAsync 제거됨 - InitializationManager에서 처리
         
         public void Shutdown()
         {
-            if (!IsInitialized) return;
-            
-            Debug.Log("[GameManager] 종료 처리 시작");
-            
-            if (_managerRegistry != null)
-            {
-                _managerRegistry.ShutdownAllManagers();
-            }
-            
-            Debug.Log("[GameManager] 종료 처리 완료");
+            Debug.Log("[GameManager] 종료 처리");
+            _managerRegistry?.ShutdownAllManagers();
         }
         
-        public bool AreManagersReady()
-        {
-            return _managerRegistry?.AreManagersReady() ?? false;
-        }
-        
-        public bool IsSessionConnected()
-        {
-            return _managerRegistry?.IsSessionConnected() ?? false;
-        }
+        // AreManagersReady, IsSessionConnected 제거됨 - 불필요한 래퍼
         
         [ContextMenu("Log Manager Status")]
         public void LogManagerStatus()
         {
-            Debug.Log("[GameManager] === 매니저 상태 ===");
-            Debug.Log($"[GameManager] 초기화: {(IsInitialized ? "완료" : "미완료")}");
-            
-            if (_managerRegistry != null)
-            {
-                _managerRegistry.LogManagerStatus();
-            }
-            else
-            {
-                Debug.LogWarning("[GameManager] ManagerRegistry가 설정되지 않았습니다.");
-            }
+            Debug.Log($"[GameManager] 초기화: {(IsInitialized ? "완료" : "미완료")}, 단계: {CurrentPhase}");
+            _managerRegistry?.LogManagerStatus();
         }
         
-        public InitializationStatus GetInitializationStatus()
-        {
-            return _initializationManager?.GetStatus() ?? new InitializationStatus
-            {
-                IsManagersInitialized = false,
-                IsServerConnected = false,
-                CurrentPhase = InitializationPhase.NotStarted,
-                Progress = 0f
-            };
-        }
+        // GetInitializationStatus 제거됨 - InitializationManager에서 직접 접근
 
         #endregion
         
@@ -227,14 +176,6 @@ namespace ProjectVG.Core.Managers
         }
         
         #endregion
-    }
-
-    public class InitializationStatus
-    {
-        public bool IsManagersInitialized { get; set; }
-        public bool IsServerConnected { get; set; }
-        public InitializationPhase CurrentPhase { get; set; }
-        public float Progress { get; set; }
     }
     
     public interface IManager

@@ -205,7 +205,6 @@ namespace ProjectVG.Infrastructure.Network.Services
             {
                 Debug.Log("[SessionManager] 초기화 시작");
                 
-                // DI로 주입받은 WebSocketManager 확인
                 if (_webSocketManager == null)
                 {
                     Debug.LogError("[SessionManager] WebSocketManager가 DI로 주입되지 않았습니다.");
@@ -294,12 +293,9 @@ namespace ProjectVG.Infrastructure.Network.Services
         
         public void Shutdown()
         {
-            Debug.Log("[SessionManager] 종료 중...");
             
-            // 이벤트 구독 해제
             UnsubscribeFromWebSocketEvents();
             
-            // 세션 종료
             EndSession();
             
             _isInitialized = false;
