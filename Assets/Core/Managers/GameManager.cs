@@ -9,6 +9,15 @@ using Cysharp.Threading.Tasks;
 
 namespace ProjectVG.Core.Managers
 {
+    public enum InitializationPhase
+    {
+        NotStarted,
+        InitializingManagers,
+        ConnectingToServer,
+        LoadingResources,
+        Completed
+    }
+
     public class GameManager : Singleton<GameManager>
     {
         [Header("Manager References")]
@@ -23,13 +32,20 @@ namespace ProjectVG.Core.Managers
         private bool _isInitialized = false;
         private readonly List<IManager> _managers = new List<IManager>();
         
+        private InitializationPhase _currentPhase = InitializationPhase.NotStarted;
+        private float _initializationProgress = 0f;
+        
         public bool IsInitialized => _isInitialized;
+        public InitializationPhase CurrentPhase => _currentPhase;
+        public float InitializationProgress => _initializationProgress;
         public WebSocketManager WebSocketManager => _webSocketManager;
         public SessionManager SessionManager => _sessionManager;
         public HttpApiClient HttpApiClient => _httpApiClient;
         
         public event Action OnGameInitialized;
         public event Action<string> OnInitializationError;
+        public event Action<InitializationPhase> OnPhaseChanged;
+        public event Action<float> OnProgressChanged;
         
         #region Unity Lifecycle
         
@@ -52,16 +68,33 @@ namespace ProjectVG.Core.Managers
         
         public async void InitializeGame()
         {
-            
+            await InitializeGameAsync();
+        }
+
+        public async UniTask InitializeGameAsync()
+        {
             Debug.Log("[GameManager] 초기화 시작");
             
             try
             {
+                SetPhase(InitializationPhase.InitializingManagers);
+                UpdateProgress(0f);
+
                 Initialize();
                 SetupDependencies();
+                UpdateProgress(0.4f);
+
+                SetPhase(InitializationPhase.ConnectingToServer);
                 await TryConnectSessionAsync();
-                
+                UpdateProgress(0.8f);
+
+                SetPhase(InitializationPhase.LoadingResources);
+                await LoadResourcesAsync();
+                UpdateProgress(1f);
+
+                SetPhase(InitializationPhase.Completed);
                 _isInitialized = true;
+                
                 Debug.Log("[GameManager] 초기화 완료");
                 OnGameInitialized?.Invoke();
             }
@@ -153,6 +186,17 @@ namespace ProjectVG.Core.Managers
             Debug.Log($"[GameManager] 세션 연결: {(IsSessionConnected() ? "연결됨" : "미연결")}");
         }
         
+        public InitializationStatus GetInitializationStatus()
+        {
+            return new InitializationStatus
+            {
+                IsManagersInitialized = _isInitialized,
+                IsServerConnected = IsSessionConnected(),
+                CurrentPhase = _currentPhase,
+                Progress = _initializationProgress
+            };
+        }
+
         #endregion
         
         #region Private Methods
@@ -246,8 +290,38 @@ namespace ProjectVG.Core.Managers
                 Debug.Log("[GameManager] WebSocketManager 의존성 주입 완료");
             }
         }
+
+        private void SetPhase(InitializationPhase phase)
+        {
+            _currentPhase = phase;
+            Debug.Log($"[GameManager] 초기화 단계: {phase}");
+            OnPhaseChanged?.Invoke(phase);
+        }
+
+        private void UpdateProgress(float progress)
+        {
+            _initializationProgress = progress;
+            OnProgressChanged?.Invoke(progress);
+        }
+
+        private async UniTask LoadResourcesAsync()
+        {
+            Debug.Log("[GameManager] 리소스 로딩 시작");
+            
+            await UniTask.Delay(500);
+            
+            Debug.Log("[GameManager] 리소스 로딩 완료");
+        }
         
         #endregion
+    }
+
+    public class InitializationStatus
+    {
+        public bool IsManagersInitialized { get; set; }
+        public bool IsServerConnected { get; set; }
+        public InitializationPhase CurrentPhase { get; set; }
+        public float Progress { get; set; }
     }
     
     public interface IManager
