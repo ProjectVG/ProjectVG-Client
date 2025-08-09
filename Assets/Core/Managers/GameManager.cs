@@ -20,38 +20,51 @@ namespace ProjectVG.Core.Managers
 
     public class GameManager : Singleton<GameManager>
     {
-        [Header("Manager References")]
-        [SerializeField] private WebSocketManager _webSocketManager;
-        [SerializeField] private SessionManager _sessionManager;
-        [SerializeField] private HttpApiClient _httpApiClient;
+        [Header("Core Managers")]
+        [SerializeField] private InitializationManager _initializationManager;
+        [SerializeField] private ManagerRegistry _managerRegistry;
+        [SerializeField] private DependencyManager _dependencyManager;
         
-        [Header("Initialization Settings")]
+        [Header("Settings")]
         [SerializeField] private bool _autoInitializeOnStart = true;
         [SerializeField] private bool _createManagersIfNotExist = true;
         
-        private bool _isInitialized = false;
-        private readonly List<IManager> _managers = new List<IManager>();
+        public bool IsInitialized => _initializationManager?.IsInitialized ?? false;
+        public InitializationPhase CurrentPhase => _initializationManager?.CurrentPhase ?? InitializationPhase.NotStarted;
+        public float InitializationProgress => _initializationManager?.InitializationProgress ?? 0f;
+        public WebSocketManager WebSocketManager => _managerRegistry?.WebSocketManager;
+        public SessionManager SessionManager => _managerRegistry?.SessionManager;
+        public HttpApiClient HttpApiClient => _managerRegistry?.HttpApiClient;
+        public AudioManager AudioManager => _managerRegistry?.AudioManager;
         
-        private InitializationPhase _currentPhase = InitializationPhase.NotStarted;
-        private float _initializationProgress = 0f;
-        
-        public bool IsInitialized => _isInitialized;
-        public InitializationPhase CurrentPhase => _currentPhase;
-        public float InitializationProgress => _initializationProgress;
-        public WebSocketManager WebSocketManager => _webSocketManager;
-        public SessionManager SessionManager => _sessionManager;
-        public HttpApiClient HttpApiClient => _httpApiClient;
-        
-        public event Action OnGameInitialized;
-        public event Action<string> OnInitializationError;
-        public event Action<InitializationPhase> OnPhaseChanged;
-        public event Action<float> OnProgressChanged;
+        public event Action OnGameInitialized
+        {
+            add => _initializationManager.OnInitializationCompleted += value;
+            remove => _initializationManager.OnInitializationCompleted -= value;
+        }
+        public event Action<string> OnInitializationError
+        {
+            add => _initializationManager.OnInitializationError += value;
+            remove => _initializationManager.OnInitializationError -= value;
+        }
+        public event Action<InitializationPhase> OnPhaseChanged
+        {
+            add => _initializationManager.OnPhaseChanged += value;
+            remove => _initializationManager.OnPhaseChanged -= value;
+        }
+        public event Action<float> OnProgressChanged
+        {
+            add => _initializationManager.OnProgressChanged += value;
+            remove => _initializationManager.OnProgressChanged -= value;
+        }
         
         #region Unity Lifecycle
         
         protected override void Awake()
         {
             base.Awake();
+            InitializeComponents();
+            
             if (_autoInitializeOnStart) {
                 InitializeGame();
             }
@@ -75,125 +88,74 @@ namespace ProjectVG.Core.Managers
         {
             Debug.Log("[GameManager] 초기화 시작");
             
-            try
+            if (_initializationManager == null)
             {
-                SetPhase(InitializationPhase.InitializingManagers);
-                UpdateProgress(0f);
-
-                Initialize();
-                SetupDependencies();
-                UpdateProgress(0.4f);
-
-                SetPhase(InitializationPhase.ConnectingToServer);
-                await TryConnectSessionAsync();
-                UpdateProgress(0.8f);
-
-                SetPhase(InitializationPhase.LoadingResources);
-                await LoadResourcesAsync();
-                UpdateProgress(1f);
-
-                SetPhase(InitializationPhase.Completed);
-                _isInitialized = true;
-                
-                Debug.Log("[GameManager] 초기화 완료");
-                OnGameInitialized?.Invoke();
+                Debug.LogError("[GameManager] InitializationManager가 설정되지 않았습니다.");
+                return;
             }
-            catch (Exception ex)
-            {
-                string error = $"[GameManager] 초기화 실패: {ex.Message}";
-                Debug.LogError(error);
-                OnInitializationError?.Invoke(error);
-            }
+            
+            await _initializationManager.InitializeAsync();
         }
         
         public async UniTask<bool> TryConnectSessionAsync()
         {
-            if (_sessionManager == null)
+            if (_managerRegistry == null)
             {
-                Debug.LogError("[GameManager] SessionManager가 초기화되지 않았습니다.");
+                Debug.LogError("[GameManager] ManagerRegistry가 설정되지 않았습니다.");
                 return false;
             }
             
-            try
-            {
-                Debug.Log("[GameManager] 세션 연결 시도");
-                
-                if (_webSocketManager != null && !_webSocketManager.IsConnected)
-                {
-                    bool webSocketConnected = await _webSocketManager.ConnectAsync();
-                    if (!webSocketConnected)
-                    {
-                        Debug.LogError("[GameManager] WebSocket 연결 실패");
-                        return false;
-                    }
-                }
-                
-                Debug.Log("[GameManager] WebSocket 연결 완료");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[GameManager] 세션 연결 오류: {ex.Message}");
-                return false;
-            }
+            return await _managerRegistry.TryConnectSessionAsync();
         }
         
         public void Shutdown()
         {
-            if (!_isInitialized) return;
+            if (!IsInitialized) return;
             
             Debug.Log("[GameManager] 종료 처리 시작");
             
-            for (int i = _managers.Count - 1; i >= 0; i--)
+            if (_managerRegistry != null)
             {
-                try
-                {
-                    _managers[i]?.Shutdown();
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"[GameManager] 매니저 종료 오류: {ex.Message}");
-                }
+                _managerRegistry.ShutdownAllManagers();
             }
-            
-            _managers.Clear();
-            _isInitialized = false;
             
             Debug.Log("[GameManager] 종료 처리 완료");
         }
         
         public bool AreManagersReady()
         {
-            return _webSocketManager != null && 
-                   _sessionManager != null && 
-                   _httpApiClient != null;
+            return _managerRegistry?.AreManagersReady() ?? false;
         }
         
         public bool IsSessionConnected()
         {
-            return _sessionManager != null && _sessionManager.IsSessionConnected;
+            return _managerRegistry?.IsSessionConnected() ?? false;
         }
         
         [ContextMenu("Log Manager Status")]
         public void LogManagerStatus()
         {
             Debug.Log("[GameManager] === 매니저 상태 ===");
-            Debug.Log($"[GameManager] 초기화: {(_isInitialized ? "완료" : "미완료")}");
-            Debug.Log($"[GameManager] WebSocketManager: {(_webSocketManager != null ? "준비됨" : "없음")}");
-            Debug.Log($"[GameManager] SessionManager: {(_sessionManager != null ? "준비됨" : "없음")}");
-            Debug.Log($"[GameManager] HttpApiClient: {(_httpApiClient != null ? "준비됨" : "없음")}");
-            Debug.Log($"[GameManager] 전체 준비: {(AreManagersReady() ? "완료" : "미완료")}");
-            Debug.Log($"[GameManager] 세션 연결: {(IsSessionConnected() ? "연결됨" : "미연결")}");
+            Debug.Log($"[GameManager] 초기화: {(IsInitialized ? "완료" : "미완료")}");
+            
+            if (_managerRegistry != null)
+            {
+                _managerRegistry.LogManagerStatus();
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] ManagerRegistry가 설정되지 않았습니다.");
+            }
         }
         
         public InitializationStatus GetInitializationStatus()
         {
-            return new InitializationStatus
+            return _initializationManager?.GetStatus() ?? new InitializationStatus
             {
-                IsManagersInitialized = _isInitialized,
-                IsServerConnected = IsSessionConnected(),
-                CurrentPhase = _currentPhase,
-                Progress = _initializationProgress
+                IsManagersInitialized = false,
+                IsServerConnected = false,
+                CurrentPhase = InitializationPhase.NotStarted,
+                Progress = 0f
             };
         }
 
@@ -201,116 +163,50 @@ namespace ProjectVG.Core.Managers
         
         #region Private Methods
         
-        private void Initialize()
+        private void InitializeComponents()
         {
-            InitializeWebSocketManager();
-            InitializeSessionManager();
-            InitializeHttpApiClient();
+            CreateManagersIfNotExist();
+            SetupManagerReferences();
         }
         
-        private void InitializeWebSocketManager()
+        private void CreateManagersIfNotExist()
         {
-            if (_webSocketManager == null && _createManagersIfNotExist)
+            if (_createManagersIfNotExist)
             {
-                var webSocketObj = new GameObject("WebSocketManager");
-                webSocketObj.transform.SetParent(transform);
-                _webSocketManager = webSocketObj.AddComponent<WebSocketManager>();
+                if (_initializationManager == null)
+                {
+                    var initObj = new GameObject("InitializationManager");
+                    initObj.transform.SetParent(transform);
+                    _initializationManager = initObj.AddComponent<InitializationManager>();
+                }
+                
+                if (_managerRegistry == null)
+                {
+                    var registryObj = new GameObject("ManagerRegistry");
+                    registryObj.transform.SetParent(transform);
+                    _managerRegistry = registryObj.AddComponent<ManagerRegistry>();
+                }
+                
+                if (_dependencyManager == null)
+                {
+                    var depObj = new GameObject("DependencyManager");
+                    depObj.transform.SetParent(transform);
+                    _dependencyManager = depObj.AddComponent<DependencyManager>();
+                }
             }
-            
-            if (_webSocketManager != null)
+        }
+        
+        private void SetupManagerReferences()
+        {
+            if (_initializationManager != null && _managerRegistry != null && _dependencyManager != null)
             {
-                _managers.Add(_webSocketManager);
-                Debug.Log("[GameManager] WebSocketManager 초기화 완료");
+                _initializationManager.Initialize(_managerRegistry, _dependencyManager);
+                Debug.Log("[GameManager] 매니저 참조 설정 완료");
             }
             else
             {
-                throw new InvalidOperationException("WebSocketManager를 초기화할 수 없습니다.");
+                Debug.LogError("[GameManager] 필수 매니저가 설정되지 않았습니다.");
             }
-        }
-        
-        private void InitializeSessionManager()
-        {
-            if (_sessionManager == null && _createManagersIfNotExist)
-            {
-                var sessionObj = new GameObject("SessionManager");
-                sessionObj.transform.SetParent(transform);
-                _sessionManager = sessionObj.AddComponent<SessionManager>();
-            }
-            
-            if (_sessionManager != null)
-            {
-                _managers.Add(_sessionManager);
-                Debug.Log("[GameManager] SessionManager 초기화 완료");
-            }
-            else
-            {
-                throw new InvalidOperationException("SessionManager를 초기화할 수 없습니다.");
-            }
-        }
-        
-        private void InitializeHttpApiClient()
-        {
-            if (_httpApiClient == null && _createManagersIfNotExist)
-            {
-                var httpObj = new GameObject("HttpApiClient");
-                httpObj.transform.SetParent(transform);
-                _httpApiClient = httpObj.AddComponent<HttpApiClient>();
-            }
-            
-            if (_httpApiClient != null)
-            {
-                _managers.Add(_httpApiClient);
-                Debug.Log("[GameManager] HttpApiClient 초기화 완료");
-            }
-            else
-            {
-                throw new InvalidOperationException("HttpApiClient를 초기화할 수 없습니다.");
-            }
-        }
-        
-        private void SetupDependencies()
-        {
-            var container = DIContainer.Instance;
-            container.Register<SessionManager>(_sessionManager);
-            
-            if (_sessionManager != null)
-            {
-
-            }
-            
-            if (_httpApiClient != null)
-            {
-                container.InjectDependencies(_httpApiClient);
-                Debug.Log("[GameManager] HttpApiClient 의존성 주입 완료");
-            }
-            
-            if (_webSocketManager != null)
-            {
-                container.InjectDependencies(_webSocketManager);
-                Debug.Log("[GameManager] WebSocketManager 의존성 주입 완료");
-            }
-        }
-
-        private void SetPhase(InitializationPhase phase)
-        {
-            _currentPhase = phase;
-            Debug.Log($"[GameManager] 초기화 단계: {phase}");
-            OnPhaseChanged?.Invoke(phase);
-        }
-
-        private void UpdateProgress(float progress)
-        {
-            _initializationProgress = progress;
-            OnProgressChanged?.Invoke(progress);
-        }
-
-        private async UniTask LoadResourcesAsync()
-        {
-            Debug.Log("[GameManager] 리소스 로딩 시작");
-            
-            await UniTask.Delay(500);
-            
-            Debug.Log("[GameManager] 리소스 로딩 완료");
         }
         
         #endregion
