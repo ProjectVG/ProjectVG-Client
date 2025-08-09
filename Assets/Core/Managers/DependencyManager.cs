@@ -57,6 +57,7 @@ namespace ProjectVG.Core.Managers
         
         private void RegisterServices(ManagerRegistry managerRegistry)
         {
+            // 모든 서비스를 먼저 등록
             if (managerRegistry.SessionManager != null)
             {
                 _container.Register<SessionManager>(managerRegistry.SessionManager);
@@ -78,17 +79,20 @@ namespace ProjectVG.Core.Managers
         
         private void InjectDependencies(ManagerRegistry managerRegistry)
         {
+            // SessionManager에 WebSocketManager 주입 (이벤트 기반으로 순환 의존성 해결됨)
+            if (managerRegistry.SessionManager != null)
+            {
+                _container.InjectDependencies(managerRegistry.SessionManager);
+                Debug.Log("[DependencyManager] SessionManager 의존성 주입 완료");
+            }
+            
             if (managerRegistry.HttpApiClient != null)
             {
                 _container.InjectDependencies(managerRegistry.HttpApiClient);
                 Debug.Log("[DependencyManager] HttpApiClient 의존성 주입 완료");
             }
             
-            if (managerRegistry.WebSocketManager != null)
-            {
-                _container.InjectDependencies(managerRegistry.WebSocketManager);
-                Debug.Log("[DependencyManager] WebSocketManager 의존성 주입 완료");
-            }
+            Debug.Log("[DependencyManager] DI 기반 의존성 주입 완료");
         }
         
         #endregion

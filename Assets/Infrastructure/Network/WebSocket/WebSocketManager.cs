@@ -31,8 +31,13 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         private int _maxReconnectAttempts = 10;
         private float _maxReconnectDelay = 60f;
         private bool _useExponentialBackoff = true;
+
+        // 순환 의존성 해결: 직접 참조 대신 이벤트 사용
+        public event Action<string> OnSessionMessageReceived;
         
-        [Inject] private SessionManager _sessionManager;
+        // 새로운 설계: 세션 연결/해제 이벤트
+        public event Action<string> OnSessionConnected;     // 세션 ID와 함께 연결 완료 
+        public event Action OnSessionDisconnected;          // 세션 연결 해제
 
         public event Action OnConnected;
         public event Action OnDisconnected;
@@ -248,7 +253,18 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _isConnected = false;
             _isConnecting = false;
             
+            // 세션 ID 클리어 및 세션 해제 이벤트 발생
+            string previousSessionId = _sessionId;
+            _sessionId = null;
+            
             Debug.LogWarning("[WebSocket] 세션이 끊어졌습니다. 재연결을 시도합니다.");
+            
+            // 세션이 있었다면 세션 해제 이벤트 발생
+            if (!string.IsNullOrEmpty(previousSessionId))
+            {
+                OnSessionDisconnected?.Invoke();
+            }
+            
             OnDisconnected?.Invoke();
             
             if (_autoReconnect)
@@ -382,14 +398,24 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             try
             {
-                if (_sessionManager != null)
+                Debug.Log($"[WebSocket] 세션 메시지 수신: {data?.Substring(0, Math.Min(50, data?.Length ?? 0))}...");
+                
+                // 세션 ID 파싱 시도
+                var jsonObject = JObject.Parse(data);
+                string sessionId = jsonObject["session_id"]?.ToString();
+                
+                if (!string.IsNullOrEmpty(sessionId))
                 {
-                    _sessionManager.HandleSessionMessage(data);
+                    // 세션 ID 저장 및 세션 연결 완료 이벤트 발생
+                    _sessionId = sessionId;
+                    Debug.Log($"[WebSocket] 세션 연결 완료: {sessionId}");
+                    OnSessionConnected?.Invoke(sessionId);
                 }
-                else
-                {
-                    Debug.LogWarning("[WebSocket] SessionManager가 없어서 세션 메시지를 처리할 수 없습니다.");
-                }
+                
+                // 기존 이벤트도 계속 발생 (호환성)
+                OnSessionMessageReceived?.Invoke(data);
+                
+                Debug.Log($"[WebSocket] 세션 메시지 처리 완료");
             }
             catch (Exception ex)
             {

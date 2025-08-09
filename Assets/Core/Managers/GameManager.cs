@@ -86,26 +86,43 @@ namespace ProjectVG.Core.Managers
 
         public async UniTask InitializeGameAsync()
         {
-            Debug.Log("[GameManager] 초기화 시작");
-            
             if (_initializationManager == null)
             {
                 Debug.LogError("[GameManager] InitializationManager가 설정되지 않았습니다.");
                 return;
             }
             
+            // 이미 초기화 완료되었으면 반환
+            if (_initializationManager.IsInitialized)
+            {
+                Debug.Log("[GameManager] 이미 초기화가 완료되었습니다.");
+                return;
+            }
+            
+            // 초기화 중이면 대기
+            if (_initializationManager.IsInitializing)
+            {
+                Debug.Log("[GameManager] 초기화가 진행 중입니다. 완료까지 대기합니다.");
+                while (_initializationManager.IsInitializing && !_initializationManager.IsInitialized)
+                {
+                    await UniTask.Yield();
+                }
+                return;
+            }
+            
+            Debug.Log("[GameManager] 초기화 시작");
             await _initializationManager.InitializeAsync();
         }
         
         public async UniTask<bool> TryConnectSessionAsync()
         {
-            if (_managerRegistry == null)
+            if (_managerRegistry?.SessionManager == null)
             {
-                Debug.LogError("[GameManager] ManagerRegistry가 설정되지 않았습니다.");
+                Debug.LogError("[GameManager] SessionManager가 설정되지 않았습니다.");
                 return false;
             }
             
-            return await _managerRegistry.TryConnectSessionAsync();
+            return await _managerRegistry.SessionManager.EnsureConnectionAsync();
         }
         
         public void Shutdown()

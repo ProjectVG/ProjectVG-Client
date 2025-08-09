@@ -13,10 +13,12 @@ namespace ProjectVG.Core.Managers
         private InitializationPhase _currentPhase = InitializationPhase.NotStarted;
         private float _initializationProgress = 0f;
         private bool _isInitialized = false;
+        private bool _isInitializing = false;
         
         public InitializationPhase CurrentPhase => _currentPhase;
         public float InitializationProgress => _initializationProgress;
         public bool IsInitialized => _isInitialized;
+        public bool IsInitializing => _isInitializing;
         
         public event Action<InitializationPhase> OnPhaseChanged;
         public event Action<float> OnProgressChanged;
@@ -36,7 +38,26 @@ namespace ProjectVG.Core.Managers
         
         public async UniTask InitializeAsync()
         {
-            Debug.Log("[InitializationManager] 초기화 시작");
+            // 중복 초기화 방지
+            if (_isInitialized)
+            {
+                Debug.Log("[InitializationManager] 이미 초기화가 완료되었습니다.");
+                return;
+            }
+            
+            if (_isInitializing)
+            {
+                Debug.Log("[InitializationManager] 이미 초기화가 진행 중입니다. 대기합니다.");
+                
+                // 초기화 완료까지 대기
+                while (_isInitializing && !_isInitialized)
+                {
+                    await UniTask.Yield();
+                }
+                return;
+            }
+            
+            _isInitializing = true;
             
             try
             {
@@ -57,7 +78,6 @@ namespace ProjectVG.Core.Managers
                 SetPhase(InitializationPhase.Completed);
                 _isInitialized = true;
                 
-                Debug.Log("[InitializationManager] 초기화 완료");
                 OnInitializationCompleted?.Invoke();
             }
             catch (Exception ex)
@@ -65,6 +85,10 @@ namespace ProjectVG.Core.Managers
                 string error = $"초기화 실패: {ex.Message}";
                 Debug.LogError($"[InitializationManager] {error}");
                 OnInitializationError?.Invoke(error);
+            }
+            finally
+            {
+                _isInitializing = false;
             }
         }
         
@@ -85,28 +109,33 @@ namespace ProjectVG.Core.Managers
         
         private async UniTask InitializeManagersAsync()
         {
-            Debug.Log("[InitializationManager] 매니저 초기화 시작");
-            
             if (_managerRegistry == null)
                 throw new InvalidOperationException("ManagerRegistry가 설정되지 않았습니다.");
                 
             _managerRegistry.InitializeAllManagers();
             _dependencyManager?.SetupDependencies(_managerRegistry);
             
-            Debug.Log("[InitializationManager] 매니저 초기화 완료");
+            // DI 완료 후 SessionManager 초기화
+            if (_managerRegistry.SessionManager != null)
+            {
+                _managerRegistry.SessionManager.Initialize();
+                Debug.Log("[InitializationManager] SessionManager 초기화 완료");
+            }
         }
         
         private async UniTask ConnectToServerAsync()
         {
-            Debug.Log("[InitializationManager] 서버 연결 시작");
-            
             if (_managerRegistry == null)
                 throw new InvalidOperationException("ManagerRegistry가 설정되지 않았습니다.");
+            
+            var sessionManager = _managerRegistry.SessionManager;
+            if (sessionManager == null)
+                throw new InvalidOperationException("SessionManager가 초기화되지 않았습니다.");
                 
-            bool connected = await _managerRegistry.TryConnectSessionAsync();
+            bool connected = await sessionManager.EnsureConnectionAsync();
             if (!connected)
             {
-                throw new InvalidOperationException("서버 연결에 실패했습니다.");
+                throw new InvalidOperationException("세션 연결에 실패했습니다.");
             }
             
             Debug.Log("[InitializationManager] 서버 연결 완료");
@@ -114,10 +143,8 @@ namespace ProjectVG.Core.Managers
         
         private async UniTask LoadResourcesAsync()
         {
-            Debug.Log("[InitializationManager] 리소스 로딩 시작");
             
-            await UniTask.Delay(500);
-            
+            //await UniTask.Delay(500);
             Debug.Log("[InitializationManager] 리소스 로딩 완료");
         }
         

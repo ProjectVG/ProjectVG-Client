@@ -40,22 +40,9 @@ namespace ProjectVG.Core.Loading
         
         #region Public Methods
         
-        public async void StartInitialization()
+        public void StartInitialization()
         {
-            Debug.Log("[LoadingManager] 초기화 시작");
-            
             SubscribeToGameManager();
-            
-            try
-            {
-                await GameManager.Instance.InitializeGameAsync();
-            }
-            catch (Exception ex)
-            {
-                string error = $"초기화 중 오류 발생: {ex.Message}";
-                Debug.LogError($"[LoadingManager] {error}");
-                OnInitializationFailed?.Invoke(error);
-            }
         }
         
         public async void StartGame()
@@ -83,11 +70,26 @@ namespace ProjectVG.Core.Loading
         private void SubscribeToGameManager()
         {
             var gameManager = GameManager.Instance;
+            if (gameManager == null)
+            {
+                Debug.LogError("[LoadingManager] GameManager Instance를 찾을 수 없습니다.");
+                return;
+            }
+            
+            // 이미 초기화가 완료된 경우 즉시 처리
+            if (gameManager.IsInitialized)
+            {
+                Debug.Log("[LoadingManager] GameManager가 이미 초기화되었습니다.");
+                OnGameInitialized();
+                return;
+            }
             
             gameManager.OnPhaseChanged += OnPhaseChanged;
             gameManager.OnProgressChanged += OnProgressChanged;
             gameManager.OnGameInitialized += OnGameInitialized;
             gameManager.OnInitializationError += OnGameManagerError;
+            
+            Debug.Log("[LoadingManager] GameManager 이벤트 구독 완료");
         }
         
         private void UnsubscribeFromGameManager()
@@ -99,6 +101,8 @@ namespace ProjectVG.Core.Loading
                 gameManager.OnProgressChanged -= OnProgressChanged;
                 gameManager.OnGameInitialized -= OnGameInitialized;
                 gameManager.OnInitializationError -= OnGameManagerError;
+                
+                Debug.Log("[LoadingManager] GameManager 이벤트 구독 해제 완료");
             }
         }
         

@@ -34,40 +34,8 @@ namespace ProjectVG.Core.Managers
         public void InitializeAllManagers()
         {
             InitializeWebSocketManager();
-            InitializeSessionManager();
             InitializeHttpApiClient();
-        }
-        
-        public async UniTask<bool> TryConnectSessionAsync()
-        {
-            if (_sessionManager == null)
-            {
-                Debug.LogError("[ManagerRegistry] SessionManager가 초기화되지 않았습니다.");
-                return false;
-            }
-            
-            try
-            {
-                Debug.Log("[ManagerRegistry] 세션 연결 시도");
-                
-                if (_webSocketManager != null && !_webSocketManager.IsConnected)
-                {
-                    bool webSocketConnected = await _webSocketManager.ConnectAsync();
-                    if (!webSocketConnected)
-                    {
-                        Debug.LogError("[ManagerRegistry] WebSocket 연결 실패");
-                        return false;
-                    }
-                }
-                
-                Debug.Log("[ManagerRegistry] WebSocket 연결 완료");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[ManagerRegistry] 세션 연결 오류: {ex.Message}");
-                return false;
-            }
+            InitializeSessionManager();
         }
         
         public bool AreManagersReady()
