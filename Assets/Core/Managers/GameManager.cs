@@ -48,6 +48,7 @@ namespace ProjectVG.Core.Managers
             add => _initializationManager.OnInitializationError += value;
             remove => _initializationManager.OnInitializationError -= value;
         }
+
         
         #region Unity Lifecycle
         
@@ -84,14 +85,12 @@ namespace ProjectVG.Core.Managers
                 return;
             }
             
-            // 이미 초기화 완료되었으면 반환
             if (_initializationManager.IsInitialized)
             {
                 Debug.Log("[GameManager] 이미 초기화가 완료되었습니다.");
                 return;
             }
-            
-            // 초기화 중이면 대기
+
             if (_initializationManager.IsInitializing)
             {
                 Debug.Log("[GameManager] 초기화가 진행 중입니다. 완료까지 대기합니다.");
@@ -106,24 +105,41 @@ namespace ProjectVG.Core.Managers
             await _initializationManager.InitializeAsync();
         }
         
-        // TryConnectSessionAsync 제거됨 - InitializationManager에서 처리
-        
+
         public void Shutdown()
         {
             Debug.Log("[GameManager] 종료 처리");
             _managerRegistry?.ShutdownAllManagers();
         }
         
-        // AreManagersReady, IsSessionConnected 제거됨 - 불필요한 래퍼
-        
+
         [ContextMenu("Log Manager Status")]
         public void LogManagerStatus()
         {
             Debug.Log($"[GameManager] 초기화: {(IsInitialized ? "완료" : "미완료")}, 단계: {CurrentPhase}");
             _managerRegistry?.LogManagerStatus();
         }
+
+        public async UniTask TransitionToMainSceneAsync()
+        {
+            Debug.Log("[GameManager] MainScene으로 전환 시작");
+            
+            try
+            {
+                await UnityEngine.SceneManagement.SceneManager.LoadSceneAsync("MainSence");
+                Debug.Log("[GameManager] MainScene 전환 완료");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[GameManager] 씬 전환 실패: {ex.Message}");
+            }
+        }
+
+        public bool IsMainScene()
+        {
+            return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "MainSence";
+        }
         
-        // GetInitializationStatus 제거됨 - InitializationManager에서 직접 접근
 
         #endregion
         

@@ -21,6 +21,7 @@ namespace ProjectVG.Core.Managers
         // 필요한 이벤트만 유지 (외부에서 구독 가능)
         public event Action OnInitializationCompleted;
         public event Action<string> OnInitializationError;
+        public event Action<string, string, float> OnProgressUpdated;
         
         private ManagerRegistry _managerRegistry;
         private DependencyManager _dependencyManager;
@@ -161,19 +162,12 @@ namespace ProjectVG.Core.Managers
         
         
         /// <summary>
-        /// LoadingManager에 작업 진행상황을 업데이트하는 메서드 (싱글톤 사용)
+        /// 로딩 진행상황을 업데이트하는 메서드 (이벤트 기반)
         /// </summary>
         private void UpdateLoadingProgress(string taskName, string description, float progress)
         {
-            var loadingManager = ProjectVG.Core.Loading.LoadingManager.Instance;
-            if (loadingManager != null)
-            {
-                loadingManager.UpdateTask(taskName, description, progress);
-            }
-            else
-            {
-                Debug.LogWarning("[InitializationManager] LoadingManager 싱글톤 인스턴스를 찾을 수 없습니다.");
-            }
+            Debug.Log($"[InitializationManager] {taskName}: {description} ({Mathf.RoundToInt(progress * 100)}%)");
+            OnProgressUpdated?.Invoke(taskName, description, progress);
         }
         
         #endregion
