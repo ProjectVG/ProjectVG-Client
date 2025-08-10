@@ -264,14 +264,14 @@ MonoBehaviour:
     m_RotationOrder: 4
   ParameterFadeInTimes:
   - -1
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
+  - -1
+  - -1
+  - -1
+  - -1
+  - -1
+  - -1
+  - -1
+  - -1
   ParameterFadeOutTimes:
   - -1
   - -1
