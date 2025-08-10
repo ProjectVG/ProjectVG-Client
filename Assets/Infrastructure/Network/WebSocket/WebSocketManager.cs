@@ -181,7 +181,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 
         private void InitializeNativeWebSocket()
         {
-            _nativeWebSocket = WebSocketFactory.Create();
+            _nativeWebSocket = WebSocketFactory.CreateWebSocket();
             
             _nativeWebSocket.OnConnected += OnNativeConnected;
             _nativeWebSocket.OnDisconnected += OnNativeDisconnected;

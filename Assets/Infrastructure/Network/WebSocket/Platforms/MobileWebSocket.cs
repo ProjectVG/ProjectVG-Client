@@ -2,15 +2,18 @@ using System;
 using System.Threading;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
-using System.Runtime.InteropServices;
+using System.Net.WebSockets;
+using System.Text;
+using System.Threading.Tasks;
+using ProjectVG.Infrastructure.Network.Configs;
 
 namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
 {
     /**
-     * 모바일 플랫폼용 WebSocket 구현체
+     * Unity 6 모바일 플랫폼용 WebSocket 구현체
      * 
-     * iOS/Android 네이티브 WebSocket 라이브러리를 사용합니다.
-     * 네이티브 플러그인을 통해 각 플랫폼의 최적화된 WebSocket 구현을 호출합니다.
+     * Unity 6의 .NET Standard 2.1 WebSocket을 우선 사용하고,
+     * 네이티브 플러그인을 폴백으로 사용합니다.
      */
     public class MobileWebSocket : INativeWebSocket
     {
@@ -22,14 +25,30 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
         public event Action<string> OnError;
         public event Action<string> OnMessageReceived;
 
+        private ClientWebSocket _webSocket;
         private CancellationTokenSource _cancellationTokenSource;
         private bool _isDisposed = false;
-        private string _currentUrl;
+        private bool _useNativePlugin = false;
         private int _nativeWebSocketId = -1;
+        private string _currentUrl;
 
         public MobileWebSocket()
         {
+            _webSocket = new ClientWebSocket();
             _cancellationTokenSource = new CancellationTokenSource();
+            
+            // Unity 6에서 네이티브 플러그인 사용 여부 결정
+            _useNativePlugin = ShouldUseNativePlugin();
+        }
+
+        /**
+         * 네이티브 플러그인 사용 여부 결정
+         */
+        private bool ShouldUseNativePlugin()
+        {
+            // Unity 6에서는 기본적으로 .NET WebSocket 사용
+            // 특별한 요구사항이 있을 때만 네이티브 플러그인 사용
+            return false;
         }
 
         public async UniTask<bool> ConnectAsync(string url, CancellationToken cancellationToken = default)
@@ -46,10 +65,17 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
             {
                 var combinedCancellationToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cancellationTokenSource.Token).Token;
                 
-                Debug.Log($"[MobileWebSocket] 연결 시도: {url}");
+                Debug.Log($"[MobileWebSocket] 연결 시도: {url} (플랫폼: {Application.platform})");
                 
-                // 네이티브 WebSocket 연결
-                bool success = await ConnectNativeWebSocketAsync(url, combinedCancellationToken);
+                bool success;
+                if (_useNativePlugin)
+                {
+                    success = await ConnectWithNativePluginAsync(url, combinedCancellationToken);
+                }
+                else
+                {
+                    success = await ConnectWithUnityWebSocketAsync(url, combinedCancellationToken);
+                }
                 
                 if (success)
                 {
@@ -57,16 +83,12 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                     IsConnecting = false;
                     Debug.Log("[MobileWebSocket] 연결 성공");
                     OnConnected?.Invoke();
-                    
-                    // 메시지 수신 모니터링 시작
-                    _ = MonitorNativeWebSocketAsync();
-                    
                     return true;
                 }
                 else
                 {
                     IsConnecting = false;
-                    Debug.LogError("[MobileWebSocket] 네이티브 연결 실패");
+                    Debug.LogError("[MobileWebSocket] 연결 실패");
                     return false;
                 }
             }
@@ -76,6 +98,73 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                 var error = $"모바일 WebSocket 연결 중 예외 발생: {ex.Message}";
                 Debug.LogError($"[MobileWebSocket] {error}");
                 OnError?.Invoke(error);
+                return false;
+            }
+        }
+
+        /**
+         * Unity 6 .NET WebSocket을 사용한 연결
+         */
+        private async UniTask<bool> ConnectWithUnityWebSocketAsync(string url, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var wsUrl = url.Replace("http://", "wss://").Replace("https://", "wss://");
+                Debug.Log($"[MobileWebSocket] Unity WebSocket 연결: {wsUrl}");
+
+                await _webSocket.ConnectAsync(new Uri(wsUrl), cancellationToken);
+                
+                // 메시지 수신 루프 시작
+                _ = ReceiveLoopAsync();
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[MobileWebSocket] Unity WebSocket 연결 실패: {ex.Message}");
+                return false;
+            }
+        }
+
+        /**
+         * 네이티브 플러그인을 사용한 연결 (폴백)
+         */
+        private async UniTask<bool> ConnectWithNativePluginAsync(string url, CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (Application.platform == RuntimePlatform.Android)
+                {
+                    _nativeWebSocketId = AndroidWebSocket_Connect(url);
+                }
+                else if (Application.platform == RuntimePlatform.IPhonePlayer)
+                {
+                    _nativeWebSocketId = IOSWebSocket_Connect(url);
+                }
+                else
+                {
+                    Debug.LogWarning($"[MobileWebSocket] 지원되지 않는 플랫폼: {Application.platform}");
+                    return false;
+                }
+                
+                if (_nativeWebSocketId >= 0)
+                {
+                    Debug.Log($"[MobileWebSocket] 네이티브 WebSocket 연결 성공 (ID: {_nativeWebSocketId})");
+                    
+                    // 네이티브 메시지 수신 모니터링 시작
+                    _ = MonitorNativeWebSocketAsync();
+                    
+                    return true;
+                }
+                else
+                {
+                    Debug.LogError("[MobileWebSocket] 네이티브 WebSocket 연결 실패");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[MobileWebSocket] 네이티브 연결 실패: {ex.Message}");
                 return false;
             }
         }
@@ -94,8 +183,14 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                 IsConnected = false;
                 IsConnecting = false;
                 
-                // 네이티브 WebSocket 연결 해제
-                await DisconnectNativeWebSocketAsync();
+                if (_useNativePlugin)
+                {
+                    await DisconnectNativeWebSocketAsync();
+                }
+                else
+                {
+                    await DisconnectUnityWebSocketAsync();
+                }
                 
                 OnDisconnected?.Invoke();
             }
@@ -105,147 +200,21 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
             }
         }
 
-        public async UniTask<bool> SendMessageAsync(string message, CancellationToken cancellationToken = default)
-        {
-            if (!IsConnected)
-            {
-                Debug.LogWarning("[MobileWebSocket] 연결되지 않았습니다.");
-                return false;
-            }
-
-            try
-            {
-                Debug.Log($"[MobileWebSocket] 메시지 전송: {message.Length} bytes");
-                
-                // 네이티브 WebSocket 메시지 전송
-                bool success = await SendNativeMessageAsync(message, cancellationToken);
-                
-                if (success)
-                {
-                    Debug.Log("[MobileWebSocket] 메시지 전송 성공");
-                }
-                else
-                {
-                    Debug.LogError("[MobileWebSocket] 메시지 전송 실패");
-                }
-                
-                return success;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[MobileWebSocket] 메시지 전송 실패: {ex.Message}");
-                return false;
-            }
-        }
-
         /**
-         * 네이티브 WebSocket 연결
+         * Unity WebSocket 연결 해제
          */
-        private async UniTask<bool> ConnectNativeWebSocketAsync(string url, CancellationToken cancellationToken)
+        private async UniTask DisconnectUnityWebSocketAsync()
         {
             try
             {
-                if (Application.platform == RuntimePlatform.Android)
+                if (_webSocket.State == WebSocketState.Open)
                 {
-                    return await ConnectAndroidWebSocketAsync(url, cancellationToken);
-                }
-                else if (Application.platform == RuntimePlatform.IPhonePlayer)
-                {
-                    return await ConnectIOSWebSocketAsync(url, cancellationToken);
-                }
-                else if (Application.isEditor)
-                {
-                    // Unity 에디터에서는 DesktopWebSocket과 동일한 방식으로 동작
-                    Debug.Log($"[MobileWebSocket] 에디터에서 테스트 모드로 동작");
-                    return await ConnectEditorWebSocketAsync(url, cancellationToken);
-                }
-                else
-                {
-                    Debug.LogWarning($"[MobileWebSocket] 지원되지 않는 플랫폼입니다: {Application.platform}");
-                    return false;
+                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client disconnect", CancellationToken.None);
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[MobileWebSocket] 네이티브 연결 실패: {ex.Message}");
-                return false;
-            }
-        }
-
-        /**
-         * Android WebSocket 연결
-         */
-        private async UniTask<bool> ConnectAndroidWebSocketAsync(string url, CancellationToken cancellationToken)
-        {
-            try
-            {
-                // Android 네이티브 플러그인 호출
-                _nativeWebSocketId = AndroidWebSocket_Connect(url);
-                
-                if (_nativeWebSocketId >= 0)
-                {
-                    Debug.Log($"[MobileWebSocket] Android WebSocket 연결 성공 (ID: {_nativeWebSocketId})");
-                    return true;
-                }
-                else
-                {
-                    Debug.LogError("[MobileWebSocket] Android WebSocket 연결 실패");
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[MobileWebSocket] Android 연결 오류: {ex.Message}");
-                return false;
-            }
-        }
-
-        /**
-         * iOS WebSocket 연결
-         */
-        private async UniTask<bool> ConnectIOSWebSocketAsync(string url, CancellationToken cancellationToken)
-        {
-            try
-            {
-                // iOS 네이티브 플러그인 호출
-                _nativeWebSocketId = IOSWebSocket_Connect(url);
-                
-                if (_nativeWebSocketId >= 0)
-                {
-                    Debug.Log($"[MobileWebSocket] iOS WebSocket 연결 성공 (ID: {_nativeWebSocketId})");
-                    return true;
-                }
-                else
-                {
-                    Debug.LogError("[MobileWebSocket] iOS WebSocket 연결 실패");
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[MobileWebSocket] iOS 연결 오류: {ex.Message}");
-                return false;
-            }
-        }
-
-        /**
-         * 에디터용 WebSocket 연결 (테스트용)
-         */
-        private async UniTask<bool> ConnectEditorWebSocketAsync(string url, CancellationToken cancellationToken)
-        {
-            try
-            {
-                // 에디터에서는 성공 시뮬레이션
-                await UniTask.Delay(100, cancellationToken: cancellationToken);
-                
-                _nativeWebSocketId = 1; // 에디터용 ID
-                Debug.Log($"[MobileWebSocket] 에디터 WebSocket 연결 성공 (ID: {_nativeWebSocketId})");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[MobileWebSocket] 에디터 연결 오류: {ex.Message}");
-                return false;
+                Debug.LogError($"[MobileWebSocket] Unity WebSocket 연결 해제 오류: {ex.Message}");
             }
         }
 
@@ -266,10 +235,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                     {
                         IOSWebSocket_Disconnect(_nativeWebSocketId);
                     }
-                    else if (Application.isEditor)
-                    {
-                        Debug.Log($"[MobileWebSocket] 에디터 WebSocket 연결 해제 (ID: {_nativeWebSocketId})");
-                    }
                     
                     _nativeWebSocketId = -1;
                 }
@@ -277,6 +242,70 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
             catch (Exception ex)
             {
                 Debug.LogError($"[MobileWebSocket] 네이티브 연결 해제 오류: {ex.Message}");
+            }
+        }
+
+        public async UniTask<bool> SendMessageAsync(string message, CancellationToken cancellationToken = default)
+        {
+            if (!IsConnected)
+            {
+                Debug.LogWarning("[MobileWebSocket] 연결되지 않았습니다.");
+                return false;
+            }
+
+            try
+            {
+                Debug.Log($"[MobileWebSocket] 메시지 전송: {message.Length} bytes");
+                
+                bool success;
+                if (_useNativePlugin)
+                {
+                    success = await SendNativeMessageAsync(message, cancellationToken);
+                }
+                else
+                {
+                    success = await SendUnityMessageAsync(message, cancellationToken);
+                }
+                
+                if (success)
+                {
+                    Debug.Log("[MobileWebSocket] 메시지 전송 성공");
+                }
+                else
+                {
+                    Debug.LogError("[MobileWebSocket] 메시지 전송 실패");
+                }
+                
+                return success;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[MobileWebSocket] 메시지 전송 실패: {ex.Message}");
+                return false;
+            }
+        }
+
+        /**
+         * Unity WebSocket 메시지 전송
+         */
+        private async UniTask<bool> SendUnityMessageAsync(string message, CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (_webSocket.State != WebSocketState.Open)
+                {
+                    Debug.LogWarning("[MobileWebSocket] Unity WebSocket이 연결되지 않았습니다.");
+                    return false;
+                }
+
+                var buffer = Encoding.UTF8.GetBytes(message);
+                await _webSocket.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, cancellationToken);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[MobileWebSocket] Unity WebSocket 메시지 전송 실패: {ex.Message}");
+                return false;
             }
         }
 
@@ -297,12 +326,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                     {
                         return IOSWebSocket_SendMessage(_nativeWebSocketId, message);
                     }
-                    else if (Application.isEditor)
-                    {
-                        // 에디터에서는 성공 시뮬레이션
-                        Debug.Log($"[MobileWebSocket] 에디터 메시지 전송: {message.Length} bytes");
-                        return true;
-                    }
                 }
                 
                 return false;
@@ -315,6 +338,53 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
         }
 
         /**
+         * Unity WebSocket 메시지 수신 루프
+         */
+        private async Task ReceiveLoopAsync()
+        {
+            var buffer = new byte[NetworkConfig.ReceiveBufferSize];
+            
+            try
+            {
+                while (IsConnected && _webSocket.State == WebSocketState.Open)
+                {
+                    var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), _cancellationTokenSource.Token);
+                    
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        Debug.Log("[MobileWebSocket] Unity WebSocket: 서버에서 연결 종료 요청");
+                        break;
+                    }
+                    else if (result.MessageType == WebSocketMessageType.Text)
+                    {
+                        var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                        OnMessageReceived?.Invoke(message);
+                    }
+                    else if (result.MessageType == WebSocketMessageType.Binary)
+                    {
+                        Debug.LogWarning("[MobileWebSocket] Unity WebSocket: 바이너리 메시지 수신됨 (무시됨)");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (!_isDisposed)
+                {
+                    Debug.LogError($"[MobileWebSocket] Unity WebSocket 수신 루프 오류: {ex.Message}");
+                    OnError?.Invoke(ex.Message);
+                }
+            }
+            finally
+            {
+                IsConnected = false;
+                if (!_isDisposed)
+                {
+                    OnDisconnected?.Invoke();
+                }
+            }
+        }
+
+        /**
          * 네이티브 WebSocket 모니터링
          */
         private async UniTask MonitorNativeWebSocketAsync()
@@ -323,7 +393,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
             {
                 while (IsConnected && !_isDisposed)
                 {
-                    // 네이티브에서 메시지 수신 확인
                     if (_nativeWebSocketId >= 0)
                     {
                         string receivedMessage = null;
@@ -339,19 +408,19 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                         
                         if (!string.IsNullOrEmpty(receivedMessage))
                         {
-                            Debug.Log($"[MobileWebSocket] 메시지 수신: {receivedMessage.Length} bytes");
+                            Debug.Log($"[MobileWebSocket] 네이티브 메시지 수신: {receivedMessage.Length} bytes");
                             OnMessageReceived?.Invoke(receivedMessage);
                         }
                     }
                     
-                    await UniTask.Delay(50); // 50ms 간격으로 체크
+                    await UniTask.Delay(50);
                 }
             }
             catch (Exception ex)
             {
                 if (!_isDisposed)
                 {
-                    Debug.LogError($"[MobileWebSocket] 모니터링 오류: {ex.Message}");
+                    Debug.LogError($"[MobileWebSocket] 네이티브 모니터링 오류: {ex.Message}");
                     OnError?.Invoke(ex.Message);
                 }
             }
@@ -374,26 +443,29 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
             
-            // 네이티브 WebSocket 정리
-            if (_nativeWebSocketId >= 0)
+            if (_useNativePlugin)
             {
                 DisconnectNativeWebSocketAsync().Forget();
             }
+            else
+            {
+                _webSocket?.Dispose();
+            }
         }
 
-        // ===== 네이티브 플러그인 인터페이스 =====
+        // ===== 네이티브 플러그인 인터페이스 (폴백용) =====
 
         #if UNITY_ANDROID && !UNITY_EDITOR
-        [DllImport("__Internal")]
+        [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern int AndroidWebSocket_Connect(string url);
         
-        [DllImport("__Internal")]
+        [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern void AndroidWebSocket_Disconnect(int webSocketId);
         
-        [DllImport("__Internal")]
+        [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern bool AndroidWebSocket_SendMessage(int webSocketId, string message);
         
-        [DllImport("__Internal")]
+        [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern string AndroidWebSocket_ReceiveMessage(int webSocketId);
         #else
         private static int AndroidWebSocket_Connect(string url) => -1;
@@ -403,16 +475,16 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
         #endif
 
         #if UNITY_IOS && !UNITY_EDITOR
-        [DllImport("__Internal")]
+        [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern int IOSWebSocket_Connect(string url);
         
-        [DllImport("__Internal")]
+        [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern void IOSWebSocket_Disconnect(int webSocketId);
         
-        [DllImport("__Internal")]
+        [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern bool IOSWebSocket_SendMessage(int webSocketId, string message);
         
-        [DllImport("__Internal")]
+        [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern string IOSWebSocket_ReceiveMessage(int webSocketId);
         #else
         private static int IOSWebSocket_Connect(string url) => -1;
