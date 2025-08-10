@@ -4,6 +4,15 @@ using Cysharp.Threading.Tasks;
 
 namespace ProjectVG.Core.Managers
 {
+    public enum InitializationPhase
+    {
+        NotStarted,
+        InitializingManagers,
+        ConnectingToServer,
+        LoadingResources,
+        Completed
+    }
+    
     /** 
      * 초기화 과정을 전담하는 매니저
      * 단계별 초기화, 진행률 추적, 이벤트 발생을 담당

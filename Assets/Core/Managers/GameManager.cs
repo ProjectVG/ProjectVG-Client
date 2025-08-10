@@ -9,15 +9,6 @@ using Cysharp.Threading.Tasks;
 
 namespace ProjectVG.Core.Managers
 {
-    public enum InitializationPhase
-    {
-        NotStarted,
-        InitializingManagers,
-        ConnectingToServer,
-        LoadingResources,
-        Completed
-    }
-
     public class GameManager : Singleton<GameManager>
     {
         [Header("Core Managers")]
@@ -29,15 +20,13 @@ namespace ProjectVG.Core.Managers
         [SerializeField] private bool _autoInitializeOnStart = true;
         [SerializeField] private bool _createManagersIfNotExist = true;
         
-        // 핵심 상태만 노출
-        public bool IsInitialized => _initializationManager?.IsInitialized ?? false;
-        public InitializationPhase CurrentPhase => _initializationManager?.CurrentPhase ?? InitializationPhase.NotStarted;
+        private bool _initializationKickoffDone = false;
         
-        // 매니저 접근 (필요시에만)
+        public bool IsInitialized => _initializationManager?.IsInitialized ?? false;
+        
         public WebSocketManager WebSocketManager => _managerRegistry?.WebSocketManager;
         public SessionManager SessionManager => _managerRegistry?.SessionManager;
         
-        // 필요한 이벤트만 전달
         public event Action OnGameInitialized
         {
             add => _initializationManager.OnInitializationCompleted += value;
@@ -49,31 +38,38 @@ namespace ProjectVG.Core.Managers
             remove => _initializationManager.OnInitializationError -= value;
         }
 
-        
-        #region Unity Lifecycle
-        
         protected override void Awake()
         {
             base.Awake();
+            if (this != Instance)
+            {
+                return;
+            }
             InitializeComponents();
             
-            if (_autoInitializeOnStart) 
+            if (_autoInitializeOnStart && !_initializationKickoffDone && !IsInitialized)
             {
+                _initializationKickoffDone = true;
                 InitializeGame();
             }
         }
         
         private void OnDestroy()
         {
+            if (this != Instance)
+            {
+                return;
+            }
             Shutdown();
         }
         
-        #endregion
-        
-        #region Public Methods
-        
         public async void InitializeGame()
         {
+            if (_initializationKickoffDone && (IsInitialized || (_initializationManager?.IsInitializing ?? false)))
+            {
+                return;
+            }
+            _initializationKickoffDone = true;
             await InitializeGameAsync();
         }
 
@@ -105,18 +101,16 @@ namespace ProjectVG.Core.Managers
             await _initializationManager.InitializeAsync();
         }
         
-
         public void Shutdown()
         {
             Debug.Log("[GameManager] 종료 처리");
             _managerRegistry?.ShutdownAllManagers();
         }
         
-
         [ContextMenu("Log Manager Status")]
         public void LogManagerStatus()
         {
-            Debug.Log($"[GameManager] 초기화: {(IsInitialized ? "완료" : "미완료")}, 단계: {CurrentPhase}");
+            Debug.Log($"[GameManager] 초기화: {(IsInitialized ? "완료" : "미완료")}");
             _managerRegistry?.LogManagerStatus();
         }
 
@@ -134,16 +128,6 @@ namespace ProjectVG.Core.Managers
                 Debug.LogError($"[GameManager] 씬 전환 실패: {ex.Message}");
             }
         }
-
-        public bool IsMainScene()
-        {
-            return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "MainSence";
-        }
-        
-
-        #endregion
-        
-        #region Private Methods
         
         private void InitializeComponents()
         {
@@ -190,8 +174,6 @@ namespace ProjectVG.Core.Managers
                 Debug.LogError("[GameManager] 필수 매니저가 설정되지 않았습니다.");
             }
         }
-        
-        #endregion
     }
     
     public interface IManager
