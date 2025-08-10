@@ -7,7 +7,7 @@ using System.Text;
 
 namespace ProjectVG.Core.Utils
 {
-    public class InGameDebugConsole : MonoBehaviour
+    public class GameDebugConsoleManager : MonoBehaviour
     {
         [Header("UI Components")]
         [SerializeField] private GameObject? _consolePanel;
