@@ -39,16 +39,18 @@ namespace ProjectVG.Core.Loading
         
         private TaskInfo _currentTask;
         
-        public event Action OnInitializationCompleted;
         public event Action<string> OnInitializationFailed;
         
         #region Unity Lifecycle
         
-        // Auto-start 제거 - 명시적으로 StartInitialization() 호출 필요
+        private void Awake()
+        {
+            SetupEventListeners();
+        }
         
         private void OnDestroy()
         {
-            // 정리 작업
+            RemoveEventListeners();
             Debug.Log("[LoadingManager] LoadingManager 해제");
         }
         
@@ -59,10 +61,19 @@ namespace ProjectVG.Core.Loading
         public void StartInitialization()
         {
             Debug.Log("[LoadingManager] 로딩 시작");
+            
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.InitializeGame();
+            }
+            else
+            {
+                Debug.LogError("[LoadingManager] GameManager가 없습니다.");
+            }
         }
         
         /// <summary>
-        /// 외부에서 작업 업데이트를 받는 메서드 (간소화된 버전)
+        /// 작업 업데이트를 받는 메서드 (이벤트 기반)
         /// </summary>
         /// <param name="taskName">작업 이름 (예: "NETWORK_CONNECTION")</param>
         /// <param name="description">작업 설명 (예: "네트워크 연결 중...")</param>
@@ -90,12 +101,71 @@ namespace ProjectVG.Core.Loading
                 await _loadingUI.FadeOut();
             }
             
-            OnInitializationCompleted?.Invoke();
+            if (GameManager.Instance != null)
+            {
+                Debug.Log("[LoadingManager] GameManager를 통해 MainScene으로 전환");
+                await GameManager.Instance.TransitionToMainSceneAsync();
+            }
+            else
+            {
+                Debug.LogError("[LoadingManager] GameManager가 없습니다.");
+            }
         }
         
         #endregion
         
         #region Private Methods
+        
+        private void SetupEventListeners()
+        {
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnGameInitialized += OnGameInitialized;
+                GameManager.Instance.OnInitializationError += OnInitializationError;
+                
+                // InitializationManager의 진행률 이벤트 구독
+                var initializationManager = GameManager.Instance.GetComponent<InitializationManager>();
+                if (initializationManager != null)
+                {
+                    initializationManager.OnProgressUpdated += OnProgressUpdated;
+                }
+                
+                Debug.Log("[LoadingManager] GameManager 이벤트 구독 완료");
+            }
+        }
+        
+        private void RemoveEventListeners()
+        {
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnGameInitialized -= OnGameInitialized;
+                GameManager.Instance.OnInitializationError -= OnInitializationError;
+                
+                // InitializationManager의 진행률 이벤트 구독 해제
+                var initializationManager = GameManager.Instance.GetComponent<InitializationManager>();
+                if (initializationManager != null)
+                {
+                    initializationManager.OnProgressUpdated -= OnProgressUpdated;
+                }
+            }
+        }
+        
+        private void OnGameInitialized()
+        {
+            Debug.Log("[LoadingManager] 게임 초기화 완료 - 게임 시작");
+            StartGame();
+        }
+        
+        private void OnInitializationError(string error)
+        {
+            Debug.LogError($"[LoadingManager] 초기화 오류: {error}");
+            OnInitializationFailed?.Invoke(error);
+        }
+        
+        private void OnProgressUpdated(string taskName, string description, float progress)
+        {
+            UpdateTask(taskName, description, progress);
+        }
 
         #endregion
     }
