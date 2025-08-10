@@ -1,4 +1,5 @@
 using UnityEngine;
+using ProjectVG.Infrastructure.Config;
 
 namespace ProjectVG.Infrastructure.Network.Configs
 {
@@ -64,12 +65,21 @@ namespace ProjectVG.Infrastructure.Network.Configs
                         Debug.LogError("NetworkConfig를 찾을 수 없습니다. Resources 폴더에 NetworkConfig.asset 파일을 생성하세요.");
                         _instance = CreateDefaultInstance();
                     }
-                    else
-                    {
-                        ApplyRuntimeGuard(_instance);
-                    }
                 }
                 return _instance;
+            }
+        }
+        
+        public static EnvironmentType CurrentEnvironment
+        {
+            get
+            {
+                var appEnv = AppEnvironmentConfig.Instance;
+                if (appEnv != null)
+                {
+                    return appEnv.GetCurrentEnvironment();
+                }
+                return Instance.environment;
             }
         }
         
@@ -91,14 +101,12 @@ namespace ProjectVG.Infrastructure.Network.Configs
         
         #region Static Accessors (편의 메서드들)
         
-        public static EnvironmentType CurrentEnvironment => Instance.Environment;
-        
         public static string HttpServerAddress
         {
             get
             {
                 string server;
-                switch (Instance.environment)
+                switch (CurrentEnvironment)
                 {
                     case EnvironmentType.Development: server = Instance.developmentServer; break;
                     case EnvironmentType.Test:        server = Instance.testServer;        break;
@@ -114,7 +122,7 @@ namespace ProjectVG.Infrastructure.Network.Configs
             get
             {
                 string server;
-                switch (Instance.environment)
+                switch (CurrentEnvironment)
                 {
                     case EnvironmentType.Development: server = Instance.developmentServer; break;
                     case EnvironmentType.Test:        server = Instance.testServer;        break;
