@@ -1,6 +1,5 @@
 using UnityEngine;
 using System;
-using System.Collections.Generic;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.Http;
@@ -83,13 +82,11 @@ namespace ProjectVG.Core.Managers
             
             if (_initializationManager.IsInitialized)
             {
-                Debug.Log("[GameManager] 이미 초기화가 완료되었습니다.");
                 return;
             }
 
             if (_initializationManager.IsInitializing)
             {
-                Debug.Log("[GameManager] 초기화가 진행 중입니다. 완료까지 대기합니다.");
                 while (_initializationManager.IsInitializing && !_initializationManager.IsInitialized)
                 {
                     await UniTask.Yield();
@@ -97,27 +94,28 @@ namespace ProjectVG.Core.Managers
                 return;
             }
             
-            Debug.Log("[GameManager] 초기화 시작");
             await _initializationManager.InitializeAsync();
+            if (IsInitialized)
+            {
+                Debug.Log("[GameManager] 게임 시스템 준비 완료");
+            }
         }
         
         public void Shutdown()
         {
-            Debug.Log("[GameManager] 종료 처리");
             _managerRegistry?.ShutdownAllManagers();
+            Debug.Log("[GameManager] 시스템 종료 완료");
         }
         
         [ContextMenu("Log Manager Status")]
         public void LogManagerStatus()
         {
-            Debug.Log($"[GameManager] 초기화: {(IsInitialized ? "완료" : "미완료")}");
+            Debug.Log($"[GameManager] Initialized: {IsInitialized}");
             _managerRegistry?.LogManagerStatus();
         }
 
         public async UniTask TransitionToMainSceneAsync()
         {
-            Debug.Log("[GameManager] MainScene으로 전환 시작");
-            
             try
             {
                 await UnityEngine.SceneManagement.SceneManager.LoadSceneAsync("MainSence");
@@ -167,7 +165,6 @@ namespace ProjectVG.Core.Managers
             if (_initializationManager != null && _managerRegistry != null && _dependencyManager != null)
             {
                 _initializationManager.Initialize(_managerRegistry, _dependencyManager);
-                Debug.Log("[GameManager] 매니저 참조 설정 완료");
             }
             else
             {

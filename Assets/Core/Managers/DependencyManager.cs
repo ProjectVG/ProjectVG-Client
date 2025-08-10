@@ -4,97 +4,72 @@ using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Http;
 
-namespace ProjectVG.Core.Managers
-{
-    /// <summary>
-    /// 의존성 주입을 전담하는 매니저
-    /// </summary>
-    public class DependencyManager : MonoBehaviour
+    namespace ProjectVG.Core.Managers
     {
-        private DIContainer _container;
-        
-        #region Unity Lifecycle
-        
-        private void Awake()
+        /// <summary>
+        /// 의존성 주입을 전담하는 매니저
+        /// </summary>
+        public class DependencyManager : MonoBehaviour
         {
-            _container = DIContainer.Instance;
-        }
-        
-        #endregion
-        
-        #region Public Methods
-        
-        public void SetupDependencies(ManagerRegistry managerRegistry)
-        {
-            if (managerRegistry == null)
+            private DIContainer _container;
+            
+            private void Awake()
             {
-                Debug.LogError("[DependencyManager] ManagerRegistry가 null입니다.");
-                return;
+                _container = DIContainer.Instance;
             }
             
-            Debug.Log("[DependencyManager] 의존성 주입 시작");
-            
-            RegisterServices(managerRegistry);
-            InjectDependencies(managerRegistry);
-            
-            Debug.Log("[DependencyManager] 의존성 주입 완료");
-        }
-        
-        public void RegisterService<T>(T service)
-        {
-            _container.Register<T>(service);
-            Debug.Log($"[DependencyManager] 서비스 등록: {typeof(T).Name}");
-        }
-        
-        public T GetService<T>()
-        {
-            return _container.Get<T>();
-        }
-        
-        #endregion
-        
-        #region Private Methods
-        
-        private void RegisterServices(ManagerRegistry managerRegistry)
-        {
-            // 모든 서비스를 먼저 등록
-            if (managerRegistry.SessionManager != null)
+            public void SetupDependencies(ManagerRegistry managerRegistry)
             {
-                _container.Register<SessionManager>(managerRegistry.SessionManager);
-                Debug.Log("[DependencyManager] SessionManager 등록 완료");
+                if (managerRegistry == null)
+                {
+                    Debug.LogError("[DependencyManager] ManagerRegistry가 null입니다.");
+                    return;
+                }
+                
+                RegisterServices(managerRegistry);
+                InjectDependencies(managerRegistry);
+                Debug.Log("[DependencyManager] DI 완료");
             }
             
-            if (managerRegistry.WebSocketManager != null)
+            public void RegisterService<T>(T service)
             {
-                _container.Register<WebSocketManager>(managerRegistry.WebSocketManager);
-                Debug.Log("[DependencyManager] WebSocketManager 등록 완료");
+                _container.Register<T>(service);
             }
             
-            if (managerRegistry.HttpApiClient != null)
+            public T GetService<T>()
             {
-                _container.Register<HttpApiClient>(managerRegistry.HttpApiClient);
-                Debug.Log("[DependencyManager] HttpApiClient 등록 완료");
+                return _container.Get<T>();
+            }
+            
+            private void RegisterServices(ManagerRegistry managerRegistry)
+            {
+                if (managerRegistry.SessionManager != null)
+                {
+                    _container.Register<SessionManager>(managerRegistry.SessionManager);
+                }
+                
+                if (managerRegistry.WebSocketManager != null)
+                {
+                    _container.Register<WebSocketManager>(managerRegistry.WebSocketManager);
+                }
+                
+                if (managerRegistry.HttpApiClient != null)
+                {
+                    _container.Register<HttpApiClient>(managerRegistry.HttpApiClient);
+                }
+            }
+            
+            private void InjectDependencies(ManagerRegistry managerRegistry)
+            {
+                if (managerRegistry.SessionManager != null)
+                {
+                    _container.InjectDependencies(managerRegistry.SessionManager);
+                }
+                
+                if (managerRegistry.HttpApiClient != null)
+                {
+                    _container.InjectDependencies(managerRegistry.HttpApiClient);
+                }
             }
         }
-        
-        private void InjectDependencies(ManagerRegistry managerRegistry)
-        {
-            // SessionManager에 WebSocketManager 주입 (이벤트 기반으로 순환 의존성 해결됨)
-            if (managerRegistry.SessionManager != null)
-            {
-                _container.InjectDependencies(managerRegistry.SessionManager);
-                Debug.Log("[DependencyManager] SessionManager 의존성 주입 완료");
-            }
-            
-            if (managerRegistry.HttpApiClient != null)
-            {
-                _container.InjectDependencies(managerRegistry.HttpApiClient);
-                Debug.Log("[DependencyManager] HttpApiClient 의존성 주입 완료");
-            }
-            
-            Debug.Log("[DependencyManager] DI 기반 의존성 주입 완료");
-        }
-        
-        #endregion
     }
-}

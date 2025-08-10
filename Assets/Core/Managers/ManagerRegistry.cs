@@ -1,7 +1,6 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.Http;
@@ -52,8 +51,6 @@ namespace ProjectVG.Core.Managers
         
         public void ShutdownAllManagers()
         {
-            Debug.Log("[ManagerRegistry] 모든 매니저 종료 시작");
-            
             for (int i = _managers.Count - 1; i >= 0; i--)
             {
                 try
@@ -65,19 +62,13 @@ namespace ProjectVG.Core.Managers
                     Debug.LogError($"[ManagerRegistry] 매니저 종료 오류: {ex.Message}");
                 }
             }
-            
             _managers.Clear();
             Debug.Log("[ManagerRegistry] 모든 매니저 종료 완료");
         }
         
         public void LogManagerStatus()
         {
-            Debug.Log("[ManagerRegistry] === 매니저 상태 ===");
-            Debug.Log($"[ManagerRegistry] WebSocketManager: {(_webSocketManager != null ? "준비됨" : "없음")}");
-            Debug.Log($"[ManagerRegistry] SessionManager: {(_sessionManager != null ? "준비됨" : "없음")}");
-            Debug.Log($"[ManagerRegistry] HttpApiClient: {(_httpApiClient != null ? "준비됨" : "없음")}");
-            Debug.Log($"[ManagerRegistry] 전체 준비: {(AreManagersReady() ? "완료" : "미완료")}");
-            Debug.Log($"[ManagerRegistry] 세션 연결: {(IsSessionConnected() ? "연결됨" : "미연결")}");
+            Debug.Log($"Managers Ready: {(AreManagersReady() ? "Yes" : "No")}, Session: {(IsSessionConnected() ? "Connected" : "Disconnected")}");
         }
         
         #endregion
@@ -92,16 +83,11 @@ namespace ProjectVG.Core.Managers
                 webSocketObj.transform.SetParent(transform);
                 _webSocketManager = webSocketObj.AddComponent<WebSocketManager>();
             }
-            
-            if (_webSocketManager != null)
-            {
-                _managers.Add(_webSocketManager);
-                Debug.Log("[ManagerRegistry] WebSocketManager 초기화 완료");
-            }
-            else
+            if (_webSocketManager == null)
             {
                 throw new InvalidOperationException("WebSocketManager를 초기화할 수 없습니다.");
             }
+            _managers.Add(_webSocketManager);
         }
         
         private void InitializeSessionManager()
@@ -112,16 +98,11 @@ namespace ProjectVG.Core.Managers
                 sessionObj.transform.SetParent(transform);
                 _sessionManager = sessionObj.AddComponent<SessionManager>();
             }
-            
-            if (_sessionManager != null)
-            {
-                _managers.Add(_sessionManager);
-                Debug.Log("[ManagerRegistry] SessionManager 초기화 완료");
-            }
-            else
+            if (_sessionManager == null)
             {
                 throw new InvalidOperationException("SessionManager를 초기화할 수 없습니다.");
             }
+            _managers.Add(_sessionManager);
         }
         
         private void InitializeHttpApiClient()
@@ -132,16 +113,11 @@ namespace ProjectVG.Core.Managers
                 httpObj.transform.SetParent(transform);
                 _httpApiClient = httpObj.AddComponent<HttpApiClient>();
             }
-            
-            if (_httpApiClient != null)
-            {
-                _managers.Add(_httpApiClient);
-                Debug.Log("[ManagerRegistry] HttpApiClient 초기화 완료");
-            }
-            else
+            if (_httpApiClient == null)
             {
                 throw new InvalidOperationException("HttpApiClient를 초기화할 수 없습니다.");
             }
+            _managers.Add(_httpApiClient);
         }
         
         #endregion
