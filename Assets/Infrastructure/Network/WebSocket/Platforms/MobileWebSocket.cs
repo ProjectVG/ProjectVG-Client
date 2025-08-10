@@ -49,22 +49,24 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                     .Replace("http://", "ws://")
                     .Replace("https://", "wss://");
                 
-                Debug.Log($"[MobileWebSocket] 연결 시도: {wsUrl} (플랫폼: {Application.platform})");
+                Debug.Log($"[MobileWebSocket] 환경: {NetworkConfig.CurrentEnvironment}");
+                Debug.Log($"[MobileWebSocket] 서버 주소(환경기반): {NetworkConfig.WebSocketServerAddress}");
+                Debug.Log($"[MobileWebSocket] 최종 연결 URL: {wsUrl}");
 
                 await _webSocket.ConnectAsync(new Uri(wsUrl), combinedCancellationToken);
                 
-                IsConnected = true;
-                IsConnecting = false;
-                OnConnected?.Invoke();
-                
+                    IsConnected = true;
+                    IsConnecting = false;
+                    OnConnected?.Invoke();
+                    
                 _ = ReceiveLoopAsync();
-                
-                return true;
+                    
+                    return true;
             }
             catch (Exception ex)
             {
                 IsConnecting = false;
-                var error = $"모바일 WebSocket 연결 중 예외 발생: {ex.Message}";
+                var error = $"모바일 WebSocket 연결 중 예외 발생: {ex.Message}\n환경: {NetworkConfig.CurrentEnvironment}\n서버 주소: {NetworkConfig.WebSocketServerAddress}\n요청 URL: {url}";
                 Debug.LogError($"[MobileWebSocket] {error}");
                 OnError?.Invoke(error);
                 return false;

@@ -84,7 +84,9 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 var combinedCancellationToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cancellationTokenSource.Token).Token;
                 
                 var wsUrl = GetWebSocketUrl(sessionId);
-                Debug.Log($"[WebSocket] 연결 시도: {wsUrl}");
+                Debug.Log($"[WebSocket] 환경: {NetworkConfig.CurrentEnvironment}");
+                Debug.Log($"[WebSocket] 서버 주소(환경기반): {NetworkConfig.WebSocketServerAddress}");
+                Debug.Log($"[WebSocket] 연결 시도 URL: {wsUrl}");
 
                 var success = await _nativeWebSocket.ConnectAsync(wsUrl, combinedCancellationToken);
                 
@@ -109,7 +111,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
             catch (Exception ex)
             {
-                var error = $"WebSocket 연결 중 예외 발생: {ex.Message}";
+                var error = $"WebSocket 연결 중 예외 발생: {ex.Message}\n환경: {NetworkConfig.CurrentEnvironment}\n서버 주소: {NetworkConfig.WebSocketServerAddress}\n요청 URL: {GetWebSocketUrl(sessionId)}";
                 Debug.LogError($"[WebSocket] {error}");
                 OnError?.Invoke(error);
                 return false;

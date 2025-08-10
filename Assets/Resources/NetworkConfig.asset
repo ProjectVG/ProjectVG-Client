@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 86f34d98107a627428323909bc15f04d, type: 3}
   m_Name: NetworkConfig
   m_EditorClassIdentifier: 
-  environment: 0
+  environment: 2
   developmentServer: localhost:7900
   testServer: localhost:7900
   productionServer: 122.153.130.223:7900
