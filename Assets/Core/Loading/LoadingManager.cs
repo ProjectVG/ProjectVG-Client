@@ -1,6 +1,5 @@
 using UnityEngine;
 using System;
-using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Core.Managers;
 using ProjectVG.Core.Utils;
@@ -13,9 +12,9 @@ namespace ProjectVG.Core.Loading
     [System.Serializable]
     public struct TaskInfo
     {
-        public string taskName;        // 작업 이름 (예: "NETWORK_CONNECTION")
-        public string taskDescription; // 작업 설명 (예: "네트워크 연결 중...")
-        public float progress;         // 진행률 (0.0 ~ 1.0)
+        public string taskName;
+        public string taskDescription;
+        public float progress;
         
         public TaskInfo(string name, string description, float progressValue)
         {
@@ -25,7 +24,6 @@ namespace ProjectVG.Core.Loading
         }
     }
     
-
     /// <summary>
     /// 로딩 과정을 전담 관리하는 싱글톤 매니저
     /// 실제 초기화는 GameManager가 담당하고, 이 클래스는 UI와 사용자 피드백에 집중
@@ -35,9 +33,8 @@ namespace ProjectVG.Core.Loading
         [Header("UI Reference")]
         [SerializeField] private LoadingUI _loadingUI;
         
-
-        
         private TaskInfo _currentTask;
+        private bool _gameStarted;
         
         public event Action<string> OnInitializationFailed;
         
@@ -51,7 +48,6 @@ namespace ProjectVG.Core.Loading
         private void OnDestroy()
         {
             RemoveEventListeners();
-            Debug.Log("[LoadingManager] LoadingManager 해제");
         }
         
         #endregion
@@ -60,8 +56,6 @@ namespace ProjectVG.Core.Loading
         
         public void StartInitialization()
         {
-            Debug.Log("[LoadingManager] 로딩 시작");
-            
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.InitializeGame();
@@ -73,42 +67,34 @@ namespace ProjectVG.Core.Loading
         }
         
         /// <summary>
-        /// 작업 업데이트를 받는 메서드 (이벤트 기반)
+        /// 외부(InitializationManager)의 진행 이벤트를 큐에 적재
         /// </summary>
-        /// <param name="taskName">작업 이름 (예: "NETWORK_CONNECTION")</param>
-        /// <param name="description">작업 설명 (예: "네트워크 연결 중...")</param>
-        /// <param name="progress">진행률 (0.0 ~ 1.0)</param>
         public void UpdateTask(string taskName, string description, float progress)
         {
             _currentTask = new TaskInfo(taskName, description, progress);
-            
-            // UI 업데이트
             if (_loadingUI != null)
             {
-                Debug.Log($"[LoadingManager] 작업 업데이트: {taskName} - {description} ({Mathf.RoundToInt(progress * 100)}%)");
                 _loadingUI.UpdateTask(_currentTask);
+            }
+            
+            if (!_gameStarted && _currentTask.progress >= 1f)
+            {
+                StartGame();
             }
         }
         
-
-        
         public async void StartGame()
         {
-            Debug.Log("[LoadingManager] 게임 시작");
-            
+            if (_gameStarted)
+                return;
+            _gameStarted = true;
             if (_loadingUI != null)
             {
                 await _loadingUI.FadeOut();
             }
-            
             if (GameManager.Instance != null)
             {
-                Debug.Log("[LoadingManager] GameManager를 통해 MainScene으로 전환");
                 await GameManager.Instance.TransitionToMainSceneAsync();
-            }
-            else
-            {
-                Debug.LogError("[LoadingManager] GameManager가 없습니다.");
             }
         }
         
@@ -122,15 +108,11 @@ namespace ProjectVG.Core.Loading
             {
                 GameManager.Instance.OnGameInitialized += OnGameInitialized;
                 GameManager.Instance.OnInitializationError += OnInitializationError;
-                
-                // InitializationManager의 진행률 이벤트 구독
                 var initializationManager = GameManager.Instance.GetComponent<InitializationManager>();
                 if (initializationManager != null)
                 {
                     initializationManager.OnProgressUpdated += OnProgressUpdated;
                 }
-                
-                Debug.Log("[LoadingManager] GameManager 이벤트 구독 완료");
             }
         }
         
@@ -140,8 +122,6 @@ namespace ProjectVG.Core.Loading
             {
                 GameManager.Instance.OnGameInitialized -= OnGameInitialized;
                 GameManager.Instance.OnInitializationError -= OnInitializationError;
-                
-                // InitializationManager의 진행률 이벤트 구독 해제
                 var initializationManager = GameManager.Instance.GetComponent<InitializationManager>();
                 if (initializationManager != null)
                 {
@@ -152,8 +132,10 @@ namespace ProjectVG.Core.Loading
         
         private void OnGameInitialized()
         {
-            Debug.Log("[LoadingManager] 게임 초기화 완료 - 게임 시작");
-            StartGame();
+            if (!_gameStarted)
+            {
+                StartGame();
+            }
         }
         
         private void OnInitializationError(string error)
@@ -166,7 +148,7 @@ namespace ProjectVG.Core.Loading
         {
             UpdateTask(taskName, description, progress);
         }
-
+        
         #endregion
     }
 }
