@@ -31,6 +31,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         private int _maxReconnectAttempts = 10;
         private float _maxReconnectDelay = 60f;
         private bool _useExponentialBackoff = true;
+        private bool _isShutdown = false;
 
         // 순환 의존성 해결: 직접 참조 대신 이벤트 사용
         public event Action<string> OnSessionMessageReceived;
@@ -162,10 +163,22 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 
         public void Shutdown()
         {
+            if (_isShutdown)
+            {
+                return;
+            }
+            _isShutdown = true;
+
             _autoReconnect = false;
             DisconnectAsync().Forget();
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource?.Dispose();
+            
+            var cts = _cancellationTokenSource;
+            _cancellationTokenSource = null;
+            if (cts != null)
+            {
+                try { cts.Cancel(); } catch { }
+                try { cts.Dispose(); } catch { }
+            }
         }
         
         #endregion
@@ -227,9 +240,10 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         
         private async UniTaskVoid StartConnectionMonitoring()
         {
-            while (!_cancellationTokenSource.Token.IsCancellationRequested)
+            var token = _cancellationTokenSource.Token;
+            while (!token.IsCancellationRequested)
             {
-                await UniTask.Delay(TimeSpan.FromSeconds(30), cancellationToken: _cancellationTokenSource.Token);
+                await UniTask.Delay(TimeSpan.FromSeconds(30), cancellationToken: token);
                 
                 if (!_isConnected && !_isConnecting && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts)
                 {
@@ -253,13 +267,11 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _isConnected = false;
             _isConnecting = false;
             
-            // 세션 ID 클리어 및 세션 해제 이벤트 발생
             string previousSessionId = _sessionId;
             _sessionId = null;
             
             Debug.LogWarning("[WebSocket] 세션이 끊어졌습니다. 재연결을 시도합니다.");
             
-            // 세션이 있었다면 세션 해제 이벤트 발생
             if (!string.IsNullOrEmpty(previousSessionId))
             {
                 OnSessionDisconnected?.Invoke();
@@ -400,19 +412,16 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             {
                 Debug.Log($"[WebSocket] 세션 메시지 수신: {data?.Substring(0, Math.Min(50, data?.Length ?? 0))}...");
                 
-                // 세션 ID 파싱 시도
                 var jsonObject = JObject.Parse(data);
                 string sessionId = jsonObject["session_id"]?.ToString();
                 
                 if (!string.IsNullOrEmpty(sessionId))
                 {
-                    // 세션 ID 저장 및 세션 연결 완료 이벤트 발생
                     _sessionId = sessionId;
                     Debug.Log($"[WebSocket] 세션 연결 완료: {sessionId}");
                     OnSessionConnected?.Invoke(sessionId);
                 }
                 
-                // 기존 이벤트도 계속 발생 (호환성)
                 OnSessionMessageReceived?.Invoke(data);
                 
                 Debug.Log($"[WebSocket] 세션 메시지 처리 완료");
