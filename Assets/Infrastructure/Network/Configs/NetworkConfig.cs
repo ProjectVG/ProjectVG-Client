@@ -25,6 +25,11 @@ namespace ProjectVG.Infrastructure.Network.Configs
         [SerializeField] private int maxRetryCount = 3;
         [SerializeField] private float retryDelay = 1f;
         
+        [Header("File Upload Settings")]
+        [SerializeField] private int maxFileSize = 10485760; // 10MB (bytes)
+        [SerializeField] private float uploadTimeout = 60f; // 파일 업로드용 더 긴 타임아웃
+        [SerializeField] private bool enableFileSizeCheck = true;
+        
         [Header("WebSocket Settings")]
         [SerializeField] private string wsPath = "ws";
         [SerializeField] private float wsTimeout = 30f;
@@ -178,6 +183,11 @@ namespace ProjectVG.Infrastructure.Network.Configs
         public static string UserAgent => Instance.userAgent;
         public static string ContentType => Instance.contentType;
         
+        // File Upload Settings
+        public static int MaxFileSize => Instance.maxFileSize;
+        public static float UploadTimeout => Instance.uploadTimeout;
+        public static bool EnableFileSizeCheck => Instance.enableFileSizeCheck;
+        
         // WebSocket 설정 정적 접근자 복원
         public static float WebSocketTimeout => Instance.wsTimeout;
         public static float ReconnectDelay => Instance.reconnectDelay;
@@ -234,6 +244,9 @@ namespace ProjectVG.Infrastructure.Network.Configs
             instance.enableMessageLogging = true;
             instance.userAgent = "ProjectVG-Client/1.0";
             instance.contentType = "application/json";
+            instance.maxFileSize = 10485760;
+            instance.uploadTimeout = 60f;
+            instance.enableFileSizeCheck = true;
             
             Debug.LogWarning("기본 NetworkConfig를 생성했습니다. Resources 폴더에 NetworkConfig.asset 파일을 생성하는 것을 권장합니다.");
             

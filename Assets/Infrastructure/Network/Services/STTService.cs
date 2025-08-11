@@ -2,10 +2,12 @@
 using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 using ProjectVG.Infrastructure.Network.Http;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
 using Newtonsoft.Json;
+using Cysharp.Threading.Tasks;
 
 namespace ProjectVG.Infrastructure.Network.Services
 {
@@ -13,51 +15,19 @@ namespace ProjectVG.Infrastructure.Network.Services
     /// Speech-to-Text 서비스 구현체
     /// HTTP API를 통해 음성을 텍스트로 변환합니다.
     /// </summary>
-    public class STTService : ISTTService
+    public class STTService
     {
-        private readonly string _baseUrl;
-        private bool _isInitialized = false;
-        private bool _isConnected = false;
+        private readonly HttpApiClient _httpClient;
         
-        public bool IsConnected => _isConnected;
-        public bool IsAvailable => _isInitialized && _isConnected;
+        public bool IsConnected => true; // 항상 연결 가능하다고 가정
+        public bool IsAvailable => _httpClient != null;
         
-        public STTService(string baseUrl = "http://localhost:7920")
+        public STTService()
         {
-            _baseUrl = baseUrl;
-        }
-        
-        /// <summary>
-        /// STT 서비스 초기화
-        /// </summary>
-        /// <returns>초기화 성공 여부</returns>
-        public async Task<bool> InitializeAsync()
-        {
-            try
+            _httpClient = HttpApiClient.Instance;
+            if (_httpClient == null)
             {
-                // 서버 상태 확인 (전체 URL 사용)
-                var healthResponse = await HttpApiClient.Instance.GetAsync<STTHealthResponse>($"{_baseUrl}/api/v1/health");
-                if (healthResponse != null)
-                {
-                    _isConnected = healthResponse.Status == "healthy" && healthResponse.ModelLoaded == true;
-                    _isInitialized = true;
-                    
-                    return _isConnected;
-                }
-                else
-                {
-                    Debug.LogError("[STTService] STT 서버 상태 확인 실패");
-                    _isConnected = false;
-                    _isInitialized = false;
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[STTService] STT 서비스 초기화 실패: {ex.Message}");
-                _isConnected = false;
-                _isInitialized = false;
-                return false;
+                Debug.LogError("[STTService] HttpApiClient.Instance가 null입니다. HttpApiClient가 생성되지 않았습니다.");
             }
         }
         
@@ -68,13 +38,14 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <param name="audioFormat">음성 포맷</param>
         /// <param name="language">언어 코드</param>
         /// <returns>변환된 텍스트</returns>
-        public async Task<string> ConvertSpeechToTextAsync(byte[] audioData, string audioFormat = "wav", string language = "ko")
+        public async UniTask<string> ConvertSpeechToTextAsync(byte[] audioData, string audioFormat = "wav", string language = "ko", CancellationToken cancellationToken = default)
         {
-            if (!IsAvailable)
+            if (_httpClient == null)
             {
-                throw new InvalidOperationException("STT 서비스가 사용 불가능합니다.");
+                Debug.LogError("[STTService] HttpApiClient가 null입니다. 초기화를 확인해주세요.");
+                throw new InvalidOperationException("HttpApiClient가 초기화되지 않았습니다.");
             }
-            
+
             if (audioData == null || audioData.Length == 0)
             {
                 throw new ArgumentException("음성 데이터가 비어있습니다.");
@@ -82,29 +53,37 @@ namespace ProjectVG.Infrastructure.Network.Services
             
             try
             {
-                // multipart/form-data로 파일 업로드
                 var formData = new Dictionary<string, object>
                 {
                     { "file", audioData }
                 };
-                
-                // 쿼리 파라미터 추가
-                string url = $"{_baseUrl}/api/v1/transcribe";
-                if (!string.IsNullOrEmpty(language))
+
+                var fileNames = new Dictionary<string, string>
                 {
-                    url += $"?language={language}";
-                }
+                    { "file", "recording.wav" }
+                };
                 
-                // HTTP POST 요청 (전체 URL 사용)
-                var response = await HttpApiClient.Instance.PostFormDataAsync<STTResponse>(url, formData);
+                // 서버 API에 맞게 language 파라미터만 사용
+                string forcedLanguage = "ko";
+                string endpoint = $"stt/transcribe?language={forcedLanguage}";
+                
+                Debug.Log($"[STTService] STT 변환 요청 시작 - 엔드포인트: {endpoint}, 파일 크기: {audioData.Length / 1024}KB, 강제 언어: {forcedLanguage}");
+                Debug.Log($"[STTService] URL 확인: {endpoint}");
+                
+                var response = await _httpClient.PostFormDataAsync<STTResponse>(endpoint, formData, fileNames, cancellationToken: cancellationToken);
+                
+                Debug.Log($"[STTService] 응답 객체 - Text: '{response?.Text}', Language: '{response?.Language}'");
+                Debug.Log($"[STTService] 응답 객체 - LanguageProbability: {response?.LanguageProbability}, SegmentsCount: {response?.SegmentsCount}");
+                Debug.Log($"[STTService] 응답 객체 - ProcessingTime: {response?.ProcessingTime}");
                 
                 if (response != null && !string.IsNullOrEmpty(response.Text))
                 {
+                    Debug.Log($"[STTService] STT 변환 성공 - 텍스트: '{response.Text}'");
                     return response.Text;
                 }
                 else
                 {
-                    Debug.LogError("[STTService] STT 변환 실패: 응답이 비어있습니다.");
+                    Debug.LogError($"[STTService] STT 변환 실패: 응답이 비어있습니다. Text: '{response?.Text}'");
                     throw new Exception("음성 변환 실패: 응답이 비어있습니다.");
                 }
             }
@@ -113,6 +92,39 @@ namespace ProjectVG.Infrastructure.Network.Services
                 Debug.LogError($"[STTService] STT 변환 중 오류 발생: {ex.Message}");
                 throw;
             }
+        }
+
+        /// <summary>
+        /// 테스트용 더미 음성 데이터 생성 (1초, 22050Hz, 사인파)
+        /// </summary>
+        public byte[] GenerateTestAudioData()
+        {
+            int sampleRate = 22050;
+            int duration = 1; // 1초
+            int samples = sampleRate * duration;
+            
+            // 440Hz 사인파 생성
+            float frequency = 440f;
+            float[] audioData = new float[samples];
+            
+            for (int i = 0; i < samples; i++)
+            {
+                audioData[i] = Mathf.Sin(2f * Mathf.PI * frequency * i / sampleRate) * 0.5f;
+            }
+            
+            // WAV로 변환
+            byte[] pcm16 = new byte[samples * 2];
+            int pcmIndex = 0;
+            for (int i = 0; i < samples; i++)
+            {
+                float clamped = Mathf.Clamp(audioData[i], -1f, 1f);
+                short s = (short)Mathf.RoundToInt(clamped * short.MaxValue);
+                pcm16[pcmIndex++] = (byte)(s & 0xFF);
+                pcm16[pcmIndex++] = (byte)((s >> 8) & 0xFF);
+            }
+            
+            // WAV 헤더 추가
+            return ProjectVG.Infrastructure.Audio.WavEncoder.WrapPcm16ToWav(pcm16, 1, sampleRate);
         }
     }
     

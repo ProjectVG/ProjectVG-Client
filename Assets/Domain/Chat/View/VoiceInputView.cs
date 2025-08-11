@@ -6,6 +6,9 @@ using TMPro;
 using ProjectVG.Domain.Chat.Service;
 using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Core.Audio;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace ProjectVG.Domain.Chat.View
 {
@@ -15,15 +18,19 @@ namespace ProjectVG.Domain.Chat.View
         [SerializeField] private Button? _btnVoice;
         [SerializeField] private Button? _btnVoiceStop;
         [SerializeField] private TextMeshProUGUI? _txtVoiceStatus;
+        [SerializeField] private Slider? _progressBar; // 녹음 진행률 표시
         
         [Header("Voice Settings")]
         [SerializeField] private float _maxRecordingTime = 30f;
-        [SerializeField] private string _voiceStatusRecording = "녹음 중...";
-        [SerializeField] private string _voiceStatusProcessing = "음성을 텍스트로 변환 중...";
+        [SerializeField] private string _voiceStatusRecording = "Recording..."; // "녹음 중..."에서 변경
+        [SerializeField] private string _voiceStatusProcessing = "Converting speech to text..."; // "음성을 텍스트로 변환 중..."에서 변경
+        
+        [Header("Debug Settings")]
+        [SerializeField] private bool _saveRecordingToFile = true;
         
         private ChatManager? _chatManager;
         private AudioRecorder? _audioRecorder;
-        private ISTTService? _sttService;
+        private STTService? _sttService;
         private bool _isRecording = false;
         private float _recordingStartTime;
         
@@ -39,10 +46,11 @@ namespace ProjectVG.Domain.Chat.View
         
         private void Update()
         {
-            if (_isRecording && Time.time - _recordingStartTime > _maxRecordingTime)
-            {
-                StopVoiceRecording();
-            }
+            // 새로운 AudioRecorder는 자체적으로 최대 시간을 관리하므로 제거
+            // if (_isRecording && Time.time - _recordingStartTime > _maxRecordingTime)
+            // {
+            //     StopVoiceRecording();
+            // }
         }
         
         private void OnDestroy()
@@ -57,6 +65,7 @@ namespace ProjectVG.Domain.Chat.View
                 _audioRecorder.OnRecordingStarted -= OnRecordingStarted;
                 _audioRecorder.OnRecordingStopped -= OnRecordingStopped;
                 _audioRecorder.OnRecordingCompleted -= OnRecordingCompleted;
+                _audioRecorder.OnRecordingProgress -= OnRecordingProgress;
                 _audioRecorder.OnError -= OnRecordingError;
             }
         }
@@ -130,6 +139,7 @@ namespace ProjectVG.Domain.Chat.View
                 _recordingStartTime = Time.time;
                 UpdateVoiceButtonState(true);
                 UpdateVoiceStatus(_voiceStatusRecording);
+                UpdateProgressBar(0f);
                 
                 bool success = _audioRecorder.StartRecording();
                 if (!success)
@@ -161,11 +171,19 @@ namespace ProjectVG.Domain.Chat.View
                 _isRecording = false;
                 UpdateVoiceButtonState(false);
                 UpdateVoiceStatus(string.Empty);
+                UpdateProgressBar(0f);
                 
                 AudioClip? recordedClip = _audioRecorder.StopRecording();
                 if (recordedClip != null)
                 {
-                    byte[] audioData = _audioRecorder.AudioClipToBytes(recordedClip);
+                    // 디버깅을 위한 파일 저장
+                    if (_saveRecordingToFile)
+                    {
+                        string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                        _audioRecorder.SaveRecordingToFile(recordedClip, $"voice_recording_{timestamp}");
+                    }
+                    
+                    byte[] audioData = _audioRecorder.AudioClipToWavBytes(recordedClip);
                     if (audioData.Length > 0)
                     {
                         SendVoiceMessage(audioData);
@@ -211,6 +229,15 @@ namespace ProjectVG.Domain.Chat.View
                     Debug.LogWarning("[VoiceInputView] TxtVoiceStatus 텍스트를 찾을 수 없습니다.");
                 }
             }
+            
+            if (_progressBar == null)
+            {
+                _progressBar = transform.Find("ProgressBar")?.GetComponent<Slider>();
+                if (_progressBar == null)
+                {
+                    Debug.LogWarning("[VoiceInputView] ProgressBar 슬라이더를 찾을 수 없습니다.");
+                }
+            }
                 
             if (_audioRecorder == null)
             {
@@ -244,6 +271,7 @@ namespace ProjectVG.Domain.Chat.View
                 _audioRecorder.OnRecordingStarted += OnRecordingStarted;
                 _audioRecorder.OnRecordingStopped += OnRecordingStopped;
                 _audioRecorder.OnRecordingCompleted += OnRecordingCompleted;
+                _audioRecorder.OnRecordingProgress += OnRecordingProgress;
                 _audioRecorder.OnError += OnRecordingError;
             }
         }
@@ -278,6 +306,15 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
+        private void UpdateProgressBar(float progress)
+        {
+            if (_progressBar != null)
+            {
+                _progressBar.value = progress;
+                _progressBar.gameObject.SetActive(progress > 0f);
+            }
+        }
+        
         private async System.Threading.Tasks.Task<string> ConvertSpeechToText(byte[] audioData)
         {
             if (_sttService == null)
@@ -288,11 +325,6 @@ namespace ProjectVG.Domain.Chat.View
             
             try
             {
-                if (!_sttService.IsAvailable)
-                {
-                    await _sttService.InitializeAsync();
-                }
-                
                 string transcribedText = await _sttService.ConvertSpeechToTextAsync(audioData);
                 return transcribedText;
             }
@@ -300,6 +332,31 @@ namespace ProjectVG.Domain.Chat.View
             {
                 Debug.LogError($"[VoiceInputView] STT 변환 실패: {ex.Message}");
                 throw;
+            }
+        }
+        
+        /// <summary>
+        /// 더미 음성으로 STT 서버 테스트
+        /// </summary>
+        [ContextMenu("Test STT with Dummy Audio")]
+        public async void TestSTTWithDummyAudio()
+        {
+            if (_sttService == null)
+            {
+                Debug.LogError("[VoiceInputView] STT 서비스가 없습니다.");
+                return;
+            }
+            
+            try
+            {
+                Debug.Log("[VoiceInputView] 더미 음성으로 STT 서버 테스트 시작");
+                byte[] dummyAudio = _sttService.GenerateTestAudioData();
+                string result = await _sttService.ConvertSpeechToTextAsync(dummyAudio);
+                Debug.Log($"[VoiceInputView] 더미 음성 테스트 결과: '{result}'");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[VoiceInputView] 더미 음성 테스트 실패: {ex.Message}");
             }
         }
         
@@ -315,14 +372,23 @@ namespace ProjectVG.Domain.Chat.View
         
         private void OnRecordingStarted()
         {
+            Debug.Log("[VoiceInputView] 녹음 시작됨");
         }
         
         private void OnRecordingStopped()
         {
+            Debug.Log("[VoiceInputView] 녹음 중지됨");
         }
         
         private void OnRecordingCompleted(AudioClip audioClip)
         {
+            Debug.Log($"[VoiceInputView] 녹음 완료 - 샘플: {audioClip.samples}, 길이: {audioClip.length:F2}초");
+        }
+        
+        private void OnRecordingProgress(float progress)
+        {
+            UpdateProgressBar(progress);
+            // Debug.Log($"[VoiceInputView] 녹음 진행률: {progress:P0}"); // 디버그 메시지 제거
         }
         
         private void OnRecordingError(string error)
