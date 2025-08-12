@@ -25,7 +25,7 @@ namespace ProjectVG.Core.Audio
         private bool _isRecording = false;
         private float _recordingStartTime;
         private float _recordingEndTime;
-        private string _currentDevice = null;
+        private string? _currentDevice = null;
         
         // 이벤트
         public event Action? OnRecordingStarted;
@@ -100,7 +100,7 @@ namespace ProjectVG.Core.Audio
                 _recordingStartTime = Time.time;
                 
                 // 최대 녹음 시간만큼 버퍼 할당
-                _recordingClip = Microphone.Start(_currentDevice, false, _maxRecordingLength, _sampleRate);
+                _recordingClip = Microphone.Start(_currentDevice ?? string.Empty, false, _maxRecordingLength, _sampleRate);
                 
                 Debug.Log($"[AudioRecorder] 음성 녹음 시작됨 (최대 {_maxRecordingLength}초, {_sampleRate}Hz)");
                 OnRecordingStarted?.Invoke();
@@ -134,7 +134,7 @@ namespace ProjectVG.Core.Audio
                 _recordingEndTime = Time.time;
                 float actualRecordingDuration = _recordingEndTime - _recordingStartTime;
                 
-                Microphone.End(_currentDevice);
+                Microphone.End(_currentDevice ?? string.Empty);
                 
                 if (_recordingClip != null)
                 {
@@ -143,11 +143,13 @@ namespace ProjectVG.Core.Audio
                     {
                         Debug.Log($"[AudioRecorder] 음성 녹음 완료됨 ({actualRecordingDuration:F1}초, {processedClip.samples} 샘플)");
                         OnRecordingCompleted?.Invoke(processedClip);
+                        OnRecordingStopped?.Invoke();
+                        return processedClip;
                     }
                 }
                 
                 OnRecordingStopped?.Invoke();
-                return _recordingClip;
+                return null;
             }
             catch (Exception ex)
             {
@@ -232,9 +234,16 @@ namespace ProjectVG.Core.Audio
         /// </summary>
         public void SetMicrophone(string deviceName)
         {
+            if (_isRecording)
+            {
+                Debug.LogError("[AudioRecorder] 녹음 중에는 마이크를 변경할 수 없습니다.");
+                return;
+            }
+            
             if (Array.Exists(Microphone.devices, device => device == deviceName))
             {
                 _currentDevice = deviceName;
+                Debug.Log($"[AudioRecorder] 마이크 변경됨: {deviceName}");
             }
             else
             {
@@ -255,6 +264,7 @@ namespace ProjectVG.Core.Audio
             if (devices.Length > 0)
             {
                 _currentDevice = devices[0];
+                Debug.Log($"[AudioRecorder] 마이크 초기화됨: {_currentDevice}");
             }
             else
             {
