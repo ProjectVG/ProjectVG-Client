@@ -25,8 +25,7 @@ namespace ProjectVG.Domain.Chat.View
         [SerializeField] private string _voiceStatusRecording = "Recording..."; // "녹음 중..."에서 변경
         [SerializeField] private string _voiceStatusProcessing = "Converting speech to text..."; // "음성을 텍스트로 변환 중..."에서 변경
         
-        [Header("Debug Settings")]
-        [SerializeField] private bool _saveRecordingToFile = true;
+
         
         private ChatManager? _chatManager;
         private AudioRecorder? _audioRecorder;
@@ -176,13 +175,6 @@ namespace ProjectVG.Domain.Chat.View
                 AudioClip? recordedClip = _audioRecorder.StopRecording();
                 if (recordedClip != null)
                 {
-                    // 디버깅을 위한 파일 저장
-                    if (_saveRecordingToFile)
-                    {
-                        string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                        _audioRecorder.SaveRecordingToFile(recordedClip, $"voice_recording_{timestamp}");
-                    }
-                    
                     byte[] audioData = _audioRecorder.AudioClipToWavBytes(recordedClip);
                     if (audioData.Length > 0)
                     {
@@ -349,14 +341,13 @@ namespace ProjectVG.Domain.Chat.View
             
             try
             {
-                Debug.Log("[VoiceInputView] 더미 음성으로 STT 서버 테스트 시작");
                 byte[] dummyAudio = _sttService.GenerateTestAudioData();
                 string result = await _sttService.ConvertSpeechToTextAsync(dummyAudio);
-                Debug.Log($"[VoiceInputView] 더미 음성 테스트 결과: '{result}'");
+                Debug.Log($"[VoiceInputView] STT 테스트 결과: '{result}'");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[VoiceInputView] 더미 음성 테스트 실패: {ex.Message}");
+                Debug.LogError($"[VoiceInputView] STT 테스트 실패: {ex.Message}");
             }
         }
         
@@ -372,28 +363,26 @@ namespace ProjectVG.Domain.Chat.View
         
         private void OnRecordingStarted()
         {
-            Debug.Log("[VoiceInputView] 녹음 시작됨");
+            // AudioRecorder에서 로그 출력
         }
         
         private void OnRecordingStopped()
         {
-            Debug.Log("[VoiceInputView] 녹음 중지됨");
+            // AudioRecorder에서 로그 출력
         }
         
         private void OnRecordingCompleted(AudioClip audioClip)
         {
-            Debug.Log($"[VoiceInputView] 녹음 완료 - 샘플: {audioClip.samples}, 길이: {audioClip.length:F2}초");
+            // AudioRecorder에서 로그 출력
         }
         
         private void OnRecordingProgress(float progress)
         {
             UpdateProgressBar(progress);
-            // Debug.Log($"[VoiceInputView] 녹음 진행률: {progress:P0}"); // 디버그 메시지 제거
         }
         
         private void OnRecordingError(string error)
         {
-            Debug.LogError($"[VoiceInputView] 녹음 오류: {error}");
             OnError?.Invoke(error);
         }
         

@@ -102,7 +102,7 @@ namespace ProjectVG.Core.Audio
                 // 최대 녹음 시간만큼 버퍼 할당
                 _recordingClip = Microphone.Start(_currentDevice, false, _maxRecordingLength, _sampleRate);
                 
-                Debug.Log($"[AudioRecorder] 녹음 시작 - 최대 시간: {_maxRecordingLength}초, 샘플레이트: {_sampleRate}Hz");
+                Debug.Log($"[AudioRecorder] 음성 녹음 시작됨 (최대 {_maxRecordingLength}초, {_sampleRate}Hz)");
                 OnRecordingStarted?.Invoke();
                 
                 return true;
@@ -141,7 +141,7 @@ namespace ProjectVG.Core.Audio
                     AudioClip processedClip = ProcessRecordingClip(actualRecordingDuration);
                     if (processedClip != null)
                     {
-                        Debug.Log($"[AudioRecorder] 녹음 완료 - 실제 녹음 시간: {actualRecordingDuration:F2}초, 샘플: {processedClip.samples}");
+                        Debug.Log($"[AudioRecorder] 음성 녹음 완료됨 ({actualRecordingDuration:F1}초, {processedClip.samples} 샘플)");
                         OnRecordingCompleted?.Invoke(processedClip);
                     }
                 }
@@ -199,9 +199,7 @@ namespace ProjectVG.Core.Audio
                 string filePath = System.IO.Path.Combine(Application.persistentDataPath, $"{fileName}.wav");
                 System.IO.File.WriteAllBytes(filePath, wavData);
                 
-                Debug.Log($"[AudioRecorder] 녹음 파일 저장 완료: {filePath}");
-                Debug.Log($"[AudioRecorder] 파일 크기: {wavData.Length} bytes");
-                Debug.Log($"[AudioRecorder] AudioClip 정보 - 샘플: {audioClip.samples}, 채널: {audioClip.channels}, 주파수: {audioClip.frequency}");
+                Debug.Log($"[AudioRecorder] 녹음 파일 저장됨: {filePath} ({wavData.Length} bytes)");
                 
                 return true;
             }
@@ -237,7 +235,6 @@ namespace ProjectVG.Core.Audio
             if (Array.Exists(Microphone.devices, device => device == deviceName))
             {
                 _currentDevice = deviceName;
-                Debug.Log($"[AudioRecorder] 마이크 설정 변경: {deviceName}");
             }
             else
             {
@@ -258,7 +255,6 @@ namespace ProjectVG.Core.Audio
             if (devices.Length > 0)
             {
                 _currentDevice = devices[0];
-                Debug.Log($"[AudioRecorder] 기본 마이크 설정: {_currentDevice}");
             }
             else
             {
@@ -281,7 +277,7 @@ namespace ProjectVG.Core.Audio
             int maxSamples = _recordingClip.samples;
             actualSamples = Mathf.Min(actualSamples, maxSamples);
             
-            Debug.Log($"[AudioRecorder] 실제 녹음 길이: {actualSamples} 샘플, 전체 버퍼: {_recordingClip.samples} 샘플, 실제 시간: {actualDuration:F2}초");
+            Debug.Log($"[AudioRecorder] 녹음 데이터 처리 중 ({actualSamples}/{_recordingClip.samples} 샘플, {actualDuration:F1}초)");
             
             if (actualSamples <= 0)
             {
@@ -310,7 +306,7 @@ namespace ProjectVG.Core.Audio
             processedClip.SetData(samples, 0);
             _recordingClip = processedClip;
             
-            Debug.Log($"[AudioRecorder] 처리된 AudioClip - 샘플: {_recordingClip.samples}, 채널: {_recordingClip.channels}, 주파수: {_recordingClip.frequency}");
+            Debug.Log($"[AudioRecorder] AudioClip 생성 완료 ({_recordingClip.samples} 샘플, {_recordingClip.channels} 채널, {_recordingClip.frequency}Hz)");
             
             return _recordingClip;
         }
