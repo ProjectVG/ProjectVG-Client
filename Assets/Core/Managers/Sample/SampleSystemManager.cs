@@ -3,7 +3,7 @@ using Live2D.Cubism.Framework.MouthMovement;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class SystemManager : Singleton<SystemManager>
+public class SampleSystemManager : Singleton<SampleSystemManager>
 {
     [SerializeField] private CubismLookTarget cubismLookTarget = null;
     [SerializeField] private Camera mCamera = null;

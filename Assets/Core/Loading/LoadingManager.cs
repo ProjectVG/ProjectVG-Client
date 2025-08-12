@@ -56,9 +56,9 @@ namespace ProjectVG.Core.Loading
         
         public void StartInitialization()
         {
-            if (GameManager.Instance != null)
+            if (SystemManager.Instance != null)
             {
-                GameManager.Instance.InitializeGame();
+                SystemManager.Instance.InitializeGame();
             }
             else
             {
@@ -92,9 +92,9 @@ namespace ProjectVG.Core.Loading
             {
                 await _loadingUI.FadeOut();
             }
-            if (GameManager.Instance != null)
+            if (SystemManager.Instance != null)
             {
-                await GameManager.Instance.TransitionToMainSceneAsync();
+                await SystemManager.Instance.TransitionToMainSceneAsync();
             }
         }
         
@@ -104,11 +104,11 @@ namespace ProjectVG.Core.Loading
         
         private void SetupEventListeners()
         {
-            if (GameManager.Instance != null)
+            if (SystemManager.Instance != null)
             {
-                GameManager.Instance.OnGameInitialized += OnGameInitialized;
-                GameManager.Instance.OnInitializationError += OnInitializationError;
-                var initializationManager = GameManager.Instance.GetComponent<InitializationManager>();
+                SystemManager.Instance.OnGameInitialized += OnGameInitialized;
+                SystemManager.Instance.OnInitializationError += OnInitializationError;
+                var initializationManager = SystemManager.Instance.GetComponent<InitializationManager>();
                 if (initializationManager != null)
                 {
                     initializationManager.OnProgressUpdated += OnProgressUpdated;
@@ -118,11 +118,11 @@ namespace ProjectVG.Core.Loading
         
         private void RemoveEventListeners()
         {
-            if (GameManager.Instance != null)
+            if (SystemManager.Instance != null)
             {
-                GameManager.Instance.OnGameInitialized -= OnGameInitialized;
-                GameManager.Instance.OnInitializationError -= OnInitializationError;
-                var initializationManager = GameManager.Instance.GetComponent<InitializationManager>();
+                SystemManager.Instance.OnGameInitialized -= OnGameInitialized;
+                SystemManager.Instance.OnInitializationError -= OnInitializationError;
+                var initializationManager = SystemManager.Instance.GetComponent<InitializationManager>();
                 if (initializationManager != null)
                 {
                     initializationManager.OnProgressUpdated -= OnProgressUpdated;

@@ -144,6 +144,25 @@ public class ScreenTapManager : Singleton<ScreenTapManager>
     {
         hitResults = null;
 
+        // 필수 컴포넌트 null 체크
+        if (_camera == null)
+        {
+            Debug.LogWarning("[ScreenTapManager] Camera가 null입니다. Initialize()를 호출해주세요.");
+            return false;
+        }
+
+        if (_raycaster == null)
+        {
+            Debug.LogWarning("[ScreenTapManager] CubismRaycaster가 null입니다. SetRaycaster()를 호출해주세요.");
+            return false;
+        }
+
+        if (_inputUpProvider == null)
+        {
+            Debug.LogWarning("[ScreenTapManager] InputUpProvider가 null입니다. Initialize()를 호출해주세요.");
+            return false;
+        }
+
         // 손 뗀 시점이 아니면 false
         if (!_inputUpProvider.TryGetPosition(out var screenPosition))
         {

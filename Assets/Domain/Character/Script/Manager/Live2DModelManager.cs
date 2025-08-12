@@ -2,235 +2,370 @@ using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Domain.Character.Live2D.Model;
-using UnityEngine.UI;
 using Live2D.Cubism.Framework.LookAt;
 using Live2D.Cubism.Framework.MouthMovement;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 namespace ProjectVG.Domain.Character.Service
 {
-    public class Live2DModelManager : MonoBehaviour, ILive2DModelManager
+    public class Live2DModelManager : Singleton<Live2DModelManager>
     {
+        [Header("설정")]
         [SerializeField] private Transform _modelRoot;
         [SerializeField] private Live2DModelRegistry _modelRegistry;
-        [SerializeField] private Live2DCharacterConfig _defaultCharacterConfig;
-        [SerializeField] private CubismLookTarget _cubismLookTarget;
-        [SerializeField] private AudioSource _voiceSource;
-        [SerializeField] private Button _expressionChangeBtn;
 
         private readonly Dictionary<string, GameObject> _characterIdToInstance = new Dictionary<string, GameObject>();
         private string _activeCharacterId;
 
-        /// <summary>
-        /// Live2D 모델 관리를 위한 초기 설정을 수행한다.
-        /// </summary>
-        public void Initialize(Live2DModelRegistry modelRegistry, Live2DCharacterConfig defaultCharacterConfig)
-        {
-            _modelRegistry = modelRegistry;
-            _defaultCharacterConfig = defaultCharacterConfig;
-            if (_modelRoot == null)
-            {
-                _modelRoot = transform;
-            }
-        }
+        #region Public Methods
 
         /// <summary>
-        /// 지정한 캐릭터 모델을 비동기 로드한다.
+        /// 캐릭터 모델을 로드하고 설정을 적용한다.
         /// </summary>
-        public UniTask<GameObject> LoadModelAsync(string characterId)
+        public GameObject LoadCharacter(string characterId, bool activateImmediately = false)
         {
             if (string.IsNullOrEmpty(characterId))
             {
-                return UniTask.FromResult<GameObject>(null);
+                Debug.LogWarning("[Live2DModelManager] 캐릭터 ID가 null입니다.");
+                return null;
             }
+
+            // 이미 로드된 모델이 있는지 확인
             if (_characterIdToInstance.TryGetValue(characterId, out var existing))
             {
-                return UniTask.FromResult(existing);
+                Debug.Log($"[Live2DModelManager] 캐릭터 '{characterId}'가 이미 로드되어 있습니다.");
+                if (activateImmediately)
+                {
+                    ActivateCharacter(characterId);
+                }
+                return existing;
             }
-            Live2DCharacterConfig config = null;
-            if (_modelRegistry != null)
-            {
-                _modelRegistry.TryGetConfig(characterId, out config);
-            }
+
+            // 설정 가져오기
+            var config = GetCharacterConfig(characterId);
             if (config == null)
             {
-                config = _defaultCharacterConfig;
+                Debug.LogError($"[Live2DModelManager] 캐릭터 '{characterId}'의 설정을 찾을 수 없습니다.");
+                return null;
             }
-            if (config == null || config.CharacterPrefab == null)
+
+            // 모델 인스턴스 생성
+            var instance = CreateModelInstance(config, characterId);
+            if (instance == null)
             {
-                return UniTask.FromResult<GameObject>(null);
+                return null;
             }
-            var instance = Instantiate(config.CharacterPrefab, _modelRoot != null ? _modelRoot : transform);
-            instance.name = characterId;
-            instance.SetActive(false);
+
+            // 설정 적용
+            ApplyCharacterConfig(instance, config);
+
+            // 딕셔너리에 저장
             _characterIdToInstance[characterId] = instance;
-            return UniTask.FromResult(instance);
+            
+            // 즉시 활성화 옵션
+            if (activateImmediately)
+            {
+                ActivateCharacter(characterId);
+            }
+            
+            Debug.Log($"[Live2DModelManager] 캐릭터 '{characterId}' 로드 완료");
+            return instance;
         }
 
         /// <summary>
-        /// 현재 활성 모델을 언로드한다.
+        /// 캐릭터 모델을 비동기로 로드하고 설정을 적용한다.
         /// </summary>
-        public void UnloadActiveModel()
-        {
-            if (string.IsNullOrEmpty(_activeCharacterId))
-            {
-                return;
-            }
-            if (_characterIdToInstance.TryGetValue(_activeCharacterId, out var go) && go != null)
-            {
-                Destroy(go);
-            }
-            _characterIdToInstance.Remove(_activeCharacterId);
-            _activeCharacterId = null;
-        }
-
-        /// <summary>
-        /// 지정한 캐릭터 ID의 모델을 활성 모델로 전환한다.
-        /// </summary>
-        public void SetActiveModel(string characterId)
+        public async UniTask<GameObject> LoadCharacterAsync(string characterId, bool activateImmediately = false)
         {
             if (string.IsNullOrEmpty(characterId))
             {
-                return;
+                Debug.LogWarning("[Live2DModelManager] 캐릭터 ID가 null입니다.");
+                return null;
             }
-            if (!_characterIdToInstance.TryGetValue(characterId, out var target))
+
+            // 이미 로드된 모델이 있는지 확인
+            if (_characterIdToInstance.TryGetValue(characterId, out var existing))
             {
-                return;
-            }
-            foreach (var kv in _characterIdToInstance)
-            {
-                if (kv.Value != null)
+                Debug.Log($"[Live2DModelManager] 캐릭터 '{characterId}'가 이미 로드되어 있습니다.");
+                if (activateImmediately)
                 {
-                    kv.Value.SetActive(false);
+                    ActivateCharacter(characterId);
                 }
+                return existing;
             }
-            target.SetActive(true);
-            _activeCharacterId = characterId;
+
+            // 설정 가져오기
+            var config = GetCharacterConfig(characterId);
+            if (config == null)
+            {
+                Debug.LogError($"[Live2DModelManager] 캐릭터 '{characterId}'의 설정을 찾을 수 없습니다.");
+                return null;
+            }
+
+            // 모델 인스턴스 생성 (비동기)
+            var instance = await CreateModelInstanceAsync(config, characterId);
+            if (instance == null)
+            {
+                return null;
+            }
+
+            // 설정 적용
+            ApplyCharacterConfig(instance, config);
+
+            // 딕셔너리에 저장
+            _characterIdToInstance[characterId] = instance;
+            
+            // 즉시 활성화 옵션
+            if (activateImmediately)
+            {
+                ActivateCharacter(characterId);
+            }
+            
+            Debug.Log($"[Live2DModelManager] 캐릭터 '{characterId}' 비동기 로드 완료");
+            return instance;
         }
 
         /// <summary>
-        /// 현재 활성 모델 GameObject를 반환한다.
+        /// 캐릭터를 활성화한다.
         /// </summary>
-        public GameObject GetActiveModel()
+        public void ActivateCharacter(string characterId)
+        {
+            if (!_characterIdToInstance.TryGetValue(characterId, out var target))
+            {
+                Debug.LogWarning($"[Live2DModelManager] 캐릭터 '{characterId}'가 로드되지 않았습니다.");
+                return;
+            }
+
+            // 모든 모델 비활성화
+            DeactivateAllModels();
+
+            // 대상 모델 활성화
+            target.SetActive(true);
+            _activeCharacterId = characterId;
+            
+            Debug.Log($"[Live2DModelManager] 캐릭터 '{characterId}' 활성화");
+        }
+
+        /// <summary>
+        /// 현재 활성 캐릭터를 반환한다.
+        /// </summary>
+        public GameObject GetActiveCharacter()
         {
             if (string.IsNullOrEmpty(_activeCharacterId))
             {
                 return null;
             }
-            _characterIdToInstance.TryGetValue(_activeCharacterId, out var go);
-            return go;
+            
+            _characterIdToInstance.TryGetValue(_activeCharacterId, out var character);
+            return character;
         }
 
         /// <summary>
-        /// 지정한 캐릭터 ID의 모델이 로드되어 있는지 반환한다.
+        /// 캐릭터가 로드되어 있는지 확인한다.
         /// </summary>
-        public bool HasModel(string characterId)
+        public bool HasCharacter(string characterId)
         {
             return !string.IsNullOrEmpty(characterId) && _characterIdToInstance.ContainsKey(characterId);
         }
 
         /// <summary>
-        /// 지정한 캐릭터 ID의 모델을 사전 로드한다.
+        /// 캐릭터를 언로드한다.
         /// </summary>
-        public UniTask PreloadModelAsync(string characterId)
+        public void UnloadCharacter(string characterId)
         {
-            return LoadModelAsync(characterId).AsUniTask();
-        }
-
-        /// <summary>
-        /// 활성 모델의 가시성을 설정한다.
-        /// </summary>
-        public void SetVisibility(bool isVisible)
-        {
-            var active = GetActiveModel();
-            if (active == null)
+            if (!_characterIdToInstance.TryGetValue(characterId, out var instance))
             {
                 return;
             }
+
+            if (instance != null)
+            {
+                Destroy(instance);
+            }
+
+            _characterIdToInstance.Remove(characterId);
+
+            // 현재 활성 캐릭터였다면 활성 ID 초기화
+            if (_activeCharacterId == characterId)
+            {
+                _activeCharacterId = null;
+            }
+
+            Debug.Log($"[Live2DModelManager] 캐릭터 '{characterId}' 언로드 완료");
+        }
+
+        /// <summary>
+        /// 모든 캐릭터를 언로드한다.
+        /// </summary>
+        public void UnloadAllCharacters()
+        {
+            foreach (var kvp in _characterIdToInstance)
+            {
+                if (kvp.Value != null)
+                {
+                    Destroy(kvp.Value);
+                }
+            }
+
+            _characterIdToInstance.Clear();
+            _activeCharacterId = null;
+            
+            Debug.Log("[Live2DModelManager] 모든 캐릭터 언로드 완료");
+        }
+
+        /// <summary>
+        /// 활성 캐릭터의 가시성을 설정한다.
+        /// </summary>
+        public void SetCharacterVisibility(bool isVisible)
+        {
+            var active = GetActiveCharacter();
+            if (active == null)
+            {
+                Debug.LogWarning("[Live2DModelManager] 활성 캐릭터가 없습니다.");
+                return;
+            }
+
             active.SetActive(isVisible);
         }
 
+        #endregion
+
+        #region Private Methods
+
         /// <summary>
-        /// 활성 모델에 캐릭터별 Live2DCharacterConfig를 적용한다.
+        /// 캐릭터 설정을 가져온다.
         /// </summary>
-        public void ApplyCharacterConfig(Live2DCharacterConfig characterConfig)
+        private Live2DCharacterConfig GetCharacterConfig(string characterId)
         {
-            var active = GetActiveModel();
-            if (active == null || characterConfig == null)
+            // 레지스트리에서 먼저 찾기
+            if (_modelRegistry != null && _modelRegistry.TryGetConfig(characterId, out var config))
+            {
+                return config;
+            }
+
+            // 설정을 찾을 수 없음
+            Debug.LogError($"[Live2DModelManager] 캐릭터 '{characterId}'의 설정을 찾을 수 없습니다. 레지스트리를 확인해주세요.");
+            return null;
+        }
+
+        /// <summary>
+        /// 모델 인스턴스를 생성한다.
+        /// </summary>
+        private GameObject CreateModelInstance(Live2DCharacterConfig config, string characterId)
+        {
+            if (config.CharacterPrefab == null)
+            {
+                Debug.LogError($"[Live2DModelManager] 캐릭터 '{characterId}'의 프리팹이 null입니다.");
+                return null;
+            }
+
+            var parent = _modelRoot != null ? _modelRoot : transform;
+            var instance = Instantiate(config.CharacterPrefab, parent);
+            instance.name = characterId;
+            instance.SetActive(false);
+
+            return instance;
+        }
+
+        /// <summary>
+        /// 모델 인스턴스를 비동기로 생성한다.
+        /// </summary>
+        private async UniTask<GameObject> CreateModelInstanceAsync(Live2DCharacterConfig config, string characterId)
+        {
+            if (config.CharacterPrefab == null)
+            {
+                Debug.LogError($"[Live2DModelManager] 캐릭터 '{characterId}'의 프리팹이 null입니다.");
+                return null;
+            }
+
+            var parent = _modelRoot != null ? _modelRoot : transform;
+            var instance = Instantiate(config.CharacterPrefab, parent);
+            instance.name = characterId;
+            instance.SetActive(false);
+
+            // 비동기 작업을 위한 지연 (필요시)
+            await UniTask.Yield();
+
+            return instance;
+        }
+
+        /// <summary>
+        /// 캐릭터 설정을 적용한다.
+        /// </summary>
+        private void ApplyCharacterConfig(GameObject character, Live2DCharacterConfig config)
+        {
+            if (character == null || config == null)
             {
                 return;
             }
 
-            var lookController = active.GetComponent<CubismLookController>();
-            if (lookController != null && _cubismLookTarget != null)
+            ApplyLookAtSettings(character, config);
+            ApplyLipSyncSettings(character, config);
+            InitializeHitHandler(character);
+        }
+
+        /// <summary>
+        /// 시선 추적 설정을 적용한다.
+        /// </summary>
+        private void ApplyLookAtSettings(GameObject character, Live2DCharacterConfig config)
+        {
+            var lookController = character.GetComponent<CubismLookController>();
+            if (lookController == null)
             {
-                lookController.Target = _cubismLookTarget.gameObject;
-                lookController.Damping = characterConfig.LockAtDamping;
-                _cubismLookTarget.Initialize(ToModelConfigProxy(characterConfig));
+                Debug.LogWarning($"[Live2DModelManager] CubismLookController를 찾을 수 없습니다: {character.name}");
+                return;
             }
 
-            var mouthInput = active.GetComponent<CubismAudioMouthInput>();
-            if (mouthInput != null && _voiceSource != null)
+            lookController.Target = null; // TODO: 시선 타겟 설정 필요
+            lookController.Damping = config.LockAtDamping;
+        }
+
+        /// <summary>
+        /// 립싱크 설정을 적용한다.
+        /// </summary>
+        private void ApplyLipSyncSettings(GameObject character, Live2DCharacterConfig config)
+        {
+            var mouthInput = character.GetComponent<CubismAudioMouthInput>();
+            if (mouthInput == null)
             {
-                mouthInput.AudioInput = _voiceSource;
-                mouthInput.Gain = characterConfig.Gain;
-                mouthInput.Smoothing = characterConfig.Smoothing;
+                Debug.LogWarning($"[Live2DModelManager] CubismAudioMouthInput을 찾을 수 없습니다: {character.name}");
+                return;
             }
 
-            var hitHandler = active.GetComponent<CubismHitHandler>();
-            if (hitHandler != null)
+            mouthInput.AudioInput = null; // TODO: 오디오 소스 설정 필요
+            mouthInput.Gain = config.Gain;
+            mouthInput.Smoothing = config.Smoothing;
+        }
+
+        /// <summary>
+        /// 터치 핸들러를 초기화한다.
+        /// </summary>
+        private void InitializeHitHandler(GameObject character)
+        {
+            var hitHandler = character.GetComponent<CubismHitHandler>();
+            if (hitHandler == null)
             {
-                hitHandler.Initialize();
-                if (_expressionChangeBtn != null)
+                Debug.LogWarning($"[Live2DModelManager] CubismHitHandler를 찾을 수 없습니다: {character.name}");
+                return;
+            }
+
+            hitHandler.Initialize();
+        }
+
+        /// <summary>
+        /// 모든 모델을 비활성화한다.
+        /// </summary>
+        private void DeactivateAllModels()
+        {
+            foreach (var kvp in _characterIdToInstance)
+            {
+                if (kvp.Value != null)
                 {
-                    _expressionChangeBtn.onClick.RemoveAllListeners();
-                    _expressionChangeBtn.onClick.AddListener(hitHandler.ExpressionChange_Btn);
+                    kvp.Value.SetActive(false);
                 }
             }
         }
 
-        /// <summary>
-        /// Live2DCharacterConfig를 ModelConfig로 임시 변환한다. (CubismLookTarget.Initialize 호환성)
-        /// </summary>
-        private ModelConfig ToModelConfigProxy(Live2DCharacterConfig cfg)
-        {
-            // ModelConfig의 필드가 private이므로 리플렉션을 사용하여 설정
-            var proxy = ScriptableObject.CreateInstance<ModelConfig>();
-            
-            // 리플렉션을 사용하여 private 필드에 값 설정
-            var type = typeof(ModelConfig);
-            
-            var modelNameField = type.GetField("modelName", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            modelNameField?.SetValue(proxy, cfg.CharacterName);
-            
-            var modelDescriptionField = type.GetField("modelDescription", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            modelDescriptionField?.SetValue(proxy, cfg.CharacterDescription);
-            
-            var thumbnailField = type.GetField("thumbnail", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            thumbnailField?.SetValue(proxy, cfg.Thumbnail);
-            
-            var lookSensitivityField = type.GetField("lookSensitivity", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            lookSensitivityField?.SetValue(proxy, cfg.LookSensitivity);
-            
-            var lockAtDampingField = type.GetField("lockAtDamping", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            lockAtDampingField?.SetValue(proxy, cfg.LockAtDamping);
-            
-            var isLockAtActiveField = type.GetField("isLockAtActive", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            isLockAtActiveField?.SetValue(proxy, cfg.IsLockAtActive);
-            
-            var gainField = type.GetField("gain", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            gainField?.SetValue(proxy, cfg.Gain);
-            
-            var smoothingField = type.GetField("smoothing", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            smoothingField?.SetValue(proxy, cfg.Smoothing);
-            
-            var modelPrefabField = type.GetField("modelPrefab", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            modelPrefabField?.SetValue(proxy, cfg.CharacterPrefab);
-            
-            return proxy;
-        }
+        #endregion
     }
 }
 

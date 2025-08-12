@@ -8,7 +8,7 @@ using Cysharp.Threading.Tasks;
 
 namespace ProjectVG.Core.Managers
 {
-    public class GameManager : Singleton<GameManager>
+    public class SystemManager : Singleton<SystemManager>
     {
         [Header("Core Managers")]
         [SerializeField] private InitializationManager _initializationManager;
@@ -76,7 +76,7 @@ namespace ProjectVG.Core.Managers
         {
             if (_initializationManager == null)
             {
-                Debug.LogError("[GameManager] InitializationManager가 설정되지 않았습니다.");
+                Debug.LogError("[SystemManager] InitializationManager가 설정되지 않았습니다.");
                 return;
             }
             
@@ -97,20 +97,20 @@ namespace ProjectVG.Core.Managers
             await _initializationManager.InitializeAsync();
             if (IsInitialized)
             {
-                Debug.Log("[GameManager] 게임 시스템 준비 완료");
+                Debug.Log("[SystemManager] 게임 시스템 준비 완료");
             }
         }
         
         public void Shutdown()
         {
             _managerRegistry?.ShutdownAllManagers();
-            Debug.Log("[GameManager] 시스템 종료 완료");
+            Debug.Log("[SystemManager] 시스템 종료 완료");
         }
         
         [ContextMenu("Log Manager Status")]
         public void LogManagerStatus()
         {
-            Debug.Log($"[GameManager] Initialized: {IsInitialized}");
+            Debug.Log($"[SystemManager] Initialized: {IsInitialized}");
             _managerRegistry?.LogManagerStatus();
         }
 
@@ -119,11 +119,11 @@ namespace ProjectVG.Core.Managers
             try
             {
                 await UnityEngine.SceneManagement.SceneManager.LoadSceneAsync("MainSence");
-                Debug.Log("[GameManager] MainScene 전환 완료");
+                Debug.Log("[SystemManager] MainScene 전환 완료");
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[GameManager] 씬 전환 실패: {ex.Message}");
+                Debug.LogError($"[SystemManager] 씬 전환 실패: {ex.Message}");
             }
         }
         
@@ -168,7 +168,7 @@ namespace ProjectVG.Core.Managers
             }
             else
             {
-                Debug.LogError("[GameManager] 필수 매니저가 설정되지 않았습니다.");
+                Debug.LogError("[SystemManager] 필수 매니저가 설정되지 않았습니다.");
             }
         }
     }

@@ -13,11 +13,24 @@ public class CubismHitHandler : MonoBehaviour
     {
         _raycaster = GetComponent<CubismRaycaster>();
         _expressionController = GetComponent<CubismExpressionController>();
-        ScreenTapManager.Instance.SetRaycaster(_raycaster);
+        
+        if (_raycaster != null && ScreenTapManager.Instance != null)
+        {
+            ScreenTapManager.Instance.SetRaycaster(_raycaster);
+        }
+        else
+        {
+            Debug.LogWarning("[CubismHitHandler] Raycaster 또는 ScreenTapManager가 null입니다.");
+        }
     }
 
     private void Update()
     {
+        if (ScreenTapManager.Instance == null)
+        {
+            return;
+        }
+        
         if (ScreenTapManager.Instance.TryGetTapUpPosition(out var hits))
         {
             foreach (var hit in hits)
