@@ -314,6 +314,13 @@ namespace ProjectVG.Core.Audio
             }
             
             processedClip.SetData(samples, 0);
+            
+            // 원본 AudioClip 정리하여 메모리 누수 방지
+            if (_recordingClip != null)
+            {
+                DestroyImmediate(_recordingClip);
+            }
+            
             _recordingClip = processedClip;
             
             Debug.Log($"[AudioRecorder] AudioClip 생성 완료 ({_recordingClip.samples} 샘플, {_recordingClip.channels} 채널, {_recordingClip.frequency}Hz)");

@@ -88,7 +88,7 @@ namespace ProjectVG.Infrastructure.Network.Http
         public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
         {
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
-            return await SendFormDataRequestAsync<T>(url, formData, headers, cancellationToken);
+            return await SendFormDataRequestAsync<T>(url, formData, null, headers, cancellationToken);
         }
 
         public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> fileNames, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
@@ -106,7 +106,7 @@ namespace ProjectVG.Infrastructure.Network.Http
                         {
                             var fileSizeMB = byteData.Length / 1024.0 / 1024.0;
                             var maxSizeMB = NetworkConfig.MaxFileSize / 1024.0 / 1024.0;
-                            throw new ArgumentException($"파일 크기가 너무 큽니다: {fileSizeMB:F2}MB (제한: {maxSizeMB:F2}MB)");
+                            throw new FileSizeExceededException(fileSizeMB, maxSizeMB);
                         }
                     }
                 }
@@ -292,59 +292,11 @@ namespace ProjectVG.Infrastructure.Network.Http
             throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, "최대 재시도 횟수 초과");
         }
         
-        private async UniTask<T> SendFormDataRequestAsync<T>(string url, Dictionary<string, object> formData, Dictionary<string, string> headers, CancellationToken cancellationToken)
-        {
-            var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
 
-            for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
-            {
-                try
-                {
-                    var form = new WWWForm();
-                    
-                    foreach (var kvp in formData)
-                    {
-                        if (kvp.Value is byte[] byteData)
-                        {
-                            form.AddBinaryData(kvp.Key, byteData, "file.wav");
-                        }
-                        else
-                        {
-                            form.AddField(kvp.Key, kvp.Value.ToString());
-                        }
-                    }
-                    
-                    using var request = UnityWebRequest.Post(url, form);
-                    SetupRequest(request, headers);
-                    request.timeout = (int)NetworkConfig.UploadTimeout;
-
-                    var operation = request.SendWebRequest();
-                    await operation.WithCancellation(combinedCancellationToken);
-
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        return ParseResponse<T>(request);
-                    }
-                    else
-                    {
-                        await HandleFileUploadFailure(request, attempt, combinedCancellationToken);
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex) when (ex is not ApiException)
-                {
-                    await HandleFileUploadException(ex, attempt, combinedCancellationToken);
-                }
-            }
-
-            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 폼 데이터 업로드 실패", 0, "최대 재시도 횟수 초과");
-        }
 
         private async UniTask<T> SendFormDataRequestAsync<T>(string url, Dictionary<string, object> formData, Dictionary<string, string> fileNames, Dictionary<string, string> headers, CancellationToken cancellationToken)
         {
+            fileNames = fileNames ?? new Dictionary<string, string>();
             var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
 
             for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
@@ -575,5 +527,18 @@ namespace ProjectVG.Infrastructure.Network.Http
             StatusCode = statusCode;
             ResponseBody = responseBody;
         }
+    }
+
+    public class FileSizeExceededException : ApiException
+    {
+        public FileSizeExceededException(double fileSizeMB, double maxSizeMB) 
+            : base($"File size exceeds limit: {fileSizeMB:F2}MB (limit: {maxSizeMB:F2}MB)", 413, null)
+        {
+            FileSizeMB = fileSizeMB;
+            MaxSizeMB = maxSizeMB;
+        }
+        
+        public double FileSizeMB { get; }
+        public double MaxSizeMB { get; }
     }
 } 
