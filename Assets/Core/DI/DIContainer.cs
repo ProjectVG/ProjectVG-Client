@@ -44,6 +44,8 @@ namespace ProjectVG.Core.DI
             var type = component.GetType();
             var fields = type.GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             
+            Debug.Log($"[DIContainer] {component.GetType().Name}에 의존성 주입 시작");
+            
             foreach (var field in fields)
             {
                 var injectAttribute = field.GetCustomAttributes(typeof(InjectAttribute), true);
@@ -54,11 +56,23 @@ namespace ProjectVG.Core.DI
                     if (service != null)
                     {
                         field.SetValue(component, service);
-                        Debug.Log($"의존성 주입 완료: {component.GetType().Name}.{field.Name} <- {serviceType.Name}");
+                        Debug.Log($"[DIContainer] 의존성 주입 완료: {component.GetType().Name}.{field.Name} <- {serviceType.Name}");
+                        
+                        // 주입 후 검증
+                        var injectedValue = field.GetValue(component);
+                        if (injectedValue != null)
+                        {
+                            Debug.Log($"[DIContainer] 주입 검증 성공: {field.Name}에 {serviceType.Name} 인스턴스가 정상적으로 설정됨");
+                        }
+                        else
+                        {
+                            Debug.LogError($"[DIContainer] 주입 검증 실패: {field.Name}이 여전히 null임");
+                        }
                     }
                     else
                     {
-                        Debug.LogWarning($"의존성 주입 실패: {serviceType.Name} 서비스를 찾을 수 없습니다.");
+                        Debug.LogWarning($"[DIContainer] 의존성 주입 실패: {serviceType.Name} 서비스를 찾을 수 없습니다.");
+                        Debug.LogWarning($"[DIContainer] 등록된 서비스 목록: {string.Join(", ", _services.Keys)}");
                     }
                 }
             }

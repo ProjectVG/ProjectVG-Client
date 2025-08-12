@@ -3,25 +3,32 @@ using System;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Core.Managers;
-using Newtonsoft.Json.Linq;
+using ProjectVG.Core.Attributes;
 
 namespace ProjectVG.Infrastructure.Network.Services
 {
+    /// <summary>
+    /// 새로운 이벤트 기반 SessionManager
+    /// WebSocketManager의 연결/해제 상태를 모니터링하고 세션 ID를 관리
+    /// </summary>
     public class SessionManager : Singleton<SessionManager>, IManager
     {
         [Header("Session Info")]
-        [SerializeField] private string _sessionId = "";
-        [SerializeField] private bool _isSessionConnected = false;
+        [SerializeField] private string _currentSessionId = "";
         [SerializeField] private bool _isInitialized = false;
         
-        private WebSocketManager _webSocketManager;
+        [Inject] private WebSocketManager _webSocketManager;
         
-        public string SessionId => _sessionId;
-        public bool IsSessionConnected => _isSessionConnected;
+        // 공개 속성
+        public string SessionId => _currentSessionId;
+        public bool IsSessionConnected => !string.IsNullOrEmpty(_currentSessionId) && _webSocketManager?.IsConnected == true;
+        public bool IsWebSocketConnected => _webSocketManager?.IsConnected == true;
+        public bool IsWebSocketConnecting => _webSocketManager?.IsConnecting == true;
         public bool IsInitialized => _isInitialized;
         
+        // 이벤트
         public event Action<string> OnSessionStarted;
-        public event Action<string> OnSessionEnded;
+        public event Action OnSessionEnded;
         public event Action<string> OnSessionError;
         
         #region Unity Lifecycle
@@ -33,7 +40,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         
         private void Start()
         {
-            Initialize();
+            // DI 완료 후 ManagerRegistry에서 Initialize 호출됨
         }
         
         private void OnDestroy()
@@ -45,127 +52,256 @@ namespace ProjectVG.Infrastructure.Network.Services
         
         #region Public Methods
         
+        /// <summary>
+        /// 세션 ID를 요청합니다. 연결되지 않았다면 연결을 시도하고 기다립니다.
+        /// </summary>
         public async UniTask<string> GetSessionIdAsync()
         {
-            if (string.IsNullOrEmpty(_sessionId) || !_isSessionConnected)
+            if (IsSessionConnected)
             {
-                await RequestNewSessionAsync();
+                Debug.Log($"[SessionManager] 현재 세션 ID 반환: {_currentSessionId}");
+                return _currentSessionId;
             }
             
-            return _sessionId;
+            Debug.Log("[SessionManager] 세션이 없거나 연결되지 않음. 연결을 시도합니다.");
+            bool connected = await EnsureConnectionAsync();
+            
+            if (connected)
+            {
+                return _currentSessionId;
+            }
+            else
+            {
+                Debug.LogError("[SessionManager] 세션 연결에 실패했습니다.");
+                return null;
+            }
         }
         
-        public async UniTask RequestNewSessionAsync()
+        /// <summary>
+        /// 세션 연결을 보장합니다. 이미 연결되어 있으면 즉시 반환하고, 그렇지 않으면 연결을 시도합니다.
+        /// </summary>
+        public async UniTask<bool> EnsureConnectionAsync()
         {
-            if (_webSocketManager == null || !_webSocketManager.IsConnected)
+            Debug.Log($"[SessionManager] EnsureConnectionAsync 호출 - 초기화 상태: {_isInitialized}, WebSocketManager: {(_webSocketManager != null ? "존재" : "null")}");
+            
+            if (IsSessionConnected)
             {
-                Debug.LogWarning("[SessionManager] WebSocket이 연결되지 않았습니다. 연결을 시도합니다.");
-                await _webSocketManager.ConnectAsync();
+                Debug.Log("[SessionManager] 이미 세션이 연결되어 있습니다.");
+                return true;
             }
             
-            if (!_webSocketManager.IsConnected)
+            // DI로 주입받은 WebSocketManager 확인
+            if (_webSocketManager == null)
             {
-                string error = "WebSocket 연결 실패";
-                Debug.LogError($"[SessionManager] {error}");
-                OnSessionError?.Invoke(error);
+                Debug.LogError("[SessionManager] WebSocketManager가 DI로 주입되지 않았습니다. DependencyManager 설정을 확인하세요.");
+                return false;
             }
+            
+            return await RequestConnectionAsync();
         }
         
-        public void EndSession()
-        {
-            if (!string.IsNullOrEmpty(_sessionId))
-            {
-                string oldSessionId = _sessionId;
-                _sessionId = "";
-                _isSessionConnected = false;
-                
-                OnSessionEnded?.Invoke(oldSessionId);
-            }
-        }
-        
-        public void HandleSessionMessage(string data)
+        /// <summary>
+        /// 새로운 연결 요청 로직 - 폴링 방식
+        /// </summary>
+        private async UniTask<bool> RequestConnectionAsync()
         {
             try
             {
-                var jsonObject = JObject.Parse(data);
-                string sessionId = jsonObject["session_id"]?.ToString();
+                // DI로 주입받은 WebSocketManager 사용
+                if (_webSocketManager == null)
+                {
+                    Debug.LogError("[SessionManager] WebSocketManager가 DI로 주입되지 않았습니다.");
+                    return false;
+                }
                 
-                if (!string.IsNullOrEmpty(sessionId))
+                // 1. WebSocket 연결 상태 확인 및 연결 요청
+                if (!IsWebSocketConnected)
                 {
-                    _sessionId = sessionId;
-                    _isSessionConnected = true;
-                    
-                    OnSessionStarted?.Invoke(_sessionId);
+                    if (IsWebSocketConnecting)
+                    {
+                        Debug.Log("[SessionManager] WebSocket이 이미 연결 중입니다. 연결 완료를 기다립니다.");
+                    }
+                    else
+                    {
+                        Debug.Log("[SessionManager] WebSocket 연결을 요청합니다.");
+                        bool connected = await _webSocketManager.ConnectAsync();
+                        if (!connected)
+                        {
+                            Debug.LogError("[SessionManager] WebSocket 연결에 실패했습니다.");
+                            return false;
+                        }
+                    }
                 }
-                else
-                {
-                    string error = $"세션 응답 데이터가 유효하지 않습니다.";
-                    Debug.LogError($"[SessionManager] {error}");
-                    OnSessionError?.Invoke(error);
-                }
+                
+                // 2. 연결 완료 대기 (폴링)
+                return await WaitForSessionConnection();
             }
             catch (Exception ex)
             {
-                string error = $"세션 메시지 처리 중 오류: {ex.Message}";
-                Debug.LogError($"[SessionManager] {error}");
-                OnSessionError?.Invoke(error);
+                Debug.LogError($"[SessionManager] 연결 요청 실패: {ex.Message}");
+                Debug.LogError($"[SessionManager] 스택 트레이스: {ex.StackTrace}");
+                OnSessionError?.Invoke($"연결 요청 실패: {ex.Message}");
+                return false;
             }
         }
         
-        public void Shutdown()
+        /// <summary>
+        /// 세션 연결 완료를 폴링으로 대기
+        /// </summary>
+        private async UniTask<bool> WaitForSessionConnection()
         {
-            if (_webSocketManager != null)
+            Debug.Log("[SessionManager] 세션 연결 완료 대기 중...");
+            
+            const int timeoutSeconds = 10;
+            const int pollIntervalMs = 100; // 100ms마다 체크
+            int elapsedMs = 0;
+            
+            while (elapsedMs < timeoutSeconds * 1000)
             {
-                _webSocketManager.OnConnected -= OnWebSocketConnected;
-                _webSocketManager.OnDisconnected -= OnWebSocketDisconnected;
-                _webSocketManager.OnError -= OnWebSocketError;
-            }
-        }
-
-        #endregion
-
-        #region Private Methods
-
-        private void Initialize()
-        {
-            if (_isInitialized)
-                return;
-
-            try {
-                if (_webSocketManager == null) {
-                    _webSocketManager = WebSocketManager.Instance;
-                    if (_webSocketManager == null) {
-                        throw new InvalidOperationException("[SessionManager] WebSocketManager Instance가 null입니다. WebSocketManager가 먼저 초기화되어야 합니다.");
-                    }
+                // 세션이 연결되었는지 확인
+                if (IsSessionConnected)
+                {
+                    Debug.Log($"[SessionManager] 세션 연결 완료: {_currentSessionId}");
+                    return true;
                 }
-
-                _webSocketManager.OnConnected += OnWebSocketConnected;
-                _webSocketManager.OnDisconnected += OnWebSocketDisconnected;
-                _webSocketManager.OnError += OnWebSocketError;
-
-                _isInitialized = true;
+                
+                // WebSocket 연결이 끊어졌다면 실패
+                if (!IsWebSocketConnected && !IsWebSocketConnecting)
+                {
+                    Debug.LogError("[SessionManager] WebSocket 연결이 끊어졌습니다.");
+                    return false;
+                }
+                
+                await UniTask.Delay(pollIntervalMs);
+                elapsedMs += pollIntervalMs;
             }
-            catch (Exception ex) {
-                Debug.LogError($"[SessionManager] SessionManager 초기화 실패: {ex.Message}");
-                OnSessionError?.Invoke($"[SessionManager] SessionManager 초기화 실패: {ex.Message}");
+            
+            Debug.LogError($"[SessionManager] 세션 연결 타임아웃 ({timeoutSeconds}초)");
+            return false;
+        }
+        
+        /// <summary>
+        /// 세션 해제
+        /// </summary>
+        public void EndSession()
+        {
+            if (!string.IsNullOrEmpty(_currentSessionId))
+            {
+                string oldSessionId = _currentSessionId;
+                _currentSessionId = "";
+                
+                Debug.Log($"[SessionManager] 세션 종료: {oldSessionId}");
+                OnSessionEnded?.Invoke();
             }
         }
-
-        private void OnWebSocketConnected()
+        
+        #endregion
+        
+        #region Private Methods - 초기화 및 이벤트 핸들링
+        
+        public void Initialize()
         {
+            try
+            {
+                Debug.Log("[SessionManager] 초기화 시작");
+                
+                if (_webSocketManager == null)
+                {
+                    Debug.LogError("[SessionManager] WebSocketManager가 DI로 주입되지 않았습니다.");
+                    return;
+                }
+                
+                // 이벤트 구독
+                SubscribeToWebSocketEvents();
+                
+                _isInitialized = true;
+                Debug.Log("[SessionManager] 초기화 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SessionManager] 초기화 실패: {ex.Message}");
+                Debug.LogError($"[SessionManager] 스택 트레이스: {ex.StackTrace}");
+            }
+        }
+        
+        private void SubscribeToWebSocketEvents()
+        {
+            if (_webSocketManager == null) return;
+            
+            // 기존 구독 해제 (중복 방지)
+            UnsubscribeFromWebSocketEvents();
+            
+            // 새로운 이벤트 구독
+            _webSocketManager.OnSessionConnected += OnWebSocketSessionConnected;
+            _webSocketManager.OnSessionDisconnected += OnWebSocketSessionDisconnected;
+            _webSocketManager.OnDisconnected += OnWebSocketDisconnected;
+            _webSocketManager.OnError += OnWebSocketError;
+            
+            Debug.Log("[SessionManager] WebSocket 이벤트 구독 완료");
+        }
+        
+        private void UnsubscribeFromWebSocketEvents()
+        {
+            if (_webSocketManager == null) return;
+            
+            _webSocketManager.OnSessionConnected -= OnWebSocketSessionConnected;
+            _webSocketManager.OnSessionDisconnected -= OnWebSocketSessionDisconnected;
+            _webSocketManager.OnDisconnected -= OnWebSocketDisconnected;
+            _webSocketManager.OnError -= OnWebSocketError;
+        }
+        
+        #endregion
+        
+        #region WebSocket 이벤트 핸들러
+        
+        private void OnWebSocketSessionConnected(string sessionId)
+        {
+            Debug.Log($"[SessionManager] WebSocket 세션 연결됨: {sessionId}");
+            
+            _currentSessionId = sessionId;
+            OnSessionStarted?.Invoke(sessionId);
+        }
+        
+        private void OnWebSocketSessionDisconnected()
+        {
+            Debug.Log("[SessionManager] WebSocket 세션 연결 해제됨");
+            
+            _currentSessionId = "";
+            OnSessionEnded?.Invoke();
         }
         
         private void OnWebSocketDisconnected()
         {
-            _isSessionConnected = false;
+            Debug.Log("[SessionManager] WebSocket 연결 해제됨");
+            
+            if (!string.IsNullOrEmpty(_currentSessionId))
+            {
+                _currentSessionId = "";
+                OnSessionEnded?.Invoke();
+            }
         }
         
         private void OnWebSocketError(string error)
         {
-            Debug.LogError($"[SessionManager] WebSocket 에러: {error}");
-            OnSessionError?.Invoke($"WebSocket 에러: {error}");
+            Debug.LogError($"[SessionManager] WebSocket 오류: {error}");
+            OnSessionError?.Invoke(error);
+        }
+        
+        #endregion
+        
+        #region IManager 구현
+        
+        public void Shutdown()
+        {
+            
+            UnsubscribeFromWebSocketEvents();
+            
+            EndSession();
+            
+            _isInitialized = false;
+            Debug.Log("[SessionManager] 종료 완료");
         }
         
         #endregion
     }
-} 
+}

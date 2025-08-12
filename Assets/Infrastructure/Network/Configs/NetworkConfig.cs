@@ -1,4 +1,5 @@
 using UnityEngine;
+using ProjectVG.Infrastructure.Config;
 
 namespace ProjectVG.Infrastructure.Network.Configs
 {
@@ -23,6 +24,11 @@ namespace ProjectVG.Infrastructure.Network.Configs
         [SerializeField] private float httpTimeout = 30f;
         [SerializeField] private int maxRetryCount = 3;
         [SerializeField] private float retryDelay = 1f;
+        
+        [Header("File Upload Settings")]
+        [SerializeField] private int maxFileSize = 10485760; // 10MB (bytes)
+        [SerializeField] private float uploadTimeout = 60f; // 파일 업로드용 더 긴 타임아웃
+        [SerializeField] private bool enableFileSizeCheck = true;
         
         [Header("WebSocket Settings")]
         [SerializeField] private string wsPath = "ws";
@@ -69,315 +75,153 @@ namespace ProjectVG.Infrastructure.Network.Configs
             }
         }
         
+        public static EnvironmentType CurrentEnvironment
+        {
+            get
+            {
+                var appEnv = AppEnvironmentConfig.Instance;
+                if (appEnv != null)
+                {
+                    return appEnv.GetCurrentEnvironment();
+                }
+                return Instance.environment;
+            }
+        }
+        
+        private static void ApplyRuntimeGuard(NetworkConfig cfg)
+        {
+            if (Application.isEditor)
+                return;
+            
+            if (Application.platform == RuntimePlatform.Android || Application.platform == RuntimePlatform.IPhonePlayer)
+            {
+                cfg.environment = EnvironmentType.Production;
+            }
+        }
+        
         // Properties
         public EnvironmentType Environment => environment;
         public string ApiPath => apiPath;
         public string WsPath => wsPath;
         
-
-        
-        #region Environment Configuration
-        
-
-        
-        #endregion
-        
         #region Static Accessors (편의 메서드들)
         
-        /// <summary>
-        /// 현재 환경
-        /// </summary>
-        public static EnvironmentType CurrentEnvironment => Instance.Environment;
-        
-        /// <summary>
-        /// HTTP 서버 주소
-        /// </summary>
         public static string HttpServerAddress
         {
             get
             {
                 string server;
-                switch (Instance.environment)
+                switch (CurrentEnvironment)
                 {
-                    case EnvironmentType.Development:
-                        server = Instance.developmentServer;
-                        break;
-                    case EnvironmentType.Test:
-                        server = Instance.testServer;
-                        break;
-                    case EnvironmentType.Production:
-                        server = Instance.productionServer;
-                        break;
-                    default:
-                        server = Instance.developmentServer;
-                        break;
+                    case EnvironmentType.Development: server = Instance.developmentServer; break;
+                    case EnvironmentType.Test:        server = Instance.testServer;        break;
+                    case EnvironmentType.Production:  server = Instance.productionServer;  break;
+                    default:                          server = Instance.developmentServer; break;
                 }
                 return $"http://{server}";
             }
         }
         
-        /// <summary>
-        /// WebSocket 서버 주소
-        /// </summary>
         public static string WebSocketServerAddress
         {
             get
             {
                 string server;
-                switch (Instance.environment)
+                switch (CurrentEnvironment)
                 {
-                    case EnvironmentType.Development:
-                        server = Instance.developmentServer;
-                        break;
-                    case EnvironmentType.Test:
-                        server = Instance.testServer;
-                        break;
-                    case EnvironmentType.Production:
-                        server = Instance.productionServer;
-                        break;
-                    default:
-                        server = Instance.developmentServer;
-                        break;
+                    case EnvironmentType.Development: server = Instance.developmentServer; break;
+                    case EnvironmentType.Test:        server = Instance.testServer;        break;
+                    case EnvironmentType.Production:  server = Instance.productionServer;  break;
+                    default:                          server = Instance.developmentServer; break;
                 }
                 return $"ws://{server}";
             }
         }
         
-        /// <summary>
-        /// API 버전
-        /// </summary>
-        public static string ApiVersion => Instance.apiVersion;
-        
-        /// <summary>
-        /// HTTP 타임아웃
-        /// </summary>
-        public static float HttpTimeout => Instance.httpTimeout;
-        
-        /// <summary>
-        /// 최대 재시도 횟수
-        /// </summary>
-        public static int MaxRetryCount => Instance.maxRetryCount;
-        
-        /// <summary>
-        /// 재시도 지연 시간
-        /// </summary>
-        public static float RetryDelay => Instance.retryDelay;
-        
-        /// <summary>
-        /// WebSocket 타임아웃
-        /// </summary>
-        public static float WebSocketTimeout => Instance.wsTimeout;
-        
-        /// <summary>
-        /// 재연결 지연 시간
-        /// </summary>
-        public static float ReconnectDelay => Instance.reconnectDelay;
-        
-        /// <summary>
-        /// 최대 재연결 시도 횟수
-        /// </summary>
-        public static int MaxReconnectAttempts => Instance.maxReconnectAttempts;
-        
-        /// <summary>
-        /// 자동 재연결
-        /// </summary>
-        public static bool AutoReconnect => Instance.autoReconnect;
-        
-        /// <summary>
-        /// 하트비트 간격
-        /// </summary>
-        public static float HeartbeatInterval => Instance.heartbeatInterval;
-        
-        /// <summary>
-        /// 하트비트 활성화
-        /// </summary>
-        public static bool EnableHeartbeat => Instance.enableHeartbeat;
-        
-        /// <summary>
-        /// 최대 메시지 크기
-        /// </summary>
-        public static int MaxMessageSize => Instance.maxMessageSize;
-        
-        /// <summary>
-        /// 수신 버퍼 크기
-        /// </summary>
-        public static int ReceiveBufferSize => Instance.receiveBufferSize;
-        
-        /// <summary>
-        /// 메시지 타임아웃
-        /// </summary>
-        public static float MessageTimeout => Instance.messageTimeout;
-        
-        /// <summary>
-        /// 메시지 로깅 활성화
-        /// </summary>
-        public static bool EnableMessageLogging => Instance.enableMessageLogging;
-        
-        /// <summary>
-        /// WebSocket 메시지 타입
-        /// </summary>
-        public static string WebSocketMessageType => Instance.wsMessageType;
-        
-        /// <summary>
-        /// JSON 메시지 타입인지 확인
-        /// </summary>
-        public static bool IsJsonMessageType => Instance.wsMessageType?.ToLower() == "json";
-        
-        /// <summary>
-        /// 바이너리 메시지 타입인지 확인
-        /// </summary>
-        public static bool IsBinaryMessageType => Instance.wsMessageType?.ToLower() == "binary";
-        
-        /// <summary>
-        /// 사용자 에이전트
-        /// </summary>
-        public static string UserAgent => Instance.userAgent;
-        
-        /// <summary>
-        /// 콘텐츠 타입
-        /// </summary>
-        public static string ContentType => Instance.contentType;
-        
-        /// <summary>
-        /// 전체 API URL 생성
-        /// </summary>
-        public static string GetFullApiUrl(string endpoint)
+        public static string GetWebSocketServerAddressFor(EnvironmentType env)
         {
-            var baseUrl = HttpServerAddress;
-            return $"{baseUrl.TrimEnd('/')}/{Instance.apiPath.TrimStart('/').TrimEnd('/')}/{Instance.apiVersion.TrimStart('/').TrimEnd('/')}/{endpoint.TrimStart('/')}";
+            string server;
+            switch (env)
+            {
+                case EnvironmentType.Development: server = Instance.developmentServer; break;
+                case EnvironmentType.Test:        server = Instance.testServer;        break;
+                case EnvironmentType.Production:  server = Instance.productionServer;  break;
+                default:                          server = Instance.developmentServer; break;
+            }
+            return $"ws://{server}";
         }
         
-        /// <summary>
-        /// 사용자 API URL
-        /// </summary>
-        public static string GetUserApiUrl(string path = "")
-        {
-            return GetFullApiUrl($"users/{path.TrimStart('/')}");
-        }
-        
-        /// <summary>
-        /// 캐릭터 API URL
-        /// </summary>
-        public static string GetCharacterApiUrl(string path = "")
-        {
-            return GetFullApiUrl($"characters/{path.TrimStart('/')}");
-        }
-        
-        /// <summary>
-        /// 대화 API URL
-        /// </summary>
-        public static string GetConversationApiUrl(string path = "")
-        {
-            return GetFullApiUrl($"conversations/{path.TrimStart('/')}");
-        }
-        
-        /// <summary>
-        /// 인증 API URL
-        /// </summary>
-        public static string GetAuthApiUrl(string path = "")
-        {
-            return GetFullApiUrl($"auth/{path.TrimStart('/')}");
-        }
-        
-        /// <summary>
-        /// WebSocket URL
-        /// </summary>
         public static string GetWebSocketUrl()
         {
             var baseUrl = WebSocketServerAddress;
             return $"{baseUrl.TrimEnd('/')}/{Instance.wsPath.TrimStart('/').TrimEnd('/')}";
         }
         
-        /// <summary>
-        /// 버전이 포함된 WebSocket URL
-        /// </summary>
+        public static string GetWebSocketUrlFor(EnvironmentType env)
+        {
+            var baseUrl = GetWebSocketServerAddressFor(env);
+            return $"{baseUrl.TrimEnd('/')}/{Instance.wsPath.TrimStart('/').TrimEnd('/')}";
+        }
+        
         public static string GetWebSocketUrlWithVersion()
         {
             var baseUrl = WebSocketServerAddress;
             return $"{baseUrl.TrimEnd('/')}/api/{Instance.apiVersion.TrimStart('/').TrimEnd('/')}/{Instance.wsPath.TrimStart('/').TrimEnd('/')}";
         }
         
-        /// <summary>
-        /// 세션이 포함된 WebSocket URL
-        /// </summary>
         public static string GetWebSocketUrlWithSession(string sessionId)
         {
             var baseWsUrl = GetWebSocketUrlWithVersion();
             return $"{baseWsUrl}?sessionId={sessionId}";
         }
-       
         
-        /// <summary>
-        /// 개발 환경 설정
-        /// </summary>
-        public static void SetDevelopmentEnvironment()
-        {
-            if (Application.isPlaying)
-            {
-                Debug.LogWarning("런타임 중에는 환경 설정을 변경할 수 없습니다.");
-                return;
-            }
-            
-            Instance.environment = EnvironmentType.Development;
-        }
+        // HTTP 공통 설정 정적 접근자 복원
+        public static string ApiVersion => Instance.apiVersion;
+        public static float HttpTimeout => Instance.httpTimeout;
+        public static int MaxRetryCount => Instance.maxRetryCount;
+        public static float RetryDelay => Instance.retryDelay;
+        public static string UserAgent => Instance.userAgent;
+        public static string ContentType => Instance.contentType;
         
-        /// <summary>
-        /// 테스트 환경 설정
-        /// </summary>
-        public static void SetTestEnvironment()
-        {
-            if (Application.isPlaying)
-            {
-                Debug.LogWarning("런타임 중에는 환경 설정을 변경할 수 없습니다.");
-                return;
-            }
-            
-            Instance.environment = EnvironmentType.Test;
-        }
+        // File Upload Settings
+        public static int MaxFileSize => Instance.maxFileSize;
+        public static float UploadTimeout => Instance.uploadTimeout;
+        public static bool EnableFileSizeCheck => Instance.enableFileSizeCheck;
         
-        /// <summary>
-        /// 프로덕션 환경 설정
-        /// </summary>
-        public static void SetProductionEnvironment()
-        {
-            if (Application.isPlaying)
-            {
-                Debug.LogWarning("런타임 중에는 환경 설정을 변경할 수 없습니다.");
-                return;
-            }
-            
-            Instance.environment = EnvironmentType.Production;
-        }
+        // WebSocket 설정 정적 접근자 복원
+        public static float WebSocketTimeout => Instance.wsTimeout;
+        public static float ReconnectDelay => Instance.reconnectDelay;
+        public static int MaxReconnectAttempts => Instance.maxReconnectAttempts;
+        public static bool AutoReconnect => Instance.autoReconnect;
+        public static float HeartbeatInterval => Instance.heartbeatInterval;
+        public static bool EnableHeartbeat => Instance.enableHeartbeat;
+        public static int MaxMessageSize => Instance.maxMessageSize;
+        public static int ReceiveBufferSize => Instance.receiveBufferSize;
+        public static float MessageTimeout => Instance.messageTimeout;
+        public static bool EnableMessageLogging => Instance.enableMessageLogging;
+        public static string WebSocketMessageType => Instance.wsMessageType;
+        public static bool IsJsonMessageType => Instance.wsMessageType?.ToLower() == "json";
+        public static bool IsBinaryMessageType => Instance.wsMessageType?.ToLower() == "binary";
         
-        /// <summary>
-        /// 현재 설정 로그 출력
-        /// </summary>
-        public static void LogCurrentSettings()
+        // HTTP URL 유틸 복원
+        public static string GetFullApiUrl(string endpoint)
         {
-            Debug.Log($"=== NetworkConfig 현재 설정 ===");
-            Debug.Log($"환경: {CurrentEnvironment}");
-            Debug.Log($"HTTP 서버: {HttpServerAddress}");
-            Debug.Log($"WebSocket 서버: {WebSocketServerAddress}");
-            Debug.Log($"API 버전: {ApiVersion}");
-            Debug.Log($"HTTP 타임아웃: {HttpTimeout}s");
-            Debug.Log($"WebSocket 타임아웃: {WebSocketTimeout}s");
-            Debug.Log($"자동 재연결: {AutoReconnect}");
-            Debug.Log($"하트비트: {EnableHeartbeat} ({HeartbeatInterval}s)");
-            Debug.Log($"================================");
+            var baseUrl = HttpServerAddress;
+            return $"{baseUrl.TrimEnd('/')}/{Instance.apiPath.TrimStart('/').TrimEnd('/')}/{Instance.apiVersion.TrimStart('/').TrimEnd('/')}/{endpoint.TrimStart('/')}";
         }
+        public static string GetUserApiUrl(string path = "") => GetFullApiUrl($"users/{path.TrimStart('/')}");
+        public static string GetCharacterApiUrl(string path = "") => GetFullApiUrl($"characters/{path.TrimStart('/')}");
+        public static string GetConversationApiUrl(string path = "") => GetFullApiUrl($"conversations/{path.TrimStart('/')}");
+        public static string GetAuthApiUrl(string path = "") => GetFullApiUrl($"auth/{path.TrimStart('/')}");
         
         #endregion
         
         #region Private Methods
         
-        /// <summary>
-        /// 기본 인스턴스 생성 (Resources 폴더에 파일이 없을 때)
-        /// </summary>
         private static NetworkConfig CreateDefaultInstance()
         {
             var instance = CreateInstance<NetworkConfig>();
             
-            // 기본 설정
             instance.environment = EnvironmentType.Development;
             instance.developmentServer = "localhost:7900";
             instance.testServer = "localhost:7900";
@@ -400,6 +244,9 @@ namespace ProjectVG.Infrastructure.Network.Configs
             instance.enableMessageLogging = true;
             instance.userAgent = "ProjectVG-Client/1.0";
             instance.contentType = "application/json";
+            instance.maxFileSize = 10485760;
+            instance.uploadTimeout = 60f;
+            instance.enableFileSizeCheck = true;
             
             Debug.LogWarning("기본 NetworkConfig를 생성했습니다. Resources 폴더에 NetworkConfig.asset 파일을 생성하는 것을 권장합니다.");
             
