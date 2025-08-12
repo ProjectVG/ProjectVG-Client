@@ -157,7 +157,7 @@ Transform:
   m_GameObject: {fileID: 194973787}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.08988479, y: -0.3071759, z: 0.044769116}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -701,6 +701,7 @@ GameObject:
   - component: {fileID: 1916112490}
   - component: {fileID: 1916112492}
   - component: {fileID: 1916112491}
+  - component: {fileID: 1916112493}
   m_Layer: 0
   m_Name: Live2D Manager
   m_TagString: Untagged
@@ -750,6 +751,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _modelRoot: {fileID: 1607417703}
   _modelRegistry: {fileID: 11400000, guid: cf68d9632ab0d2c42a02de12beecadff, type: 2}
+--- !u!114 &1916112493
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1916112489}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c31e1b9082df088489ede1181874cde4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _initializationManager: {fileID: 0}
+  _managerRegistry: {fileID: 0}
+  _dependencyManager: {fileID: 0}
+  _autoInitializeOnStart: 1
+  _createManagersIfNotExist: 1
+  _camera: {fileID: 0}
 --- !u!1 &2028963604
 GameObject:
   m_ObjectHideFlags: 0

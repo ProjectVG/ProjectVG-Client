@@ -102,12 +102,36 @@ public class ScreenTapManager : Singleton<ScreenTapManager>
 
     public void Initialize(Camera cam)
     {
-        if (_camera == null)
-            _camera = cam;
+        _camera = cam; // 항상 업데이트
         if(_inputProvider == null)
             _inputProvider = new DefaultInputProvider();
         if (_inputUpProvider == null)
             _inputUpProvider = new DefaultInputUpProvider();
+    }
+
+    /// <summary>
+    /// 씬 전환 시 Camera를 업데이트한다.
+    /// </summary>
+    public void UpdateCamera(Camera newCamera)
+    {
+        _camera = newCamera;
+        Debug.Log($"[ScreenTapManager] Camera 업데이트: {(newCamera != null ? newCamera.name : "null")}");
+    }
+
+    /// <summary>
+    /// 현재 Main Camera로 Camera를 업데이트한다.
+    /// </summary>
+    public void UpdateToMainCamera()
+    {
+        var mainCamera = Camera.main;
+        if (mainCamera != null)
+        {
+            UpdateCamera(mainCamera);
+        }
+        else
+        {
+            Debug.LogWarning("[ScreenTapManager] Main Camera를 찾을 수 없습니다.");
+        }
     }
 
     #region LockAt

@@ -18,6 +18,10 @@ namespace ProjectVG.Core.Managers
         [Header("Settings")]
         [SerializeField] private bool _autoInitializeOnStart = true;
         [SerializeField] private bool _createManagersIfNotExist = true;
+        [SerializeField] private bool _autoUpdateCameraOnSceneChange = true;
+
+        [Header("Camera Settings")]
+        [SerializeField] private Camera _camera;
         
         private bool _initializationKickoffDone = false;
         
@@ -52,6 +56,15 @@ namespace ProjectVG.Core.Managers
                 InitializeGame();
             }
         }
+
+        private void Start()
+        {
+            // 씬 전환 이벤트 구독
+            if (_autoUpdateCameraOnSceneChange)
+            {
+                UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+            }
+        }
         
         private void OnDestroy()
         {
@@ -59,7 +72,61 @@ namespace ProjectVG.Core.Managers
             {
                 return;
             }
+            
+            // 이벤트 구독 해제
+            if (_autoUpdateCameraOnSceneChange)
+            {
+                UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+            }
+            
             Shutdown();
+        }
+
+        /// <summary>
+        /// 씬이 로드될 때 호출된다.
+        /// </summary>
+        private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            Debug.Log($"[SystemManager] 씬 로드됨: {scene.name}");
+            UpdateCamera();
+        }
+
+        /// <summary>
+        /// 현재 씬의 Main Camera로 Camera를 업데이트한다.
+        /// </summary>
+        public void UpdateCamera()
+        {
+            var mainCamera = Camera.main;
+            if (mainCamera != null)
+            {
+                _camera = mainCamera;
+                Debug.Log($"[SystemManager] Camera 업데이트: {mainCamera.name}");
+                
+                // ScreenTapManager에 Camera 주입
+                if (ScreenTapManager.Instance != null)
+                {
+                    ScreenTapManager.Instance.UpdateCamera(_camera);
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[SystemManager] Main Camera를 찾을 수 없습니다.");
+            }
+        }
+
+        /// <summary>
+        /// 수동으로 Camera를 설정한다.
+        /// </summary>
+        public void SetCamera(Camera camera)
+        {
+            _camera = camera;
+            Debug.Log($"[SystemManager] Camera 수동 설정: {(camera != null ? camera.name : "null")}");
+            
+            // ScreenTapManager에 Camera 주입
+            if (ScreenTapManager.Instance != null)
+            {
+                ScreenTapManager.Instance.UpdateCamera(_camera);
+            }
         }
         
         public async void InitializeGame()
@@ -69,6 +136,14 @@ namespace ProjectVG.Core.Managers
                 return;
             }
             _initializationKickoffDone = true;
+
+            // Camera 업데이트 및 ScreenTapManager 초기화
+            UpdateCamera();
+            if (_camera != null)
+            {
+                ScreenTapManager.Instance.Initialize(_camera);
+            }
+
             await InitializeGameAsync();
         }
 
@@ -111,7 +186,28 @@ namespace ProjectVG.Core.Managers
         public void LogManagerStatus()
         {
             Debug.Log($"[SystemManager] Initialized: {IsInitialized}");
+            Debug.Log($"[SystemManager] Current Camera: {(_camera != null ? _camera.name : "null")}");
             _managerRegistry?.LogManagerStatus();
+        }
+
+        [ContextMenu("Update Camera")]
+        public void UpdateCameraFromContextMenu()
+        {
+            UpdateCamera();
+        }
+
+        [ContextMenu("Set Main Camera")]
+        public void SetMainCameraFromContextMenu()
+        {
+            var mainCamera = Camera.main;
+            if (mainCamera != null)
+            {
+                SetCamera(mainCamera);
+            }
+            else
+            {
+                Debug.LogWarning("[SystemManager] Main Camera를 찾을 수 없습니다.");
+            }
         }
 
         public async UniTask TransitionToMainSceneAsync()

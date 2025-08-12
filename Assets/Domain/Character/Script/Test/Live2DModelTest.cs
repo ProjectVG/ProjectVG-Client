@@ -29,6 +29,16 @@ namespace ProjectVG.Domain.Character.Test
         private void Start()
         {
             SetupUI();
+            
+            // Live2DModelManager 초기화 확인
+            if (Live2DModelManager.Instance != null)
+            {
+                UpdateStatus("Live2DModelManager 준비 완료");
+            }
+            else
+            {
+                UpdateStatus("Live2DModelManager 초기화 실패");
+            }
         }
 
         /// <summary>
