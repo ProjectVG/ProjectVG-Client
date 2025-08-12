@@ -774,10 +774,10 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 2
   windowsGamepadBackendHint: 0
-  cloudProjectId: 29b51001-b8b7-48b5-92ed-855bb7405b41
+  cloudProjectId: 4c39af93-facf-4026-b793-0d03e4600fa4
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: ProjectVG-Client
+  projectName: ProjectVG_Client
   organizationId: imdlsrks
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
