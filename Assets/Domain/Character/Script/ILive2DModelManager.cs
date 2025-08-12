@@ -29,8 +29,8 @@ namespace ProjectVG.Domain.Character.Service
         /** 활성 모델의 가시성을 설정한다. */
         void SetVisibility(bool isVisible);
 
-        /** 활성 모델에 캐릭터별 ModelConfig를 적용한다. */
-        void ApplyModelConfig(ModelConfig modelConfig);
+        /** 활성 모델에 캐릭터별 Live2DCharacterConfig를 적용한다. */
+        void ApplyCharacterConfig(ProjectVG.Domain.Character.Live2D.Model.Live2DCharacterConfig characterConfig);
     }
 }
 
