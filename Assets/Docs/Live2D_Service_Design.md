@@ -94,8 +94,8 @@ graph TD
 
 ### 모듈 API 초안 (스켈레톤 중심)
 ```csharp
-/** 캐릭터 전반의 상태를 단일 진입점에서 관리한다. */
-public interface ILive2DCharacterManager
+/** 모델 전반의 상태를 단일 진입점에서 관리한다. */
+public interface ILive2DModelManagerFacade
 {
     void Initialize();
     void ApplyReaction(EmotionData emotionData, ActionData actionData);
@@ -144,7 +144,7 @@ public struct ActionData { public string Action; public object Args; }
   - 음성 종료 이벤트 후 상태 정상 복원
 
 ### 구성/데이터 자산
-- `Live2DCharacterConfig`(ScriptableObject 제안)
+- `Live2DModelConfig`(ScriptableObject 제안)
   - `Emotion → ExpressionKey` 사전
   - `Action → MotionKey` 사전(더미 가능)
   - 블렌드/지속 기본값, 우선순위 정책

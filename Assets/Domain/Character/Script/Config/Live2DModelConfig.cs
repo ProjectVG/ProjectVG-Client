@@ -4,8 +4,8 @@ using UnityEngine;
 
 namespace ProjectVG.Domain.Character.Live2D.Model
 {
-    [CreateAssetMenu(fileName = "Live2DCharacterConfig", menuName = "ProjectVG/Live2D/CharacterConfig", order = 100)]
-    public class Live2DCharacterConfig : ScriptableObject
+    [CreateAssetMenu(fileName = "Live2DModelConfig", menuName = "ProjectVG/Live2D/ModelConfig", order = 100)]
+    public class Live2DModelConfig : ScriptableObject
     {
         [Serializable]
         public class EmotionMapping
@@ -104,6 +104,11 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         public GameObject CharacterPrefab => characterPrefab;
         public Texture2D Thumbnail => thumbnail;
         public string CharacterDescription => characterDescription;
+
+        public string ModelId => characterId;
+        public string ModelName => characterName;
+        public GameObject ModelPrefab => characterPrefab;
+        public string ModelDescription => characterDescription;
 
         // 행동/표정
         public List<EmotionMapping> EmotionMappings => emotionMappings;

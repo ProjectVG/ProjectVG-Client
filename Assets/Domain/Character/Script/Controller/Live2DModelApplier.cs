@@ -6,7 +6,7 @@ namespace ProjectVG.Domain.Character.Service
     {
         [SerializeField] private bool _autoApplyOnEnable = true;
 
-        public void Apply(GameObject activeModel, ProjectVG.Domain.Character.Live2D.Model.Live2DCharacterConfig characterConfig)
+        public void Apply(GameObject activeModel, ProjectVG.Domain.Character.Live2D.Model.Live2DModelConfig characterConfig)
         {
         }
     }

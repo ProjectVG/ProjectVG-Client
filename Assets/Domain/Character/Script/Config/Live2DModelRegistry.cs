@@ -10,12 +10,12 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         public class Entry
         {
             public string characterId;
-            public Live2DCharacterConfig characterConfig;
+            public Live2DModelConfig characterConfig;
         }
 
         [SerializeField] private List<Entry> _entries = new List<Entry>();
 
-        public bool TryGetConfig(string characterId, out Live2DCharacterConfig config)
+        public bool TryGetConfig(string characterId, out Live2DModelConfig config)
         {
             foreach (var e in _entries)
             {

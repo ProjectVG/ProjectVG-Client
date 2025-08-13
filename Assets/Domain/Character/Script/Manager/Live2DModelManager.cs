@@ -239,7 +239,7 @@ namespace ProjectVG.Domain.Character.Service
         /// <summary>
         /// 캐릭터 설정을 가져온다.
         /// </summary>
-        private Live2DCharacterConfig GetCharacterConfig(string characterId)
+        private Live2DModelConfig GetCharacterConfig(string characterId)
         {
             // 레지스트리에서 먼저 찾기
             if (_modelRegistry != null && _modelRegistry.TryGetConfig(characterId, out var config))
@@ -255,7 +255,7 @@ namespace ProjectVG.Domain.Character.Service
         /// <summary>
         /// 모델 인스턴스를 생성한다.
         /// </summary>
-        private GameObject CreateModelInstance(Live2DCharacterConfig config, string characterId)
+        private GameObject CreateModelInstance(Live2DModelConfig config, string characterId)
         {
             if (config.CharacterPrefab == null)
             {
@@ -274,7 +274,7 @@ namespace ProjectVG.Domain.Character.Service
         /// <summary>
         /// 모델 인스턴스를 비동기로 생성한다.
         /// </summary>
-        private async UniTask<GameObject> CreateModelInstanceAsync(Live2DCharacterConfig config, string characterId)
+        private async UniTask<GameObject> CreateModelInstanceAsync(Live2DModelConfig config, string characterId)
         {
             if (config.CharacterPrefab == null)
             {
@@ -296,7 +296,7 @@ namespace ProjectVG.Domain.Character.Service
         /// <summary>
         /// 캐릭터 설정을 적용한다.
         /// </summary>
-        private void ApplyCharacterConfig(GameObject character, Live2DCharacterConfig config)
+        private void ApplyCharacterConfig(GameObject character, Live2DModelConfig config)
         {
             if (character == null || config == null)
             {
@@ -311,7 +311,7 @@ namespace ProjectVG.Domain.Character.Service
         /// <summary>
         /// 시선 추적 설정을 적용한다.
         /// </summary>
-        private void ApplyLookAtSettings(GameObject character, Live2DCharacterConfig config)
+        private void ApplyLookAtSettings(GameObject character, Live2DModelConfig config)
         {
             var lookController = character.GetComponent<CubismLookController>();
             if (lookController == null)
@@ -327,7 +327,7 @@ namespace ProjectVG.Domain.Character.Service
         /// <summary>
         /// 립싱크 설정을 적용한다.
         /// </summary>
-        private void ApplyLipSyncSettings(GameObject character, Live2DCharacterConfig config)
+        private void ApplyLipSyncSettings(GameObject character, Live2DModelConfig config)
         {
             var mouthInput = character.GetComponent<CubismAudioMouthInput>();
             if (mouthInput == null)
