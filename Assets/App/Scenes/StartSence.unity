@@ -128,7 +128,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 177257299}
-  - component: {fileID: 177257298}
+  - component: {fileID: 177257300}
   m_Layer: 0
   m_Name: GameSystem
   m_TagString: Untagged
@@ -136,23 +136,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &177257298
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 177257297}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f2343a97be172e748a6501089d9e3c0a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _initializationManager: {fileID: 0}
-  _managerRegistry: {fileID: 0}
-  _dependencyManager: {fileID: 0}
-  _autoInitializeOnStart: 1
-  _createManagersIfNotExist: 1
 --- !u!4 &177257299
 Transform:
   m_ObjectHideFlags: 0
@@ -166,10 +149,30 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 573203869}
   - {fileID: 1015393258}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &177257300
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 177257297}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c31e1b9082df088489ede1181874cde4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _webSocketManager: {fileID: 0}
+  _sessionManager: {fileID: 0}
+  _httpApiClient: {fileID: 0}
+  _audioManager: {fileID: 0}
+  _loadingManager: {fileID: 0}
+  _autoInitializeOnStart: 1
+  _createManagersIfNotExist: 1
+  _autoUpdateCameraOnSceneChange: 1
+  _camera: {fileID: 0}
 --- !u!1 &193680551
 GameObject:
   m_ObjectHideFlags: 0
@@ -414,78 +417,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 359102246}
   m_CullTransparentMesh: 1
---- !u!1 &573203868
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 573203869}
-  - component: {fileID: 573203872}
-  - component: {fileID: 573203871}
-  - component: {fileID: 573203870}
-  m_Layer: 0
-  m_Name: Network Managers
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &573203869
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 573203868}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 177257299}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &573203870
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 573203868}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8e1977f0484f5f84684a077ad63409b5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &573203871
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 573203868}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 00fbb8efd091db646bc0653b6295222f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &573203872
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 573203868}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f0048fe563a65f94a90a49760ba27126, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _currentSessionId: 
-  _isInitialized: 0
 --- !u!1 &648783742
 GameObject:
   m_ObjectHideFlags: 0
@@ -827,6 +758,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _loadingUI: {fileID: 193680555}
+  _autoProgressMax: 0.9
+  _autoProgressSpeed: 0.25
 --- !u!4 &915844785
 Transform:
   m_ObjectHideFlags: 0

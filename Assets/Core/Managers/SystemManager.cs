@@ -3,17 +3,20 @@ using System;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.Http;
-using ProjectVG.Core.DI;
 using Cysharp.Threading.Tasks;
+using ProjectVG.Core.Loading;
 
 namespace ProjectVG.Core.Managers
 {
     public class SystemManager : Singleton<SystemManager>
     {
         [Header("Core Managers")]
-        [SerializeField] private InitializationManager _initializationManager;
-        [SerializeField] private ManagerRegistry _managerRegistry;
-        [SerializeField] private DependencyManager _dependencyManager;
+        [SerializeField] private WebSocketManager _webSocketManager;
+        [SerializeField] private SessionManager _sessionManager;
+        [SerializeField] private HttpApiClient _httpApiClient;
+        [SerializeField] private AudioManager _audioManager;
+        [SerializeField] private LoadingManager _loadingManager;
+
         
         [Header("Settings")]
         [SerializeField] private bool _autoInitializeOnStart = true;
@@ -24,22 +27,15 @@ namespace ProjectVG.Core.Managers
         [SerializeField] private Camera _camera;
         
         private bool _initializationKickoffDone = false;
-        
-        public bool IsInitialized => _initializationManager?.IsInitialized ?? false;
-        
-        public WebSocketManager WebSocketManager => _managerRegistry?.WebSocketManager;
-        public SessionManager SessionManager => _managerRegistry?.SessionManager;
-        
-        public event Action OnGameInitialized
-        {
-            add => _initializationManager.OnInitializationCompleted += value;
-            remove => _initializationManager.OnInitializationCompleted -= value;
-        }
-        public event Action<string> OnInitializationError
-        {
-            add => _initializationManager.OnInitializationError += value;
-            remove => _initializationManager.OnInitializationError -= value;
-        }
+        public bool IsInitialized { get; private set; }
+
+        public WebSocketManager WebSocketManager => _webSocketManager;
+        public SessionManager SessionManager => _sessionManager;
+        public AudioManager AudioManager => _audioManager;
+        public LoadingManager LoadingManager => _loadingManager;
+
+        public event Action OnGameInitialized;
+        public event Action<string> OnInitializationError;
 
         protected override void Awake()
         {
@@ -59,7 +55,6 @@ namespace ProjectVG.Core.Managers
 
         private void Start()
         {
-            // 씬 전환 이벤트 구독
             if (_autoUpdateCameraOnSceneChange)
             {
                 UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
@@ -73,7 +68,6 @@ namespace ProjectVG.Core.Managers
                 return;
             }
             
-            // 이벤트 구독 해제
             if (_autoUpdateCameraOnSceneChange)
             {
                 UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
@@ -131,7 +125,7 @@ namespace ProjectVG.Core.Managers
         
         public async void InitializeGame()
         {
-            if (_initializationKickoffDone && (IsInitialized || (_initializationManager?.IsInitializing ?? false)))
+            if (_initializationKickoffDone && IsInitialized)
             {
                 return;
             }
@@ -149,36 +143,26 @@ namespace ProjectVG.Core.Managers
 
         public async UniTask InitializeGameAsync()
         {
-            if (_initializationManager == null)
+            try
             {
-                Debug.LogError("[SystemManager] InitializationManager가 설정되지 않았습니다.");
-                return;
-            }
-            
-            if (_initializationManager.IsInitialized)
-            {
-                return;
-            }
-
-            if (_initializationManager.IsInitializing)
-            {
-                while (_initializationManager.IsInitializing && !_initializationManager.IsInitialized)
-                {
-                    await UniTask.Yield();
-                }
-                return;
-            }
-            
-            await _initializationManager.InitializeAsync();
-            if (IsInitialized)
-            {
+                await InitializeManagersAsync();
+                IsInitialized = true;
                 Debug.Log("[SystemManager] 게임 시스템 준비 완료");
+                OnGameInitialized?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                IsInitialized = false;
+                Debug.LogError($"[SystemManager] 초기화 실패: {ex.Message}");
+                OnInitializationError?.Invoke(ex.Message);
             }
         }
         
         public void Shutdown()
         {
-            _managerRegistry?.ShutdownAllManagers();
+            try { _httpApiClient?.Shutdown(); } catch {}
+            try { _sessionManager?.Shutdown(); } catch {}
+            try { _webSocketManager?.Shutdown(); } catch {}
             Debug.Log("[SystemManager] 시스템 종료 완료");
         }
         
@@ -187,7 +171,7 @@ namespace ProjectVG.Core.Managers
         {
             Debug.Log($"[SystemManager] Initialized: {IsInitialized}");
             Debug.Log($"[SystemManager] Current Camera: {(_camera != null ? _camera.name : "null")}");
-            _managerRegistry?.LogManagerStatus();
+            Debug.Log($"[SystemManager] WS: {(WebSocketManager != null ? "OK" : "null")}, Session: {(SessionManager != null ? "OK" : "null")}, Audio: {(AudioManager != null ? "OK" : "null")}, Loading: {(LoadingManager != null ? "OK" : "null")}");
         }
 
         [ContextMenu("Update Camera")]
@@ -226,51 +210,39 @@ namespace ProjectVG.Core.Managers
         private void InitializeComponents()
         {
             CreateManagersIfNotExist();
-            SetupManagerReferences();
         }
         
         private void CreateManagersIfNotExist()
         {
             if (_createManagersIfNotExist)
             {
-                if (_initializationManager == null)
-                {
-                    var initObj = new GameObject("InitializationManager");
-                    initObj.transform.SetParent(transform);
-                    _initializationManager = initObj.AddComponent<InitializationManager>();
-                }
-                
-                if (_managerRegistry == null)
-                {
-                    var registryObj = new GameObject("ManagerRegistry");
-                    registryObj.transform.SetParent(transform);
-                    _managerRegistry = registryObj.AddComponent<ManagerRegistry>();
-                }
-                
-                if (_dependencyManager == null)
-                {
-                    var depObj = new GameObject("DependencyManager");
-                    depObj.transform.SetParent(transform);
-                    _dependencyManager = depObj.AddComponent<DependencyManager>();
-                }
+                _webSocketManager = WebSocketManager.Instance;
+                _sessionManager = SessionManager.Instance;
+                _httpApiClient = HttpApiClient.Instance;
+                _audioManager = AudioManager.Instance;
+                _loadingManager = LoadingManager.Instance;
             }
         }
-        
-        private void SetupManagerReferences()
+
+        private async UniTask InitializeManagersAsync()
         {
-            if (_initializationManager != null && _managerRegistry != null && _dependencyManager != null)
+            if (_webSocketManager == null || _sessionManager == null || _httpApiClient == null)
             {
-                _initializationManager.Initialize(_managerRegistry, _dependencyManager);
+                throw new InvalidOperationException("필수 매니저 인스턴스를 찾을 수 없습니다.");
             }
-            else
+            _loadingManager?.BeginLoadingUI();
+            _audioManager?.Initialize();
+            _webSocketManager.Initialize();
+            _sessionManager.Initialize(_webSocketManager);
+            _httpApiClient.Initialize(_sessionManager);
+
+            bool connected = await _sessionManager.EnsureConnectionAsync();
+            if (!connected)
             {
-                Debug.LogError("[SystemManager] 필수 매니저가 설정되지 않았습니다.");
+                throw new InvalidOperationException("세션 연결 실패");
             }
         }
     }
     
-    public interface IManager
-    {
-        void Shutdown();
-    }
+    
 } 

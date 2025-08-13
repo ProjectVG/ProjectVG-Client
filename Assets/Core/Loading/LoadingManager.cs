@@ -35,6 +35,9 @@ namespace ProjectVG.Core.Loading
         
         private TaskInfo _currentTask;
         private bool _gameStarted;
+		[SerializeField] private float _autoProgressMax = 0.9f;
+		[SerializeField] private float _autoProgressSpeed = 0.25f;
+		private Coroutine _autoProgressCoroutine;
         
         public event Action<string> OnInitializationFailed;
         
@@ -54,11 +57,22 @@ namespace ProjectVG.Core.Loading
         
         #region Public Methods
         
+        /// <summary>
+        /// 로딩 UI 시작 및 자동 진행 시작
+        /// </summary>
+        public void BeginLoadingUI()
+        {
+            UpdateTask("INITIALIZATION", "시스템 초기화 중...", 0.05f);
+            StartAutoProgress();
+        }
+
         public void StartInitialization()
         {
             if (SystemManager.Instance != null)
             {
-                SystemManager.Instance.InitializeGame();
+				UpdateTask("INITIALIZATION", "시스템 초기화 중...", 0.05f);
+				StartAutoProgress();
+				SystemManager.Instance.InitializeGame();
             }
             else
             {
@@ -108,11 +122,6 @@ namespace ProjectVG.Core.Loading
             {
                 SystemManager.Instance.OnGameInitialized += OnGameInitialized;
                 SystemManager.Instance.OnInitializationError += OnInitializationError;
-                var initializationManager = SystemManager.Instance.GetComponent<InitializationManager>();
-                if (initializationManager != null)
-                {
-                    initializationManager.OnProgressUpdated += OnProgressUpdated;
-                }
             }
         }
         
@@ -122,11 +131,6 @@ namespace ProjectVG.Core.Loading
             {
                 SystemManager.Instance.OnGameInitialized -= OnGameInitialized;
                 SystemManager.Instance.OnInitializationError -= OnInitializationError;
-                var initializationManager = SystemManager.Instance.GetComponent<InitializationManager>();
-                if (initializationManager != null)
-                {
-                    initializationManager.OnProgressUpdated -= OnProgressUpdated;
-                }
             }
         }
         
@@ -134,6 +138,8 @@ namespace ProjectVG.Core.Loading
         {
             if (!_gameStarted)
             {
+				StopAutoProgress();
+				UpdateTask("INITIALIZATION", "완료", 1f);
                 StartGame();
             }
         }
@@ -144,10 +150,36 @@ namespace ProjectVG.Core.Loading
             OnInitializationFailed?.Invoke(error);
         }
         
-        private void OnProgressUpdated(string taskName, string description, float progress)
-        {
-            UpdateTask(taskName, description, progress);
-        }
+		/// <summary>
+		/// 자동 진행 바 업데이트 시작
+		/// </summary>
+		private void StartAutoProgress()
+		{
+			if (_autoProgressCoroutine != null) return;
+			_autoProgressCoroutine = StartCoroutine(AutoProgressRoutine());
+		}
+
+		/// <summary>
+		/// 자동 진행 바 중지
+		/// </summary>
+		private void StopAutoProgress()
+		{
+			if (_autoProgressCoroutine == null) return;
+			StopCoroutine(_autoProgressCoroutine);
+			_autoProgressCoroutine = null;
+		}
+
+		private System.Collections.IEnumerator AutoProgressRoutine()
+		{
+			float p = Mathf.Clamp01(_currentTask.progress);
+			while (p < _autoProgressMax && !_gameStarted)
+			{
+				p += Time.deltaTime * _autoProgressSpeed;
+				UpdateTask("INITIALIZATION", "시스템 초기화 중...", Mathf.Min(p, _autoProgressMax));
+				yield return null;
+			}
+			_autoProgressCoroutine = null;
+		}
         
         #endregion
     }

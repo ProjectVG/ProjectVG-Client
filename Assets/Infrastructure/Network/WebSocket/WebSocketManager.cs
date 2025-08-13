@@ -5,16 +5,13 @@ using UnityEngine;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
-using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Domain.Chat.Model;
-using ProjectVG.Core.Managers;
-using ProjectVG.Core.Attributes;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace ProjectVG.Infrastructure.Network.WebSocket
 {
-    public class WebSocketManager : Singleton<WebSocketManager>, IManager
+    public class WebSocketManager : Singleton<WebSocketManager>
     {
         private INativeWebSocket _nativeWebSocket;
         private CancellationTokenSource _cancellationTokenSource;
@@ -56,7 +53,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         protected override void Awake()
         {
             base.Awake();
-            Initialize();
         }
 
         private void OnDestroy()
@@ -67,7 +63,24 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         #endregion
         
         #region Public Methods
+
+        /// <summary>
+        /// 웹소켓 매니저 초기화
+        /// </summary>
+        public void Initialize()
+        {
+			if (_cancellationTokenSource != null)
+			{
+				return;
+			}
+			_cancellationTokenSource = new CancellationTokenSource();
+			InitializeNativeWebSocket();
+			StartConnectionMonitoring();
+        }
         
+        /// <summary>
+        /// 서버와 웹소켓 연결 시도
+        /// </summary>
         public async UniTask<bool> ConnectAsync(string sessionId = null, CancellationToken cancellationToken = default)
         {
             if (_isConnected || _isConnecting)
@@ -122,6 +135,9 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
         }
 
+        /// <summary>
+        /// 웹소켓 연결 해제
+        /// </summary>
         public async UniTask DisconnectAsync()
         {
             if (!_isConnected)
@@ -140,29 +156,25 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             OnDisconnected?.Invoke();
         }
         
-        public void SetAutoReconnect(bool enabled)
-        {
-            _autoReconnect = enabled;
-        }
-        
-        public void SetReconnectSettings(int maxAttempts, float delay, float maxDelay = 60f, bool useExponentialBackoff = true)
-        {
-            _maxReconnectAttempts = maxAttempts;
-            _reconnectDelay = delay;
-            _maxReconnectDelay = maxDelay;
-            _useExponentialBackoff = useExponentialBackoff;
-        }
-
+        /// <summary>
+        /// 웹소켓 메시지 전송
+        /// </summary>
         public async UniTask<bool> SendMessageAsync(string type, string data)
         {
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// 연결 상태 로깅
+        /// </summary>
         public void LogConnectionStatus()
         {
             Debug.Log($"[WebSocket] 연결 상태: {(_isConnected ? "연결됨" : "연결안됨")}, 연결 중: {(_isConnecting ? "예" : "아니오")}, 재연결 시도: {_reconnectAttempts}/{_maxReconnectAttempts}");
         }
 
+        /// <summary>
+        /// 매니저 종료 및 리소스 정리
+        /// </summary>
         public void Shutdown()
         {
             if (_isShutdown)
@@ -187,13 +199,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         
         #region Private Methods
         
-        private void Initialize()
-        {
-            _cancellationTokenSource = new CancellationTokenSource();
-            InitializeNativeWebSocket();
-            StartConnectionMonitoring();
-        }
-
         private void InitializeNativeWebSocket()
         {
             _nativeWebSocket = WebSocketFactory.CreateWebSocket();

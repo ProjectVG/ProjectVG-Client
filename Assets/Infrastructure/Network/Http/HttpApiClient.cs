@@ -9,12 +9,10 @@ using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
 using ProjectVG.Infrastructure.Network.Services;
 using Newtonsoft.Json;
-using ProjectVG.Core.Managers;
-using ProjectVG.Core.Attributes;
 
 namespace ProjectVG.Infrastructure.Network.Http
 {
-    public class HttpApiClient : Singleton<HttpApiClient>, IManager
+    public class HttpApiClient : Singleton<HttpApiClient>
     {
         [Header("API Configuration")]
 
@@ -24,14 +22,14 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         private readonly Dictionary<string, string> defaultHeaders = new Dictionary<string, string>();
         private CancellationTokenSource cancellationTokenSource;
-        [Inject] private SessionManager _sessionManager;
+        private SessionManager _sessionManager;
+        public bool IsInitialized { get; private set; }
         
         #region Unity Lifecycle
         
         protected override void Awake()
         {
             base.Awake();
-            Initialize();
         }
 
         private void OnDestroy()
@@ -43,11 +41,31 @@ namespace ProjectVG.Infrastructure.Network.Http
         
         #region Public Methods
         
+        /// <summary>
+        /// 초기화 실행
+        /// </summary>
+        public void Initialize(SessionManager sessionManager)
+        {
+            _sessionManager = sessionManager;
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource?.Dispose();
+            cancellationTokenSource = new CancellationTokenSource();
+            ApplyNetworkConfig();
+            SetupDefaultHeaders();
+            IsInitialized = true;
+        }
+        
+        /// <summary>
+        /// 기본 헤더 추가
+        /// </summary>
         public void AddDefaultHeader(string key, string value)
         {
             defaultHeaders[key] = value;
         }
 
+        /// <summary>
+        /// 인증 토큰 설정
+        /// </summary>
         public void SetAuthToken(string token)
         {
             AddDefaultHeader(AUTHORIZATION_HEADER, $"{BEARER_PREFIX}{token}");
@@ -82,7 +100,15 @@ namespace ProjectVG.Infrastructure.Network.Http
         public async UniTask<T> UploadFileAsync<T>(string endpoint, byte[] fileData, string fileName, string fieldName = "file", Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
         {
             var url = GetFullUrl(endpoint);
-            return await SendFileRequestAsync<T>(url, fileData, fileName, fieldName, headers, cancellationToken);
+            var formData = new Dictionary<string, object>
+            {
+                { fieldName, fileData }
+            };
+            var fileNames = new Dictionary<string, string>
+            {
+                { fieldName, fileName }
+            };
+            return await SendFormDataRequestAsync<T>(url, formData, fileNames, headers, cancellationToken);
         }
         
         public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
@@ -115,22 +141,19 @@ namespace ProjectVG.Infrastructure.Network.Http
             return await SendFormDataRequestAsync<T>(url, formData, fileNames, headers, cancellationToken);
         }
 
+        /// <summary>
+        /// 종료 처리
+        /// </summary>
         public void Shutdown()
         {
             cancellationTokenSource?.Cancel();
             cancellationTokenSource?.Dispose();
+            IsInitialized = false;
         }
         
         #endregion
         
         #region Private Methods
-        
-        private void Initialize()
-        {
-            cancellationTokenSource = new CancellationTokenSource();
-            ApplyNetworkConfig();
-            SetupDefaultHeaders();
-        }
 
         private void ApplyNetworkConfig()
         {
@@ -178,9 +201,7 @@ namespace ProjectVG.Infrastructure.Network.Http
             return jsonData;
         }
 
-        private void LogRequestDetails(string method, string url, string jsonData)
-        {
-        }
+		
 
         private async UniTask<T> SendJsonRequestAsync<T>(string url, string method, string jsonData, Dictionary<string, string> headers, CancellationToken cancellationToken)
         {
@@ -217,80 +238,9 @@ namespace ProjectVG.Infrastructure.Network.Http
             throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 요청 실패", 0, "최대 재시도 횟수 초과");
         }
 
-        private async UniTask<T> SendRequestAsync<T>(string url, string method, string jsonData, Dictionary<string, string> headers, CancellationToken cancellationToken)
-        {
-            var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
+		
 
-            for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
-            {
-                try
-                {
-                    using var request = CreateRequest(url, method, jsonData, headers);
-                    
-                    var operation = request.SendWebRequest();
-                    await operation.WithCancellation(combinedCancellationToken);
-
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        return ParseResponse<T>(request);
-                    }
-                    else
-                    {
-                        await HandleRequestFailure(request, attempt, combinedCancellationToken);
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex) when (ex is not ApiException)
-                {
-                    await HandleRequestException(ex, attempt, combinedCancellationToken);
-                }
-            }
-
-            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 요청 실패", 0, "최대 재시도 횟수 초과");
-        }
-
-        private async UniTask<T> SendFileRequestAsync<T>(string url, byte[] fileData, string fileName, string fieldName, Dictionary<string, string> headers, CancellationToken cancellationToken)
-        {
-            var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
-
-            for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
-            {
-                try
-                {
-                    var form = new WWWForm();
-                    form.AddBinaryData(fieldName, fileData, fileName);
-                    
-                    using var request = UnityWebRequest.Post(url, form);
-                    SetupRequest(request, headers);
-                    request.timeout = (int)NetworkConfig.HttpTimeout;
-
-                    var operation = request.SendWebRequest();
-                    await operation.WithCancellation(combinedCancellationToken);
-
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        return ParseResponse<T>(request);
-                    }
-                    else
-                    {
-                        await HandleFileUploadFailure(request, attempt, combinedCancellationToken);
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex) when (ex is not ApiException)
-                {
-                    await HandleFileUploadException(ex, attempt, combinedCancellationToken);
-                }
-            }
-
-            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, "최대 재시도 횟수 초과");
-        }
+		
         
 
 
@@ -407,22 +357,7 @@ namespace ProjectVG.Infrastructure.Network.Http
             throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, ex.Message);
         }
 
-        private UnityWebRequest CreateRequest(string url, string method, string jsonData, Dictionary<string, string> headers)
-        {
-            var request = new UnityWebRequest(url, method);
-            
-            if (!string.IsNullOrEmpty(jsonData))
-            {
-                var bodyRaw = Encoding.UTF8.GetBytes(jsonData);
-                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            }
-            
-            request.downloadHandler = new DownloadHandlerBuffer();
-            SetupRequest(request, headers);
-            request.timeout = (int)NetworkConfig.HttpTimeout;
-            
-            return request;
-        }
+		
 
         private UnityWebRequest CreateJsonRequest(string url, string method, string jsonData, Dictionary<string, string> headers)
         {
