@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
@@ -7,10 +8,8 @@ using ProjectVG.Core.Audio;
 using ProjectVG.Domain.Chat.Model;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
-using ProjectVG.Infrastructure.Network.DTOs.Chat;
-using ProjectVG.Domain.Chat.Service;
 using ProjectVG.Domain.Chat.View;
-using ProjectVG.Core.Audio;
+
 
 namespace ProjectVG.Domain.Chat.Service
 {
@@ -77,12 +76,22 @@ namespace ProjectVG.Domain.Chat.Service
             StartCoroutine(InitializeWhenReady());
         }
         
-        private System.Collections.IEnumerator InitializeWhenReady()
+        private IEnumerator InitializeWhenReady()
         {
+            float timeout = 5f;
+            float elapsedTime = 0f;
+            
             // ChatBubblePanel이 준비될 때까지 대기
-            while (_chatBubblePanel == null)
+            while (_chatBubblePanel == null && elapsedTime < timeout)
             {
                 yield return new WaitForEndOfFrame();
+                elapsedTime += Time.deltaTime;
+            }
+            
+            if (_chatBubblePanel == null)
+            {
+                Debug.LogError("[ChatManager] ChatBubblePanel 초기화 타임아웃");
+                yield break;
             }
             
             Initialize();

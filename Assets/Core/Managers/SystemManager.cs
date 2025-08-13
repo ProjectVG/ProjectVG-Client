@@ -8,6 +8,7 @@ using Cysharp.Threading.Tasks;
 using ProjectVG.Core.Loading;
 using ProjectVG.Core.Audio;
 using ProjectVG.Domain.Chat.Service;
+using ProjectVG.Core.Utils;
 
 namespace ProjectVG.Core.Managers
 {
@@ -129,20 +130,28 @@ namespace ProjectVG.Core.Managers
         
         public async void Initialize()
         {
-            if (_initializationKickoffDone && IsInitialized)
+            try
             {
-                return;
-            }
-            _initializationKickoffDone = true;
+                if (_initializationKickoffDone && IsInitialized)
+                {
+                    return;
+                }
+                _initializationKickoffDone = true;
 
-            // Camera 업데이트 및 ScreenTapManager 초기화
-            UpdateCamera();
-            if (_camera != null)
+                // Camera 업데이트 및 ScreenTapManager 초기화
+                UpdateCamera();
+                if (_camera != null)
+                {
+                    ScreenTapManager.Instance.Initialize(_camera);
+                }
+
+                await InitializeAppAsync();
+            }
+            catch (Exception ex)
             {
-                ScreenTapManager.Instance.Initialize(_camera);
+                Debug.LogError($"[SystemManager] Initialize 중 오류 발생: {ex.Message}");
+                OnInitializationError?.Invoke(ex.Message);
             }
-
-            await InitializeAppAsync();
         }
 
         public async UniTask InitializeAppAsync()

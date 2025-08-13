@@ -112,12 +112,15 @@ namespace ProjectVG.Core.Audio
         
         private IEnumerator ReturnToPoolWhenFinished(AudioSource audioSource)
         {
-            while (audioSource.isPlaying)
+            while (audioSource != null && audioSource.isPlaying)
             {
                 yield return null;
             }
             
-            ReturnToPool(audioSource);
+            if (audioSource != null)
+            {
+                ReturnToPool(audioSource);
+            }
         }
     }
 }

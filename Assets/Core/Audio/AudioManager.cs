@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Audio;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Domain.Chat.Model;
+using ProjectVG.Core.Utils;
 
 namespace ProjectVG.Core.Audio
 {
@@ -29,6 +30,7 @@ namespace ProjectVG.Core.Audio
         [SerializeField] private float _masterVolume = 1f;
         
         private bool _isInitialized = false;
+        private bool _isLoadingSettings = false;
         
         public bool IsInitialized => _isInitialized;
         public float MasterVolume => _masterVolume;
@@ -179,6 +181,8 @@ namespace ProjectVG.Core.Audio
         
         public void SaveVolumeSettings()
         {
+            if (_isLoadingSettings) return;
+            
             PlayerPrefs.SetFloat("Audio_MasterVolume", _masterVolume);
             PlayerPrefs.SetFloat("Audio_BGMVolume", BgmVolume);
             PlayerPrefs.SetFloat("Audio_SFXVolume", SfxVolume);
@@ -189,6 +193,8 @@ namespace ProjectVG.Core.Audio
         
         public void LoadVolumeSettings()
         {
+            _isLoadingSettings = true;
+            
             _masterVolume = PlayerPrefs.GetFloat("Audio_MasterVolume", 1f);
             float bgmVolume = PlayerPrefs.GetFloat("Audio_BGMVolume", 1f);
             float sfxVolume = PlayerPrefs.GetFloat("Audio_SFXVolume", 1f);
@@ -200,6 +206,8 @@ namespace ProjectVG.Core.Audio
             SetSFXVolume(sfxVolume);
             SetUIVolume(uiVolume);
             SetVoiceVolume(voiceVolume);
+            
+            _isLoadingSettings = false;
         }
         
         public void ResetVolumeSettings()

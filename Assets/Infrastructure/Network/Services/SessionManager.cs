@@ -87,6 +87,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             if (_webSocketManager == null)
             {
                 Debug.LogError("[SessionManager] WebSocketManager가 DI로 주입되지 않았습니다. DependencyManager 설정을 확인하세요.");
+                OnSessionError?.Invoke("WebSocketManager가 null입니다.");
                 return false;
             }
             
@@ -104,6 +105,7 @@ namespace ProjectVG.Infrastructure.Network.Services
                 if (_webSocketManager == null)
                 {
                     Debug.LogError("[SessionManager] WebSocketManager가 DI로 주입되지 않았습니다.");
+                    OnSessionError?.Invoke("WebSocketManager가 null입니다.");
                     return false;
                 }
                 
@@ -205,6 +207,7 @@ namespace ProjectVG.Infrastructure.Network.Services
                 if (_webSocketManager == null)
                 {
                     Debug.LogError("[SessionManager] WebSocketManager가 null입니다.");
+                    OnSessionError?.Invoke("WebSocketManager가 null입니다.");
                     return;
                 }
 
@@ -217,6 +220,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             {
                 Debug.LogError($"[SessionManager] 초기화 실패: {ex.Message}");
                 Debug.LogError($"[SessionManager] 스택 트레이스: {ex.StackTrace}");
+                OnSessionError?.Invoke($"초기화 실패: {ex.Message}");
             }
         }
         
