@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEngine;
 using System;
 using ProjectVG.Infrastructure.Network.WebSocket;
@@ -5,6 +6,8 @@ using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Infrastructure.Network.Http;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Core.Loading;
+using ProjectVG.Core.Audio;
+using ProjectVG.Domain.Chat.Service;
 
 namespace ProjectVG.Core.Managers
 {
@@ -16,6 +19,7 @@ namespace ProjectVG.Core.Managers
         [SerializeField] private HttpApiClient _httpApiClient;
         [SerializeField] private AudioManager _audioManager;
         [SerializeField] private LoadingManager _loadingManager;
+        [SerializeField] private ChatManager? _chatManager;
 
         
         [Header("Settings")]

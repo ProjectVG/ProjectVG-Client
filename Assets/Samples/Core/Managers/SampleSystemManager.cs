@@ -2,6 +2,7 @@ using Live2D.Cubism.Framework.LookAt;
 using Live2D.Cubism.Framework.MouthMovement;
 using UnityEngine;
 using UnityEngine.UI;
+using ProjectVG.Core.Audio;
 
 public class SampleSystemManager : Singleton<SampleSystemManager>
 {

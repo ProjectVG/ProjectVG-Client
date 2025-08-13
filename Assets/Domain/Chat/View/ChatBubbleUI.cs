@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using ProjectVG.Domain.Chat.Model;
-using ProjectVG.Domain.Chat.Service;
+ 
 
 namespace ProjectVG.Domain.Chat.View
 {
@@ -67,7 +67,7 @@ namespace ProjectVG.Domain.Chat.View
         private Coroutine? _typingCoroutine;
         private Coroutine? _animationCoroutine;
         
-        private ChatBubbleManager? _manager;
+        private ChatBubblePanel? _manager;
         
         // 애니메이션 관련 변수들
         private Vector3 _originalPosition;
@@ -110,7 +110,7 @@ namespace ProjectVG.Domain.Chat.View
         
         #region Public Methods
         
-        public void Initialize(Actor actor, string text, float displayTime, ChatBubbleManager? manager = null)
+        public void Initialize(Actor actor, string text, float displayTime, ChatBubblePanel? manager = null)
         {
             _actor = actor;
             _fullText = text;
