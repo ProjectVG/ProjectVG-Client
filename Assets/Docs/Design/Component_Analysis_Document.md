@@ -265,8 +265,8 @@ smoothing: 1
 
 ## 6. 연관 클래스들
 
-### 6.1 GameManager
-- 게임 전체의 초기화와 관리
+### 6.1 SystemManager
+- 앱 전체의 초기화와 관리
 - WebSocket, Session, HTTP API 클라이언트 관리
 - 시스템 간 의존성 설정
 

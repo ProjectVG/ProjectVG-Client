@@ -1,7 +1,7 @@
-# 인게임 디버그 콘솔 사용 가이드
+# 인앱 디버그 콘솔 사용 가이드
 
 ## 개요
-인게임에서 Debug.Log 메시지를 실시간으로 확인할 수 있는 관리자 콘솔입니다.
+앱 실행 중 Debug.Log 메시지를 실시간으로 확인할 수 있는 관리자 콘솔입니다.
 
 ## 주요 기능
 - **실시간 로그 표시**: 모든 Debug.Log 메시지를 실시간으로 확인
@@ -41,7 +41,7 @@ LogEntryPrefab (GameObject)
 ```
 
 ### 3. 컴포넌트 설정
-1. **InGameDebugConsole** 스크립트를 ConsolePanel에 추가
+1. **InAppDebugConsole** 스크립트를 ConsolePanel에 추가
 2. **LogEntryPrefab** 스크립트를 로그 엔트리 프리팹에 추가
 3. **DebugConsoleSettings** ScriptableObject 생성:
    - Project 창에서 우클릭 → Create → ProjectVG → Debug Console Settings
@@ -103,7 +103,7 @@ LogEntryPrefab (GameObject)
 
 ```csharp
 // 디버그 콘솔 참조
-InGameDebugConsole debugConsole = FindObjectOfType<InGameDebugConsole>();
+InAppDebugConsole debugConsole = FindObjectOfType<InAppDebugConsole>();
 
 // 특정 키워드로 필터링
 debugConsole.SetFilter("ChatManager");
@@ -151,5 +151,5 @@ debugConsole.ToggleConsole();
 2. 민감한 정보가 로그에 포함되지 않도록 주의
 3. 모바일에서는 3개 손가락 동시 터치로 콘솔 제어 (설정에서 변경 가능)
 4. 오브젝트 풀링 사용 시 Pool Size를 적절히 설정하여 메모리 사용량 조절
-5. 백그라운드 로깅 사용 시 게임 성능에 미치는 영향을 모니터링
+5. 백그라운드 로깅 사용 시 앱 성능에 미치는 영향을 모니터링
 6. 성능이 중요한 경우 `InitializePoolOnStart`를 false로 설정하여 지연 초기화 사용 

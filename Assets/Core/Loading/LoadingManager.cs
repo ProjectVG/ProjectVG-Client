@@ -26,7 +26,7 @@ namespace ProjectVG.Core.Loading
     
     /// <summary>
     /// 로딩 과정을 전담 관리하는 싱글톤 매니저
-    /// 실제 초기화는 GameManager가 담당하고, 이 클래스는 UI와 사용자 피드백에 집중
+    /// 실제 초기화는 SystemManager가 담당하고, 이 클래스는 UI와 사용자 피드백에 집중
     /// </summary>
     public class LoadingManager : Singleton<LoadingManager>
     {
@@ -34,7 +34,7 @@ namespace ProjectVG.Core.Loading
         [SerializeField] private LoadingUI _loadingUI;
         
         private TaskInfo _currentTask;
-        private bool _gameStarted;
+        private bool _appStarted;
 		[SerializeField] private float _autoProgressMax = 0.9f;
 		[SerializeField] private float _autoProgressSpeed = 0.25f;
 		private Coroutine _autoProgressCoroutine;
@@ -72,11 +72,11 @@ namespace ProjectVG.Core.Loading
             {
 				UpdateTask("INITIALIZATION", "시스템 초기화 중...", 0.05f);
 				StartAutoProgress();
-				SystemManager.Instance.InitializeGame();
+				SystemManager.Instance.Initialize();
             }
             else
             {
-                Debug.LogError("[LoadingManager] GameManager가 없습니다.");
+                Debug.LogError("[LoadingManager] SystemManager가 없습니다.");
             }
         }
         
@@ -91,17 +91,17 @@ namespace ProjectVG.Core.Loading
                 _loadingUI.UpdateTask(_currentTask);
             }
             
-            if (!_gameStarted && _currentTask.progress >= 1f)
+            if (!_appStarted && _currentTask.progress >= 1f)
             {
-                StartGame();
+                StartApp();
             }
         }
         
-        public async void StartGame()
+        public async void StartApp()
         {
-            if (_gameStarted)
+            if (_appStarted)
                 return;
-            _gameStarted = true;
+            _appStarted = true;
             if (_loadingUI != null)
             {
                 await _loadingUI.FadeOut();
@@ -120,7 +120,7 @@ namespace ProjectVG.Core.Loading
         {
             if (SystemManager.Instance != null)
             {
-                SystemManager.Instance.OnGameInitialized += OnGameInitialized;
+                SystemManager.Instance.OnAppInitialized += OnAppInitialized;
                 SystemManager.Instance.OnInitializationError += OnInitializationError;
             }
         }
@@ -129,18 +129,18 @@ namespace ProjectVG.Core.Loading
         {
             if (SystemManager.Instance != null)
             {
-                SystemManager.Instance.OnGameInitialized -= OnGameInitialized;
+                SystemManager.Instance.OnAppInitialized -= OnAppInitialized;
                 SystemManager.Instance.OnInitializationError -= OnInitializationError;
             }
         }
         
-        private void OnGameInitialized()
+        private void OnAppInitialized()
         {
-            if (!_gameStarted)
+            if (!_appStarted)
             {
 				StopAutoProgress();
 				UpdateTask("INITIALIZATION", "완료", 1f);
-                StartGame();
+                StartApp();
             }
         }
         
@@ -172,7 +172,7 @@ namespace ProjectVG.Core.Loading
 		private System.Collections.IEnumerator AutoProgressRoutine()
 		{
 			float p = Mathf.Clamp01(_currentTask.progress);
-			while (p < _autoProgressMax && !_gameStarted)
+            while (p < _autoProgressMax && !_appStarted)
 			{
 				p += Time.deltaTime * _autoProgressSpeed;
 				UpdateTask("INITIALIZATION", "시스템 초기화 중...", Mathf.Min(p, _autoProgressMax));

@@ -34,7 +34,7 @@ namespace ProjectVG.Core.Managers
         public AudioManager AudioManager => _audioManager;
         public LoadingManager LoadingManager => _loadingManager;
 
-        public event Action OnGameInitialized;
+        public event Action OnAppInitialized;
         public event Action<string> OnInitializationError;
 
         protected override void Awake()
@@ -49,7 +49,7 @@ namespace ProjectVG.Core.Managers
             if (_autoInitializeOnStart && !_initializationKickoffDone && !IsInitialized)
             {
                 _initializationKickoffDone = true;
-                InitializeGame();
+                Initialize();
             }
         }
 
@@ -123,7 +123,7 @@ namespace ProjectVG.Core.Managers
             }
         }
         
-        public async void InitializeGame()
+        public async void Initialize()
         {
             if (_initializationKickoffDone && IsInitialized)
             {
@@ -138,17 +138,17 @@ namespace ProjectVG.Core.Managers
                 ScreenTapManager.Instance.Initialize(_camera);
             }
 
-            await InitializeGameAsync();
+            await InitializeAppAsync();
         }
 
-        public async UniTask InitializeGameAsync()
+        public async UniTask InitializeAppAsync()
         {
             try
             {
                 await InitializeManagersAsync();
                 IsInitialized = true;
-                Debug.Log("[SystemManager] 게임 시스템 준비 완료");
-                OnGameInitialized?.Invoke();
+                Debug.Log("[SystemManager] 앱 시스템 준비 완료");
+                OnAppInitialized?.Invoke();
             }
             catch (Exception ex)
             {
