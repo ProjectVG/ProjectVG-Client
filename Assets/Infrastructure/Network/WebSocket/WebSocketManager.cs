@@ -75,7 +75,9 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 			}
 			_cancellationTokenSource = new CancellationTokenSource();
 			InitializeNativeWebSocket();
+#pragma warning disable CS4014
 			StartConnectionMonitoring();
+#pragma warning restore CS4014
         }
         
         /// <summary>
@@ -159,7 +161,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         /// <summary>
         /// 웹소켓 메시지 전송
         /// </summary>
-        public async UniTask<bool> SendMessageAsync(string type, string data)
+        public UniTask<bool> SendMessageAsync(string type, string data)
         {
             throw new NotImplementedException();
         }

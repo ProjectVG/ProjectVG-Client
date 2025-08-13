@@ -27,7 +27,7 @@ namespace ProjectVG.Core.Audio
             return AudioManager.Instance._sfxGroup;
         }
         
-        public void Stop()
+        public override void Stop()
         {
             foreach (var source in _activeSources.ToArray())
             {
@@ -39,7 +39,7 @@ namespace ProjectVG.Core.Audio
             }
         }
         
-        public bool IsPlaying()
+        public override bool IsPlaying()
         {
             return _activeSources.Count > 0;
         }

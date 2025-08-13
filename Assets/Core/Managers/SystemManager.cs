@@ -15,11 +15,11 @@ namespace ProjectVG.Core.Managers
     public class SystemManager : Singleton<SystemManager>
     {
         [Header("Core Managers")]
-        [SerializeField] private WebSocketManager _webSocketManager;
-        [SerializeField] private SessionManager _sessionManager;
-        [SerializeField] private HttpApiClient _httpApiClient;
-        [SerializeField] private AudioManager _audioManager;
-        [SerializeField] private LoadingManager _loadingManager;
+        [SerializeField] private WebSocketManager? _webSocketManager;
+        [SerializeField] private SessionManager? _sessionManager;
+        [SerializeField] private HttpApiClient? _httpApiClient;
+        [SerializeField] private AudioManager? _audioManager;
+        [SerializeField] private LoadingManager? _loadingManager;
         [SerializeField] private ChatManager? _chatManager;
 
         
@@ -29,18 +29,18 @@ namespace ProjectVG.Core.Managers
         [SerializeField] private bool _autoUpdateCameraOnSceneChange = true;
 
         [Header("Camera Settings")]
-        [SerializeField] private Camera _camera;
+        [SerializeField] private Camera? _camera;
         
         private bool _initializationKickoffDone = false;
         public bool IsInitialized { get; private set; }
 
-        public WebSocketManager WebSocketManager => _webSocketManager;
-        public SessionManager SessionManager => _sessionManager;
-        public AudioManager AudioManager => _audioManager;
-        public LoadingManager LoadingManager => _loadingManager;
+        public WebSocketManager? WebSocketManager => _webSocketManager;
+        public SessionManager? SessionManager => _sessionManager;
+        public AudioManager? AudioManager => _audioManager;
+        public LoadingManager? LoadingManager => _loadingManager;
 
-        public event Action OnAppInitialized;
-        public event Action<string> OnInitializationError;
+        public event Action? OnAppInitialized;
+        public event Action<string>? OnInitializationError;
 
         protected override void Awake()
         {

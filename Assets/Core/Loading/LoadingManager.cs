@@ -43,8 +43,9 @@ namespace ProjectVG.Core.Loading
         
         #region Unity Lifecycle
         
-        private void Awake()
+        protected override void Awake()
         {
+            base.Awake();
             SetupEventListeners();
         }
         

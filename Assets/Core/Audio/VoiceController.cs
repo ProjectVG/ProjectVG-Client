@@ -27,7 +27,7 @@ namespace ProjectVG.Core.Audio
         
         private void Update()
         {
-            if (_isPlaying && !_audioSource.isPlaying && _audioSource.clip != null)
+            if (_isPlaying && _audioSource != null && !_audioSource.isPlaying && _audioSource.clip != null)
             {
                 _isPlaying = false;
                 OnVoiceFinished?.Invoke();
@@ -114,10 +114,13 @@ namespace ProjectVG.Core.Audio
             await UniTask.Delay(50);
             
             _currentVoice = voiceData;
-            _audioSource.clip = voiceData.AudioClip;
-            _audioSource.volume = _volume;
+            if (_audioSource != null)
+            {
+                _audioSource.clip = voiceData.AudioClip;
+                _audioSource.volume = _volume;
+            }
             
-            if (_autoPlay)
+            if (_autoPlay && _audioSource != null)
             {
                 _audioSource.Play();
                 _isPlaying = true;
@@ -138,10 +141,13 @@ namespace ProjectVG.Core.Audio
             await UniTask.Delay(50);
             
             _currentVoice = voiceData;
-            _audioSource.clip = voiceData.AudioClip;
-            _audioSource.volume = _volume;
+            if (_audioSource != null)
+            {
+                _audioSource.clip = voiceData.AudioClip;
+                _audioSource.volume = _volume;
+            }
             
-            if (_autoPlay)
+            if (_autoPlay && _audioSource != null)
             {
                 _audioSource.Play();
                 _isPlaying = true;

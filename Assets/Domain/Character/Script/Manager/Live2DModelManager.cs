@@ -16,7 +16,7 @@ namespace ProjectVG.Domain.Character.Service
         private readonly Dictionary<string, GameObject> _characterIdToInstance = new Dictionary<string, GameObject>();
         private string _activeCharacterId;
 
-        private void Awake()
+        protected override void Awake()
         {
             base.Awake();
         }

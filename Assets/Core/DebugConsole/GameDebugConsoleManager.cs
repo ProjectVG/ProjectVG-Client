@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -285,7 +286,7 @@ namespace ProjectVG.Core.Utils
                 return Instantiate(_logEntryPrefab, _logContentParent);
             }
             
-            return null;
+            return null!;
         }
         
         private void ReturnToPool(GameObject obj)

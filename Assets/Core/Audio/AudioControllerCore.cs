@@ -6,8 +6,8 @@ namespace ProjectVG.Core.Audio
 {
     public class AudioControllerCore : MonoBehaviour
     {
-        [SerializeField] protected AudioSource _audioSource;
-        [SerializeField] protected AudioMixerGroup _audioMixerGroup;
+        [SerializeField] protected AudioSource? _audioSource;
+        [SerializeField] protected AudioMixerGroup? _audioMixerGroup;
         
         protected float _volume = 1f;
         protected string _volumeParameterName = "";
@@ -28,7 +28,11 @@ namespace ProjectVG.Core.Audio
             // AudioMixerGroup이 설정되지 않은 경우 AudioManager에서 자동 할당
             if (_audioMixerGroup == null)
             {
-                _audioMixerGroup = GetAudioMixerGroupFromManager();
+                var group = GetAudioMixerGroupFromManager();
+                if (group != null)
+                {
+                    _audioMixerGroup = group;
+                }
             }
             
             if (_audioSource != null && _audioMixerGroup != null)
@@ -72,7 +76,7 @@ namespace ProjectVG.Core.Audio
             return _volume;
         }
         
-        public AudioSource GetAudioSource() => _audioSource;
-        public AudioMixerGroup GetAudioMixerGroup() => _audioMixerGroup;
+        public AudioSource? GetAudioSource() => _audioSource;
+        public AudioMixerGroup? GetAudioMixerGroup() => _audioMixerGroup;
     }
 }

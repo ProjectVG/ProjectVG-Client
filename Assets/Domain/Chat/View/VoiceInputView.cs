@@ -17,15 +17,7 @@ namespace ProjectVG.Domain.Chat.View
         [Header("UI Components")]
         [SerializeField] private Button? _btnVoice;
         [SerializeField] private Button? _btnVoiceStop;
-        [SerializeField] private TextMeshProUGUI? _txtVoiceStatus;
-        [SerializeField] private Slider? _progressBar; // 녹음 진행률 표시
         
-        [Header("Voice Settings")]
-        [SerializeField] private float _maxRecordingTime = 30f;
-        [SerializeField] private string _voiceStatusRecording = "Recording..."; // "녹음 중..."에서 변경
-        [SerializeField] private string _voiceStatusProcessing = "Converting speech to text..."; // "음성을 텍스트로 변환 중..."에서 변경
-        
-
         
         private ChatManager? _chatManager;
         private AudioRecorder? _audioRecorder;
@@ -64,7 +56,6 @@ namespace ProjectVG.Domain.Chat.View
                 _audioRecorder.OnRecordingStarted -= OnRecordingStarted;
                 _audioRecorder.OnRecordingStopped -= OnRecordingStopped;
                 _audioRecorder.OnRecordingCompleted -= OnRecordingCompleted;
-                _audioRecorder.OnRecordingProgress -= OnRecordingProgress;
                 _audioRecorder.OnError -= OnRecordingError;
             }
         }
@@ -96,8 +87,6 @@ namespace ProjectVG.Domain.Chat.View
                 
             try
             {
-                UpdateVoiceStatus(_voiceStatusProcessing);
-                
                 string transcribedText = await ConvertSpeechToText(audioData);
                 
                 if (!string.IsNullOrWhiteSpace(transcribedText))
@@ -117,7 +106,6 @@ namespace ProjectVG.Domain.Chat.View
             }
             finally
             {
-                UpdateVoiceStatus(string.Empty);
             }
         }
         
@@ -137,8 +125,6 @@ namespace ProjectVG.Domain.Chat.View
                 _isRecording = true;
                 _recordingStartTime = Time.time;
                 UpdateVoiceButtonState(true);
-                UpdateVoiceStatus(_voiceStatusRecording);
-                UpdateProgressBar(0f);
                 
                 bool success = _audioRecorder.StartRecording();
                 if (!success)
@@ -169,8 +155,6 @@ namespace ProjectVG.Domain.Chat.View
             {
                 _isRecording = false;
                 UpdateVoiceButtonState(false);
-                UpdateVoiceStatus(string.Empty);
-                UpdateProgressBar(0f);
                 
                 AudioClip? recordedClip = _audioRecorder.StopRecording();
                 if (recordedClip != null)
@@ -213,23 +197,7 @@ namespace ProjectVG.Domain.Chat.View
                 }
             }
                 
-            if (_txtVoiceStatus == null)
-            {
-                _txtVoiceStatus = transform.Find("TxtVoiceStatus")?.GetComponent<TextMeshProUGUI>();
-                if (_txtVoiceStatus == null)
-                {
-                    Debug.LogWarning("[VoiceInputView] TxtVoiceStatus 텍스트를 찾을 수 없습니다.");
-                }
-            }
-            
-            if (_progressBar == null)
-            {
-                _progressBar = transform.Find("ProgressBar")?.GetComponent<Slider>();
-                if (_progressBar == null)
-                {
-                    Debug.LogWarning("[VoiceInputView] ProgressBar 슬라이더를 찾을 수 없습니다.");
-                }
-            }
+
                 
             if (_audioRecorder == null)
             {
@@ -263,7 +231,6 @@ namespace ProjectVG.Domain.Chat.View
                 _audioRecorder.OnRecordingStarted += OnRecordingStarted;
                 _audioRecorder.OnRecordingStopped += OnRecordingStopped;
                 _audioRecorder.OnRecordingCompleted += OnRecordingCompleted;
-                _audioRecorder.OnRecordingProgress += OnRecordingProgress;
                 _audioRecorder.OnError += OnRecordingError;
             }
         }
@@ -289,23 +256,7 @@ namespace ProjectVG.Domain.Chat.View
                 _btnVoiceStop.gameObject.SetActive(isRecording);
         }
         
-        private void UpdateVoiceStatus(string status)
-        {
-            if (_txtVoiceStatus != null)
-            {
-                _txtVoiceStatus.text = status;
-                _txtVoiceStatus.gameObject.SetActive(!string.IsNullOrEmpty(status));
-            }
-        }
-        
-        private void UpdateProgressBar(float progress)
-        {
-            if (_progressBar != null)
-            {
-                _progressBar.value = progress;
-                _progressBar.gameObject.SetActive(progress > 0f);
-            }
-        }
+
         
         private async System.Threading.Tasks.Task<string> ConvertSpeechToText(byte[] audioData)
         {
@@ -376,10 +327,7 @@ namespace ProjectVG.Domain.Chat.View
             // AudioRecorder에서 로그 출력
         }
         
-        private void OnRecordingProgress(float progress)
-        {
-            UpdateProgressBar(progress);
-        }
+
         
         private void OnRecordingError(string error)
         {
