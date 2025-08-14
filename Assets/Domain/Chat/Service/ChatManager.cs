@@ -9,6 +9,7 @@ using ProjectVG.Domain.Chat.Model;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Domain.Chat.View;
+using ProjectVG.Domain.Character.Service;
 
 
 namespace ProjectVG.Domain.Chat.Service
@@ -27,12 +28,16 @@ namespace ProjectVG.Domain.Chat.Service
         [SerializeField] private bool _enableMessageQueue = true;
         [SerializeField] private int _maxQueueSize = 100;
         
+        [Header("Live2D Integration")]
+        [SerializeField] private bool _enableLive2DIntegration = true;
+        
         private bool _isConnected = false;
         private bool _isInitialized = false;
         private bool _isProcessing = false;
         
         private WebSocketManager? _webSocketManager;
         private AudioManager? _audioManager;
+        private Live2DCharacterManager? _live2DCharacterManager;
         
         private readonly Queue<ChatMessage> _messageQueue = new Queue<ChatMessage>();
         private readonly object _queueLock = new object();
@@ -119,6 +124,12 @@ namespace ProjectVG.Domain.Chat.Service
                 _webSocketManager = WebSocketManager.Instance;
                 _audioManager = AudioManager.Instance;
                 
+                // Live2D 모듈 초기화
+                if (_enableLive2DIntegration)
+                {
+                    _live2DCharacterManager = Live2DCharacterManager.Instance;
+                }
+                
                 if (_webSocketManager != null)
                 {
                     _webSocketManager.OnChatMessageReceived += HandleChatMessageReceived;
@@ -202,10 +213,6 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
-
-        
-
-        
         #endregion
         
         #region Private Methods
@@ -261,6 +268,9 @@ namespace ProjectVG.Domain.Chat.Service
                     _chatBubblePanel.CreateBubble(Actor.Character, chatMessage.Text);
                 }
                 
+                // Live2D 반응 적용
+                ApplyLive2DReaction(chatMessage);
+                
                 if (chatMessage.VoiceData != null && _audioManager != null)
                 {
                     _audioManager.PlayVoice(chatMessage.VoiceData);
@@ -284,6 +294,9 @@ namespace ProjectVG.Domain.Chat.Service
                     _chatBubblePanel.CreateBubble(Actor.Character, chatMessage.Text);
                 }
                 
+                // Live2D 반응 적용
+                ApplyLive2DReaction(chatMessage);
+                
                 if (chatMessage.VoiceData != null && _audioManager != null)
                 {
                     await _audioManager.PlayVoiceAsync(chatMessage.VoiceData);
@@ -294,6 +307,55 @@ namespace ProjectVG.Domain.Chat.Service
                 Debug.LogError($"[ChatManager] 캐릭터 메시지 처리 실패: {ex.Message}");
                 OnError?.Invoke($"메시지 처리 실패: {ex.Message}");
             }
+        }
+        
+        private void ApplyLive2DReaction(ChatMessage chatMessage)
+        {
+            if (!_enableLive2DIntegration || _live2DCharacterManager == null)
+                return;
+            
+            try
+            {
+                // 메타데이터에서 감정/행동 정보 추출
+                var emotionData = ExtractEmotionData(chatMessage);
+                var actionData = ExtractActionData(chatMessage);
+                
+                // Live2D 반응 적용
+                _live2DCharacterManager.ApplyReaction(emotionData, actionData);
+                
+                // 음성 재생 시작 알림
+                if (chatMessage.VoiceData != null)
+                {
+                    _live2DCharacterManager.OnVoiceStarted();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ChatManager] Live2D 반응 적용 실패: {ex.Message}");
+            }
+        }
+        
+        private EmotionData ExtractEmotionData(ChatMessage chatMessage)
+        {
+            // TODO: 실제 메타데이터에서 감정 정보 추출
+            // 현재는 기본값 반환
+            return new EmotionData
+            {
+                Emotion = "neutral",
+                Intensity = 0.5f,
+                DurationMs = 2000
+            };
+        }
+        
+        private ActionData ExtractActionData(ChatMessage chatMessage)
+        {
+            // TODO: 실제 메타데이터에서 행동 정보 추출
+            // 현재는 기본값 반환
+            return new ActionData
+            {
+                Action = "",
+                Args = null
+            };
         }
         
         private bool ValidateUserInput(string message)
@@ -312,8 +374,6 @@ namespace ProjectVG.Domain.Chat.Service
             
             return true;
         }
-        
-
         
         private void HandleChatMessageReceived(ChatMessage chatMessage)
         {
