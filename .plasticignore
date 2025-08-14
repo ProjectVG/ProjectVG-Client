@@ -22,6 +22,7 @@ Desktop.ini
 *.tmp
 *.user
 *.userprefs
+*.vsconfig
 
 # macOS 관련
 *.DS_Store
@@ -41,3 +42,46 @@ Desktop.ini
 *.log
 *.bak
 *.meta~             # 임시 메타파일
+
+# 추가된 항목들
+*.blend1
+*.blend1.meta
+/[Rr]ecordings/
+*.DotSettings.user
+mono_crash.*
+*.unitypackage.meta
+InitTestScene*.unity*
+/ServerData
+/[Aa]ssets/AddressableAssetsData/link.xml*
+/[Aa]ssets/Addressables_Temp*
+*.stacktrace
+*.crash
+*.xcuserdata
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.private
+*.private.meta
+^*.private.[0-9]+$
+^*.private.[0-9]+.meta$
+~UnityDirMonSyncFile~*
+**/Assets/StreamingAssets/aa.meta
+**/assets/streamingassets/*/aa/*
+
+# 대용량 미디어 파일
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+*.webm
+*.m4a
+*.m4v
+*.m4b
+*.m4r
+*.m4p
+
+# 특정 플러그인
+/Assets/Plugins/FiveMinuteChat
+/Assets/Plugins/WebGLTemplates
