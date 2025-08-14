@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using ProjectVG.Domain.Chat.Model;
-using ProjectVG.Domain.Chat.Service;
+ 
 
 namespace ProjectVG.Domain.Chat.View
 {
@@ -23,7 +23,6 @@ namespace ProjectVG.Domain.Chat.View
         private CanvasGroup? _canvasGroup;
         
         [Header("Animation Settings")]
-        [SerializeField] private float _slideInDuration = 0.25f;
         [SerializeField] private float _slideOutDuration = 0.03f;
         [SerializeField] private float _typingSpeed = 0.025f;
         [SerializeField] private bool _enableAutoDestroy = true;
@@ -34,7 +33,7 @@ namespace ProjectVG.Domain.Chat.View
         [SerializeField] private float _toastBounceHeight = 20f;
         [SerializeField] private float _toastBounceScale = 1.1f;
         [SerializeField] private float _queueSlideDuration = 0.2f;
-        [SerializeField] private float _queueSlideDistance = 10f;
+
         [SerializeField] private bool _enableBounceEffect = true;
         [SerializeField] private bool _enableScaleEffect = true;
         [SerializeField] private EasingType _bounceEasing = EasingType.Bounce;
@@ -60,14 +59,13 @@ namespace ProjectVG.Domain.Chat.View
         private string _fullText = string.Empty;
         private float _displayTime;
         
-        private bool _isInitialized = false;
         private bool _isAnimating = false;
         private bool _isTyping = false;
         private float _typingProgress = 0f;
         private Coroutine? _typingCoroutine;
         private Coroutine? _animationCoroutine;
         
-        private ChatBubbleManager? _manager;
+        private ChatBubblePanel? _manager;
         
         // 애니메이션 관련 변수들
         private Vector3 _originalPosition;
@@ -110,7 +108,7 @@ namespace ProjectVG.Domain.Chat.View
         
         #region Public Methods
         
-        public void Initialize(Actor actor, string text, float displayTime, ChatBubbleManager? manager = null)
+        public void Initialize(Actor actor, string text, float displayTime, ChatBubblePanel? manager = null)
         {
             _actor = actor;
             _fullText = text;
@@ -135,7 +133,6 @@ namespace ProjectVG.Domain.Chat.View
                 }
             }
             
-            _isInitialized = true;
             OnBubbleCreated?.Invoke(this);
         }
         

@@ -14,7 +14,6 @@ namespace ProjectVG.Core.Audio
     {
         [Header("Recording Settings")]
         [SerializeField] private int _sampleRate = 44100;
-        [SerializeField] private int _channels = 1;
         [SerializeField] private int _maxRecordingLength = 30; // 최대 녹음 시간 (초)
         
         [Header("Audio Processing")]
@@ -99,8 +98,7 @@ namespace ProjectVG.Core.Audio
                 _isRecording = true;
                 _recordingStartTime = Time.time;
                 
-                // 최대 녹음 시간만큼 버퍼 할당
-                _recordingClip = Microphone.Start(_currentDevice ?? string.Empty, false, _maxRecordingLength, _sampleRate);
+                _recordingClip = Microphone.Start(_currentDevice != null ? _currentDevice : string.Empty, false, _maxRecordingLength, _sampleRate);
                 
                 Debug.Log($"[AudioRecorder] 음성 녹음 시작됨 (최대 {_maxRecordingLength}초, {_sampleRate}Hz)");
                 OnRecordingStarted?.Invoke();
@@ -134,7 +132,7 @@ namespace ProjectVG.Core.Audio
                 _recordingEndTime = Time.time;
                 float actualRecordingDuration = _recordingEndTime - _recordingStartTime;
                 
-                Microphone.End(_currentDevice ?? string.Empty);
+                Microphone.End(_currentDevice != null ? _currentDevice : string.Empty);
                 
                 if (_recordingClip != null)
                 {

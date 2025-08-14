@@ -111,7 +111,7 @@ namespace ProjectVG.Core.Loading
             }
             
             // 초기 상태 메시지
-            UpdateStatus("게임 시작 준비 중...");
+            UpdateStatus("앱 시작 준비 중...");
         }
         
         /// <summary>

@@ -1,0 +1,21 @@
+sequenceDiagram
+participant U as User
+participant CM as ChatManager
+participant API as ApiService
+participant L2D as Live2DCharacterManager
+participant EMO as EmotionController
+participant ACT as ActionController
+participant VO as VoiceManager
+
+U->>CM: 사용자 입력 전송
+CM->>API: 요청(텍스트, 캐릭터/유저 ID)
+API-->>CM: 응답(text, audio, metadata{emotion, action})
+CM->>CM: ChatMessage 변환 및 큐 처리
+CM->>VO: 음성 재생
+CM->>L2D: ApplyReaction(metadata)
+L2D->>EMO: SetEmotion(emotion, intensity, duration)
+L2D->>ACT: TriggerAction(action)
+VO-->>L2D: OnVoiceFinished()
+L2D->>EMO: Release/Restore 상태 갱신
+
+

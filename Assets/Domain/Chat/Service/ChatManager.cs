@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
@@ -7,17 +8,16 @@ using ProjectVG.Core.Audio;
 using ProjectVG.Domain.Chat.Model;
 using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
-using ProjectVG.Infrastructure.Network.DTOs.Chat;
-using ProjectVG.Domain.Chat.Service;
+using ProjectVG.Domain.Chat.View;
+
 
 namespace ProjectVG.Domain.Chat.Service
 {
-    public class ChatManager : Singleton<ChatManager>
+    public class ChatManager : MonoBehaviour
     {
         [Header("Components")]
-        [SerializeField] private WebSocketManager _webSocketManager;
-        [SerializeField] private VoiceManager _voiceManager;
-        [SerializeField] private ChatBubbleManager _chatBubbleManager;
+        [SerializeField] private ChatBubblePanel? _chatBubblePanel;
+    
         
         [Header("Chat Settings")]
         [SerializeField] private string _characterId = "44444444-4444-4444-4444-444444444444";
@@ -31,6 +31,9 @@ namespace ProjectVG.Domain.Chat.Service
         private bool _isInitialized = false;
         private bool _isProcessing = false;
         
+        private WebSocketManager? _webSocketManager;
+        private AudioManager? _audioManager;
+        
         private readonly Queue<ChatMessage> _messageQueue = new Queue<ChatMessage>();
         private readonly object _queueLock = new object();
         
@@ -43,13 +46,53 @@ namespace ProjectVG.Domain.Chat.Service
         
         #region Unity Lifecycle
         
-        protected override void Awake()
+        private static ChatManager? _instance;
+        public static ChatManager Instance
         {
-            base.Awake();
+            get
+            {
+                if (_instance == null)
+                {
+                    _instance = FindAnyObjectByType<ChatManager>();
+                }
+                return _instance;
+            }
+        }
+        
+        private void Awake()
+        {
+            if (_instance != null && _instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+            
+            _instance = this;
         }
         
         private void Start()
         {
+            // UI 컴포넌트들이 모두 생성된 후 초기화
+            StartCoroutine(InitializeWhenReady());
+        }
+        
+        private IEnumerator InitializeWhenReady()
+        {
+            float timeout = 5f;
+            float startTime = Time.realtimeSinceStartup;
+            
+            // ChatBubblePanel이 준비될 때까지 대기
+            while (_chatBubblePanel == null && (Time.realtimeSinceStartup - startTime) < timeout)
+            {
+                yield return new WaitForSecondsRealtime(0.1f);
+            }
+            
+            if (_chatBubblePanel == null)
+            {
+                Debug.LogError("[ChatManager] ChatBubblePanel 초기화 타임아웃");
+                yield break;
+            }
+            
             Initialize();
         }
         
@@ -58,11 +101,6 @@ namespace ProjectVG.Domain.Chat.Service
             if (_webSocketManager != null)
             {
                 _webSocketManager.OnChatMessageReceived -= HandleChatMessageReceived;
-            }
-            
-            if (_voiceManager != null)
-            {
-                _voiceManager.OnVoiceFinished -= OnVoiceFinished;
             }
         }
         
@@ -77,23 +115,13 @@ namespace ProjectVG.Domain.Chat.Service
                 
             try
             {
-                if (_webSocketManager == null)
-                    _webSocketManager = WebSocketManager.Instance;
-                    
-                if (_voiceManager == null)
-                    _voiceManager = VoiceManager.Instance;
-                    
-                if (_chatBubbleManager == null)
-                    _chatBubbleManager = FindObjectOfType<ChatBubbleManager>();
+                // 기본 매니저들 초기화
+                _webSocketManager = WebSocketManager.Instance;
+                _audioManager = AudioManager.Instance;
                 
                 if (_webSocketManager != null)
                 {
                     _webSocketManager.OnChatMessageReceived += HandleChatMessageReceived;
-                }
-                
-                if (_voiceManager != null)
-                {
-                    _voiceManager.OnVoiceFinished += OnVoiceFinished;
                 }
                 
                 _isInitialized = true;
@@ -114,9 +142,9 @@ namespace ProjectVG.Domain.Chat.Service
                 
             try
             {
-                if (_chatBubbleManager != null)
+                if (_chatBubblePanel != null)
                 {
-                    _chatBubbleManager.CreateBubble(Actor.User, message);
+                    _chatBubblePanel.CreateBubble(Actor.User, message);
                 }
                 
                 var chatService = ApiServiceManager.Instance.Chat;
@@ -174,6 +202,10 @@ namespace ProjectVG.Domain.Chat.Service
             }
         }
         
+
+        
+
+        
         #endregion
         
         #region Private Methods
@@ -224,14 +256,14 @@ namespace ProjectVG.Domain.Chat.Service
                 OnChatMessageReceived?.Invoke(chatMessage);
                 
                 // 캐릭터 메시지를 버블로 표시
-                if (_chatBubbleManager != null && !string.IsNullOrEmpty(chatMessage.Text))
+                if (_chatBubblePanel != null && !string.IsNullOrEmpty(chatMessage.Text))
                 {
-                    _chatBubbleManager.CreateBubble(Actor.Character, chatMessage.Text);
+                    _chatBubblePanel.CreateBubble(Actor.Character, chatMessage.Text);
                 }
                 
-                if (chatMessage.VoiceData != null && _voiceManager != null)
+                if (chatMessage.VoiceData != null && _audioManager != null)
                 {
-                    _voiceManager.PlayVoice(chatMessage.VoiceData);
+                    _audioManager.PlayVoice(chatMessage.VoiceData);
                 }
             }
             catch (Exception ex)
@@ -247,14 +279,14 @@ namespace ProjectVG.Domain.Chat.Service
             {
                 OnChatMessageReceived?.Invoke(chatMessage);
                 
-                if (_chatBubbleManager != null && !string.IsNullOrEmpty(chatMessage.Text))
+                if (_chatBubblePanel != null && !string.IsNullOrEmpty(chatMessage.Text))
                 {
-                    _chatBubbleManager.CreateBubble(Actor.Character, chatMessage.Text);
+                    _chatBubblePanel.CreateBubble(Actor.Character, chatMessage.Text);
                 }
                 
-                if (chatMessage.VoiceData != null && _voiceManager != null)
+                if (chatMessage.VoiceData != null && _audioManager != null)
                 {
-                    await _voiceManager.PlayVoiceAsync(chatMessage.VoiceData);
+                    await _audioManager.PlayVoiceAsync(chatMessage.VoiceData);
                 }
             }
             catch (Exception ex)
@@ -281,9 +313,7 @@ namespace ProjectVG.Domain.Chat.Service
             return true;
         }
         
-        private void OnVoiceFinished()
-        {
-        }
+
         
         private void HandleChatMessageReceived(ChatMessage chatMessage)
         {

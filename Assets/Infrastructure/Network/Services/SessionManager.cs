@@ -2,8 +2,6 @@ using UnityEngine;
 using System;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.WebSocket;
-using ProjectVG.Core.Managers;
-using ProjectVG.Core.Attributes;
 
 namespace ProjectVG.Infrastructure.Network.Services
 {
@@ -11,13 +9,13 @@ namespace ProjectVG.Infrastructure.Network.Services
     /// 새로운 이벤트 기반 SessionManager
     /// WebSocketManager의 연결/해제 상태를 모니터링하고 세션 ID를 관리
     /// </summary>
-    public class SessionManager : Singleton<SessionManager>, IManager
+    public class SessionManager : Singleton<SessionManager>
     {
         [Header("Session Info")]
         [SerializeField] private string _currentSessionId = "";
         [SerializeField] private bool _isInitialized = false;
         
-        [Inject] private WebSocketManager _webSocketManager;
+        private WebSocketManager _webSocketManager;
         
         // 공개 속성
         public string SessionId => _currentSessionId;
@@ -38,11 +36,6 @@ namespace ProjectVG.Infrastructure.Network.Services
             base.Awake();
         }
         
-        private void Start()
-        {
-            // DI 완료 후 ManagerRegistry에서 Initialize 호출됨
-        }
-        
         private void OnDestroy()
         {
             Shutdown();
@@ -53,7 +46,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         #region Public Methods
         
         /// <summary>
-        /// 세션 ID를 요청합니다. 연결되지 않았다면 연결을 시도하고 기다립니다.
+        /// 세션 ID 요청
         /// </summary>
         public async UniTask<string> GetSessionIdAsync()
         {
@@ -78,7 +71,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         }
         
         /// <summary>
-        /// 세션 연결을 보장합니다. 이미 연결되어 있으면 즉시 반환하고, 그렇지 않으면 연결을 시도합니다.
+        /// 세션 연결 보장
         /// </summary>
         public async UniTask<bool> EnsureConnectionAsync()
         {
@@ -94,6 +87,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             if (_webSocketManager == null)
             {
                 Debug.LogError("[SessionManager] WebSocketManager가 DI로 주입되지 않았습니다. DependencyManager 설정을 확인하세요.");
+                OnSessionError?.Invoke("WebSocketManager가 null입니다.");
                 return false;
             }
             
@@ -101,7 +95,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         }
         
         /// <summary>
-        /// 새로운 연결 요청 로직 - 폴링 방식
+        /// 연결 요청
         /// </summary>
         private async UniTask<bool> RequestConnectionAsync()
         {
@@ -111,6 +105,7 @@ namespace ProjectVG.Infrastructure.Network.Services
                 if (_webSocketManager == null)
                 {
                     Debug.LogError("[SessionManager] WebSocketManager가 DI로 주입되지 않았습니다.");
+                    OnSessionError?.Invoke("WebSocketManager가 null입니다.");
                     return false;
                 }
                 
@@ -146,7 +141,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         }
         
         /// <summary>
-        /// 세션 연결 완료를 폴링으로 대기
+        /// 세션 연결 완료 대기
         /// </summary>
         private async UniTask<bool> WaitForSessionConnection()
         {
@@ -199,21 +194,25 @@ namespace ProjectVG.Infrastructure.Network.Services
         
         #region Private Methods - 초기화 및 이벤트 핸들링
         
-        public void Initialize()
+        /// <summary>
+        /// 초기화 실행
+        /// </summary>
+        public void Initialize(WebSocketManager webSocketManager)
         {
             try
             {
+                _webSocketManager = webSocketManager;
                 Debug.Log("[SessionManager] 초기화 시작");
-                
+
                 if (_webSocketManager == null)
                 {
-                    Debug.LogError("[SessionManager] WebSocketManager가 DI로 주입되지 않았습니다.");
+                    Debug.LogError("[SessionManager] WebSocketManager가 null입니다.");
+                    OnSessionError?.Invoke("WebSocketManager가 null입니다.");
                     return;
                 }
-                
-                // 이벤트 구독
+
                 SubscribeToWebSocketEvents();
-                
+
                 _isInitialized = true;
                 Debug.Log("[SessionManager] 초기화 완료");
             }
@@ -221,6 +220,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             {
                 Debug.LogError($"[SessionManager] 초기화 실패: {ex.Message}");
                 Debug.LogError($"[SessionManager] 스택 트레이스: {ex.StackTrace}");
+                OnSessionError?.Invoke($"초기화 실패: {ex.Message}");
             }
         }
         

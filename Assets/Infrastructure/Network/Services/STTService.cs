@@ -17,9 +17,9 @@ namespace ProjectVG.Infrastructure.Network.Services
     /// </summary>
     public class STTService
     {
-        private readonly HttpApiClient _httpClient;
+        private readonly HttpApiClient? _httpClient;
         
-        public bool IsConnected => true; // 항상 연결 가능하다고 가정
+        public bool IsConnected => true;
         public bool IsAvailable => _httpClient != null;
         
         public STTService()
@@ -67,18 +67,10 @@ namespace ProjectVG.Infrastructure.Network.Services
                 string forcedLanguage = "ko";
                 string endpoint = $"stt/transcribe?language={forcedLanguage}";
                 
-                Debug.Log($"[STTService] STT 변환 요청 시작 - 엔드포인트: {endpoint}, 파일 크기: {audioData.Length / 1024}KB, 강제 언어: {forcedLanguage}");
-                Debug.Log($"[STTService] URL 확인: {endpoint}");
-                
                 var response = await _httpClient.PostFormDataAsync<STTResponse>(endpoint, formData, fileNames, cancellationToken: cancellationToken);
-                
-                Debug.Log($"[STTService] 응답 객체 - Text: '{response?.Text}', Language: '{response?.Language}'");
-                Debug.Log($"[STTService] 응답 객체 - LanguageProbability: {response?.LanguageProbability}, SegmentsCount: {response?.SegmentsCount}");
-                Debug.Log($"[STTService] 응답 객체 - ProcessingTime: {response?.ProcessingTime}");
                 
                 if (response != null && !string.IsNullOrEmpty(response.Text))
                 {
-                    Debug.Log($"[STTService] STT 변환 성공 - 텍스트: '{response.Text}'");
                     return response.Text;
                 }
                 else

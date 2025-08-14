@@ -8,6 +8,7 @@ namespace ProjectVG.Infrastructure.Config
      */
     public class AppEnvironmentConfig : ScriptableObject
     {
+        #pragma warning disable CS0414
         [Header("Override")]
         [SerializeField] private bool overrideEnabled = false;
         [SerializeField] private NetworkConfig.EnvironmentType overrideEnvironment = NetworkConfig.EnvironmentType.Development;
@@ -15,12 +16,19 @@ namespace ProjectVG.Infrastructure.Config
         [Header("Per-Platform Default Environments")]
         [SerializeField] private NetworkConfig.EnvironmentType editorEnvironment = NetworkConfig.EnvironmentType.Development;
         [SerializeField] private NetworkConfig.EnvironmentType androidEnvironment = NetworkConfig.EnvironmentType.Production;
+
         [SerializeField] private NetworkConfig.EnvironmentType iosEnvironment = NetworkConfig.EnvironmentType.Production;
+
         [SerializeField] private NetworkConfig.EnvironmentType standaloneEnvironment = NetworkConfig.EnvironmentType.Development;
         [SerializeField] private NetworkConfig.EnvironmentType webglEnvironment = NetworkConfig.EnvironmentType.Development;
         
         [Header("Build Flags Mapping")]
         [SerializeField] private bool mapDevelopmentBuildToDevelopment = true;
+        
+        #pragma warning restore CS0414
+        
+        // 프로퍼티로 필드 사용을 명시적으로 표시
+        public NetworkConfig.EnvironmentType IOSEnvironment => iosEnvironment;
         
         private static AppEnvironmentConfig _instance;
         public static AppEnvironmentConfig Instance
@@ -91,3 +99,4 @@ namespace ProjectVG.Infrastructure.Config
         }
     }
 }
+

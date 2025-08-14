@@ -1,0 +1,10 @@
+graph TD
+  CM[ChatManager] --> LCM[Live2DCharacterManager]
+  LCM --> LMM[Live2DModelManager]
+  LCM --> LPC[Live2DParameterController]
+  LCM --> EMO[EmotionController]
+  LCM --> ACT[ActionController]
+  LMM -->|Active Model| L2D[Live2D Components]
+  LPC -->|Parameters/Expressions| L2D
+
+

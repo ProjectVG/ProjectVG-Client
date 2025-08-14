@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -190,7 +191,7 @@ namespace ProjectVG.Core.Utils
         {
             if (_logEntryPrefab == null || _logContentParent == null) return;
             
-            GameObject logEntryObj;
+            GameObject? logEntryObj;
             if (_settings?.UseObjectPooling == true)
             {
                 logEntryObj = GetPooledObject();
@@ -271,7 +272,7 @@ namespace ProjectVG.Core.Utils
             }
         }
         
-        private GameObject GetPooledObject()
+        private GameObject? GetPooledObject()
         {
             if (_objectPool.Count > 0)
             {
