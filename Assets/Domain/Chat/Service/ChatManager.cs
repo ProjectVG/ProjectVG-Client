@@ -79,13 +79,12 @@ namespace ProjectVG.Domain.Chat.Service
         private IEnumerator InitializeWhenReady()
         {
             float timeout = 5f;
-            float elapsedTime = 0f;
+            float startTime = Time.realtimeSinceStartup;
             
             // ChatBubblePanel이 준비될 때까지 대기
-            while (_chatBubblePanel == null && elapsedTime < timeout)
+            while (_chatBubblePanel == null && (Time.realtimeSinceStartup - startTime) < timeout)
             {
-                yield return new WaitForEndOfFrame();
-                elapsedTime += Time.deltaTime;
+                yield return new WaitForSecondsRealtime(0.1f);
             }
             
             if (_chatBubblePanel == null)

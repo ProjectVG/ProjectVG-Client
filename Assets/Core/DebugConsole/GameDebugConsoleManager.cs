@@ -191,7 +191,7 @@ namespace ProjectVG.Core.Utils
         {
             if (_logEntryPrefab == null || _logContentParent == null) return;
             
-            GameObject logEntryObj;
+            GameObject? logEntryObj;
             if (_settings?.UseObjectPooling == true)
             {
                 logEntryObj = GetPooledObject();
@@ -272,7 +272,7 @@ namespace ProjectVG.Core.Utils
             }
         }
         
-        private GameObject GetPooledObject()
+        private GameObject? GetPooledObject()
         {
             if (_objectPool.Count > 0)
             {
@@ -286,7 +286,7 @@ namespace ProjectVG.Core.Utils
                 return Instantiate(_logEntryPrefab, _logContentParent);
             }
             
-            return null!;
+            return null;
         }
         
         private void ReturnToPool(GameObject obj)
