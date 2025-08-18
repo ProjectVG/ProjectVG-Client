@@ -136,7 +136,7 @@ namespace ProjectVG.Core.Audio
                 
                 if (_recordingClip != null)
                 {
-                    AudioClip processedClip = ProcessRecordingClip(actualRecordingDuration);
+                    AudioClip? processedClip = ProcessRecordingClip(actualRecordingDuration);
                     if (processedClip != null)
                     {
                         Debug.Log($"[AudioRecorder] 음성 녹음 완료됨 ({actualRecordingDuration:F1}초, {processedClip.samples} 샘플)");
