@@ -15,3 +15,5 @@ MonoBehaviour:
   _entries:
   - characterId: zero
     characterConfig: {fileID: 11400000, guid: 4c6d1f5cb9556f24c843f3e9fe14d49e, type: 2}
+  - characterId: zero
+    characterConfig: {fileID: 11400000, guid: 4c6d1f5cb9556f24c843f3e9fe14d49e, type: 2}
