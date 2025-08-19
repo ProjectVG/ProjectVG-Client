@@ -8,6 +8,10 @@ namespace ProjectVG.Domain.Character.Service
 	/// </summary>
 	public class CharacterFacade : MonoBehaviour, ICharacterFacade
 	{
+		[SerializeField] private Transform _modelTransform;
+		[SerializeField] private Live2DModelRegistry _modelRegistry;
+
+
 		private ICharacterModelManager _modelManager;
 		private ICharacterActionService _actionService;
 		private ICharacterActionResolver _actionResolver;
@@ -17,33 +21,14 @@ namespace ProjectVG.Domain.Character.Service
 		/// </summary>
 		public void Initialize()
 		{
-			// 의존성 주입을 통해 초기화
-			// TODO: 실제 의존성 주입 컨테이너에서 가져오도록 수정
-			Debug.LogWarning("[CharacterFacade] 의존성 주입이 아직 구현되지 않았습니다.");
+			_modelManager = GetComponent<CharacterModelManager>();
+			_modelManager.Initialize(_modelTransform, _modelRegistry);
+
+
+
 		}
 
-		/// <summary>
-		/// 의존성을 주입한다.
-		/// </summary>
-		/// <param name="modelManager">모델 매니저</param>
-		/// <param name="actionService">액션 서비스</param>
-		/// <param name="actionResolver">액션 해석기</param>
-		public void InjectDependencies(ICharacterModelManager modelManager, ICharacterActionService actionService, ICharacterActionResolver actionResolver)
-		{
-			_modelManager = modelManager;
-			_actionService = actionService;
-			_actionResolver = actionResolver;
-		}
-
-		/// <summary>
-		/// 파사드를 종료한다.
-		/// </summary>
-		public void Shutdown()
-		{
-			if (_modelManager != null) {
-				_modelManager.UnloadAll();
-			}
-		}
+		
 
 		/// <summary>
 		/// 캐릭터를 등록한다.
@@ -144,6 +129,16 @@ namespace ProjectVG.Domain.Character.Service
 		{
 			return _modelManager?.IsLoaded(characterId) ?? false;
 		}
-	}
+
+        /// <summary>
+        /// 파사드를 종료한다.
+        /// </summary>
+        public void Shutdown()
+        {
+            if (_modelManager != null) {
+                _modelManager.UnloadAll();
+            }
+        }
+    }
 }
 

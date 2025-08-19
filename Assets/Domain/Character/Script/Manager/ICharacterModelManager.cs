@@ -1,5 +1,6 @@
-using UnityEngine;
 using Cysharp.Threading.Tasks;
+using ProjectVG.Domain.Character.Live2D.Model;
+using UnityEngine;
 
 namespace ProjectVG.Domain.Character.Service
 {
@@ -10,11 +11,18 @@ namespace ProjectVG.Domain.Character.Service
 	{
 
 		/// <summary>
-		/// 캐릭터 모델을 로드한다.
+		/// 매니저를 초기화 한다.
 		/// </summary>
-		/// <param name="characterId">로드할 캐릭터의 고유 ID</param>
-		/// <param name="preload">사전 로드 여부 (true면 로드 후 즉시 활성화)</param>
-		void LoadModel(string characterId, bool preload = false);
+		/// <param name="modelRoot">모델 위치</param>
+		/// <param name="modelRegistry">모델 등록자</param>
+		public void Initialize(Transform modelRoot, Live2DModelRegistry modelRegistry);
+
+        /// <summary>
+        /// 캐릭터 모델을 로드한다.
+        /// </summary>
+        /// <param name="characterId">로드할 캐릭터의 고유 ID</param>
+        /// <param name="preload">사전 로드 여부 (true면 로드 후 즉시 활성화)</param>
+        void LoadModel(string characterId, bool preload = false);
 
 		/// <summary>
 		/// 캐릭터 모델을 비동기로 로드한다.
