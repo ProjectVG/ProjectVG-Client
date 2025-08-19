@@ -1,5 +1,7 @@
-using UnityEngine;
 using ProjectVG.Domain.Character.Live2D.Model;
+using UnityEngine;
+using UnityEngine.TextCore.Text;
+using ProjectVG.Domain.Character.Component;
 
 namespace ProjectVG.Domain.Character.Service
 {
@@ -16,24 +18,44 @@ namespace ProjectVG.Domain.Character.Service
 		private ICharacterActionService _actionService;
 		private ICharacterActionResolver _actionResolver;
 
-		/// <summary>
+        #region Unity Lifecycle
+
+		void Start()
+		{
+			Initialize();
+        }
+
+        #endregion
+
+
+        		/// <summary>
 		/// 파사드를 초기화한다.
 		/// </summary>
 		public void Initialize()
 		{
 			_modelManager = GetComponent<CharacterModelManager>();
-			_modelManager.Initialize(_modelTransform, _modelRegistry);
+			if (_modelManager == null)
+			{
+				_modelManager = gameObject.AddComponent<CharacterModelManager>();
+				Debug.Log($"[CharacterFacade] CharacterModelManager가 자동으로 추가되었습니다: {gameObject.name}");
+			}
+            _modelManager.Initialize(_modelTransform, _modelRegistry);
+            _modelManager.LoadModel("zero", true); // 임시 활성화
 
+            if (_modelTransform != null) {
+                var scaler = _modelTransform.GetComponent<Live2DModelScaler>();
+                if (scaler == null) {
+                    scaler = _modelTransform.gameObject.AddComponent<Live2DModelScaler>();
+                    Debug.Log($"[CharacterFacade] Live2DModelScaler가 자동으로 추가되었습니다: {_modelTransform.name}");
+                }
+            }
+        }
 
-
-		}
-
-		
 
 		/// <summary>
 		/// 캐릭터를 등록한다.
 		/// </summary>
-		public void RegisterCharacter(string characterId, bool preload = false)
+		public void RegisterCharacter(string characterId, bool preload = true)
 		{
 			if (_modelManager != null) {
 				_modelManager.LoadModel(characterId, preload);

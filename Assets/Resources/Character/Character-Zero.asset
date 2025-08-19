@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f22d39f6e7c71524d911cb4b658d7fd9, type: 3}
+  m_Name: Character-Zero
+  m_EditorClassIdentifier: 
+  characterId: zero
+  characterName: "\uC81C\uB85C"
+  characterPrefab: {fileID: 403089766806550510, guid: 611b9f4305cdce9458ff7eaead5c0a53, type: 3}
+  thumbnail: {fileID: 2800000, guid: 17a1333e87a81c34693569503c7ba213, type: 3}
+  characterDescription: "\uCE58\uC640\uC9F1 \uBAA8\uB378 \uAE30\uBC18"
+  emotionMappings:
+  - emotionKey: 
+    expressionName: 
+    defaultIntensity: 0
+    defaultDurationMs: 0
+  actionMappings:
+  - actionKey: 
+    motionGroup: 
+    motionName: 
+  isLockAtActive: 0
+  lookSensitivity: 1
+  lockAtDamping: 0
+  gain: 1
+  smoothing: 1
