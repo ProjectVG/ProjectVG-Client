@@ -2,6 +2,7 @@ using ProjectVG.Domain.Character.Live2D.Model;
 using UnityEngine;
 using UnityEngine.TextCore.Text;
 using ProjectVG.Domain.Character.Component;
+using ProjectVG.Core.Audio;
 
 namespace ProjectVG.Domain.Character.Service
 {
@@ -12,7 +13,6 @@ namespace ProjectVG.Domain.Character.Service
 	{
 		[SerializeField] private Transform _modelTransform;
 		[SerializeField] private Live2DModelRegistry _modelRegistry;
-
 
 		private ICharacterModelManager _modelManager;
 		private ICharacterActionService _actionService;
@@ -39,7 +39,12 @@ namespace ProjectVG.Domain.Character.Service
 				_modelManager = gameObject.AddComponent<CharacterModelManager>();
 				Debug.Log($"[CharacterFacade] CharacterModelManager가 자동으로 추가되었습니다: {gameObject.name}");
 			}
-            _modelManager.Initialize(_modelTransform, _modelRegistry);
+            
+            // AudioManager에서 Voice AudioSource 가져오기
+            var voiceAudioSource = GetVoiceAudioSource();
+            
+            _modelManager.Initialize(_modelTransform, _modelRegistry, voiceAudioSource);
+            
             _modelManager.LoadModel("zero", true); // 임시 활성화
 
             if (_modelTransform != null) {
@@ -161,6 +166,33 @@ namespace ProjectVG.Domain.Character.Service
                 _modelManager.UnloadAll();
             }
         }
+        
+
+        
+        /// <summary>
+        /// AudioManager에서 Voice AudioSource를 가져온다.
+        /// </summary>
+        private AudioSource? GetVoiceAudioSource()
+        {
+            var audioManager = AudioManager.Instance;
+            if (audioManager != null && audioManager.IsInitialized)
+            {
+                var voiceController = audioManager.GetVoiceController();
+                if (voiceController != null)
+                {
+                    var audioSource = voiceController.GetAudioSource();
+                    if (audioSource != null)
+                    {
+                        Debug.Log("[CharacterFacade] Voice AudioSource 가져오기 완료");
+                        return audioSource;
+                    }
+                }
+            }
+            
+            Debug.LogWarning("[CharacterFacade] AudioManager가 초기화되지 않았거나 Voice AudioSource를 찾을 수 없습니다.");
+            return null;
+        }
     }
 }
+
 

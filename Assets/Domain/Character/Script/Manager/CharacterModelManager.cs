@@ -1,7 +1,11 @@
-using UnityEngine;
 using Cysharp.Threading.Tasks;
-using System.Collections.Generic;
+using Live2D.Cubism.Framework;
+using Live2D.Cubism.Framework.MouthMovement;
+using Live2D.Cubism.Core;
+using ProjectVG.Core.Audio;
 using ProjectVG.Domain.Character.Live2D.Model;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace ProjectVG.Domain.Character.Service
 {
@@ -16,10 +20,19 @@ namespace ProjectVG.Domain.Character.Service
 		private Live2DModelRegistry _modelRegistry;
 		private readonly Dictionary<string, GameObject> _characterIdToInstance = new Dictionary<string, GameObject>();
 		private string _activeCharacterId;
+		private AudioSource? _voiceAudioSource;
 
 		#endregion
 
 		#region Unity Lifecycle
+
+		private void Update()
+		{
+			// 립싱크 디버깅을 위한 AudioSource 상태 모니터링
+			if (_voiceAudioSource != null && _voiceAudioSource.isPlaying) {
+				Debug.Log($"[CharacterModelManager] AudioSource 재생중: {_voiceAudioSource.name}, 볼륨: {_voiceAudioSource.volume}, 시간: {_voiceAudioSource.time}");
+			}
+		}
 
 		#endregion
 
@@ -28,10 +41,11 @@ namespace ProjectVG.Domain.Character.Service
 		/// <summary>
 		/// 매니저를 초기화한다
 		/// </summary>
-		public void Initialize(Transform modelRoot, Live2DModelRegistry modelRegistry)
+		public void Initialize(Transform modelRoot, Live2DModelRegistry modelRegistry, AudioSource? voiceAudioSource = null)
 		{
 			_modelRoot = modelRoot;
 			_modelRegistry = modelRegistry;
+			_voiceAudioSource = voiceAudioSource;
 		}
 
 		/// <summary>
@@ -105,13 +119,19 @@ namespace ProjectVG.Domain.Character.Service
 		/// </summary>
 		public void UnloadAll()
 		{
+			var keysToRemove = new List<string>();
+			
 			foreach (var kvp in _characterIdToInstance) {
 				if (kvp.Value != null) {
 					Destroy(kvp.Value);
 				}
+				keysToRemove.Add(kvp.Key);
 			}
 
-			_characterIdToInstance.Clear();
+			foreach (var key in keysToRemove) {
+				_characterIdToInstance.Remove(key);
+			}
+			
 			_activeCharacterId = null;
 		}
 
@@ -122,6 +142,12 @@ namespace ProjectVG.Domain.Character.Service
 		{
 			if (!_characterIdToInstance.TryGetValue(characterId, out var target)) {
 				Debug.LogWarning($"[CharacterModelManager] 캐릭터 '{characterId}'가 로드되지 않았습니다.");
+				return;
+			}
+
+			if (target == null) {
+				_characterIdToInstance.Remove(characterId);
+				Debug.LogWarning($"[CharacterModelManager] 캐릭터 '{characterId}'의 인스턴스가 파괴되었습니다.");
 				return;
 			}
 
@@ -140,8 +166,12 @@ namespace ProjectVG.Domain.Character.Service
 				return;
 			}
 
-			if (_characterIdToInstance.TryGetValue(_activeCharacterId, out var current) && current != null) {
-				current.SetActive(false);
+			if (_characterIdToInstance.TryGetValue(_activeCharacterId, out var current)) {
+				if (current != null) {
+					current.SetActive(false);
+				} else {
+					_characterIdToInstance.Remove(_activeCharacterId);
+				}
 			}
 
 			_activeCharacterId = null;
@@ -162,6 +192,7 @@ namespace ProjectVG.Domain.Character.Service
 		{
 			return !string.IsNullOrEmpty(characterId) && _characterIdToInstance.ContainsKey(characterId);
 		}
+
 
 		#endregion
 
@@ -228,6 +259,8 @@ namespace ProjectVG.Domain.Character.Service
 			var instance = Instantiate(config.CharacterPrefab, parent);
 			instance.name = characterId;
 			instance.SetActive(false);
+			
+			SetupModelComponents(instance, config);
 			return instance;
 		}
 
@@ -247,8 +280,82 @@ namespace ProjectVG.Domain.Character.Service
 			instance.name = characterId;
 			instance.SetActive(false);
 			
+			SetupModelComponents(instance, config);
 			await UniTask.Yield();
 			return instance;
+		}
+
+		/// <summary>
+		/// 모델에 필요한 컴포넌트들을 설정한다
+		/// </summary>
+		private void SetupModelComponents(GameObject modelInstance, Live2DModelConfig config)
+		{
+			SetupLipSync(modelInstance, config);
+			SetupAutoEyeBlink(modelInstance, config);
+		}
+
+		/// <summary>
+		/// 립싱크 컴포넌트를 설정한다
+		/// </summary>
+		private void SetupLipSync(GameObject modelInstance, Live2DModelConfig config)
+		{
+			if (!config.UseLipSync) {
+				Debug.Log($"[CharacterModelManager] 립싱크가 비활성화되어 있습니다: {modelInstance.name}");
+				return;
+			}
+
+			var mouthController = modelInstance.GetComponent<CubismAudioMouthInput>();
+			if (mouthController == null) {
+				mouthController = modelInstance.AddComponent<CubismAudioMouthInput>();
+				Debug.Log($"[CharacterModelManager] CubismAudioMouthInput 컴포넌트를 추가했습니다: {modelInstance.name}");
+			}
+
+			if (_voiceAudioSource == null) {
+				Debug.LogWarning($"[CharacterModelManager] Voice AudioSource가 null입니다. 립싱크가 동작하지 않을 수 있습니다: {modelInstance.name}");
+			} else {
+				Debug.Log($"[CharacterModelManager] Voice AudioSource 설정 완료: {modelInstance.name}, AudioSource: {_voiceAudioSource.name}");
+			}
+
+			mouthController.AudioInput = _voiceAudioSource;
+			mouthController.Gain = config.Gain;
+			mouthController.Smoothing = config.Smoothing;
+			
+			// Live2D 모델에 Mouth 파라미터가 있는지 확인
+			var model = modelInstance.GetComponent<CubismModel>();
+			if (model != null) {
+				var mouthParameter = model.Parameters.FindById("ParamMouthOpenY");
+				if (mouthParameter != null) {
+					Debug.Log($"[CharacterModelManager] Mouth 파라미터 발견: {mouthParameter.Id}, 현재값: {mouthParameter.Value}");
+				} else {
+					Debug.LogWarning($"[CharacterModelManager] Mouth 파라미터(ParamMouthOpenY)를 찾을 수 없습니다: {modelInstance.name}");
+				}
+			}
+			
+			Debug.Log($"[CharacterModelManager] 립싱크 설정 완료: {modelInstance.name}, Gain: {config.Gain}, Smoothing: {config.Smoothing}");
+		}
+
+		/// <summary>
+		/// 자동 눈 깜빡임 컴포넌트를 설정한다
+		/// </summary>
+		private void SetupAutoEyeBlink(GameObject modelInstance, Live2DModelConfig config)
+		{
+			if (!config.UseAutoEyeBlink) {
+				return;
+			}
+
+			var eyeBlinkController = modelInstance.GetComponent<CubismAutoEyeBlinkInput>();
+			if (eyeBlinkController == null) {
+				eyeBlinkController = modelInstance.AddComponent<CubismAutoEyeBlinkInput>();
+			}
+			
+			eyeBlinkController.Mean = config.EyeBlinkMean;
+			eyeBlinkController.MaximumDeviation = config.EyeBlinkMaximumDeviation;
+			eyeBlinkController.Timescale = config.EyeBlinkTimescale;
+			eyeBlinkController.SetBlinkingSettings(
+				config.EyeBlinkClosingSeconds,
+				config.EyeBlinkClosedSeconds,
+				config.EyeBlinkOpeningSeconds
+			);
 		}
 
 		/// <summary>
@@ -256,10 +363,47 @@ namespace ProjectVG.Domain.Character.Service
 		/// </summary>
 		private void DeactivateAllModels()
 		{
+			var keysToRemove = new List<string>();
+			
 			foreach (var kvp in _characterIdToInstance) {
-				if (kvp.Value != null) {
-					kvp.Value.SetActive(false);
+				if (kvp.Value == null) {
+					keysToRemove.Add(kvp.Key);
+					continue;
 				}
+				
+				kvp.Value.SetActive(false);
+			}
+			
+			foreach (var key in keysToRemove) {
+				_characterIdToInstance.Remove(key);
+			}
+		}
+
+		/// <summary>
+		/// 모든 로드된 모델의 립싱크 컴포넌트를 업데이트한다
+		/// </summary>
+		private void UpdateAllLipSyncComponents()
+		{
+			var keysToRemove = new List<string>();
+			
+			foreach (var kvp in _characterIdToInstance) {
+				if (kvp.Value == null) {
+					keysToRemove.Add(kvp.Key);
+					continue;
+				}
+				
+				var mouthController = kvp.Value.GetComponent<CubismAudioMouthInput>();
+				if (mouthController != null) {
+					mouthController.AudioInput = _voiceAudioSource;
+					
+					if (_voiceAudioSource != null) {
+						Debug.Log($"[CharacterModelManager] 립싱크 업데이트: {kvp.Key}, AudioSource 재생중: {_voiceAudioSource.isPlaying}, 볼륨: {_voiceAudioSource.volume}");
+					}
+				}
+			}
+			
+			foreach (var key in keysToRemove) {
+				_characterIdToInstance.Remove(key);
 			}
 		}
 
