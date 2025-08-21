@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ProjectVG.Domain.Character.Live2D.Model
 {
@@ -75,7 +76,7 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         [Space(2)]
 
         [Tooltip("시선 추적 사용 여부")]
-        [SerializeField] private bool isLockAtActive = true;
+        [SerializeField] private bool isLookAtActive = true;
         
         [Tooltip("시선 민감도 (값이 클수록 회전이 커짐)")]
         [Range(0f, 30f)]
@@ -83,12 +84,16 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         
         [Tooltip("시선 반응 속도 (값이 작을수록 빠름)")]
         [Range(0f, 5f)]
-        [SerializeField] private float lockAtDamping = 0.0f;
+        [SerializeField, FormerlySerializedAs("lockAtDamping")]
+        private float lookAtDamping = 0.0f;
 
         [Space(5)]
         [Header("────────────────────────────────────────")]
         [Header("[ 립싱크 설정 ]")]
         [Space(2)]
+
+        [Tooltip("립싱크 사용 여부")]
+        [SerializeField] private bool useLipSync = true;
 
         [Tooltip("음량 배수 (1 = 기본)")]
         [Range(1f, 10f)]
@@ -97,6 +102,40 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         [Tooltip("입 움직임 부드러움 (값이 클수록 부드럽지만 부하 증가)")]
         [Range(0f, 1f)]
         [SerializeField] private float smoothing = 1f;
+
+        [Space(5)]
+        [Header("────────────────────────────────────────")]
+        [Header("[ 자동 애니메이션 설정 ]")]
+        [Space(2)]
+
+        [Tooltip("자동 눈 깜빡임 사용 여부")]
+        [SerializeField] private bool useAutoEyeBlink = true;
+
+        [Header("눈 깜빡임 타이밍 설정")]
+        [Tooltip("눈 깜빡임 간격의 평균 시간 (초)")]
+        [Range(1f, 10f)]
+        [SerializeField] private float eyeBlinkMean = 2.5f;
+        
+        [Tooltip("평균에서의 최대 편차 (초)")]
+        [Range(0.5f, 5f)]
+        [SerializeField] private float eyeBlinkMaximumDeviation = 2f;
+        
+        [Tooltip("눈 깜빡임 시간 스케일")]
+        [Range(1f, 20f)]
+        [SerializeField] private float eyeBlinkTimescale = 10f;
+
+        [Header("눈 깜빡임 동작 세부 설정")]
+        [Tooltip("눈을 감는 동작 시간 (초)")]
+        [Range(0.1f, 3f)]
+        [SerializeField] private float eyeBlinkClosingSeconds = 1.0f;
+        
+        [Tooltip("눈이 감긴 상태 지속 시간 (초)")]
+        [Range(0.1f, 2f)]
+        [SerializeField] private float eyeBlinkClosedSeconds = 0.5f;
+        
+        [Tooltip("눈을 여는 동작 시간 (초)")]
+        [Range(0.1f, 3f)]
+        [SerializeField] private float eyeBlinkOpeningSeconds = 1.5f;
 
         // 캐릭터 기본정보
         public string CharacterId => characterId;
@@ -115,11 +154,23 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         public List<ActionMapping> ActionMappings => actionMappings;
 
         // 세부 설정
-        public bool IsLockAtActive => isLockAtActive;
+        public bool IsLookAtActive => isLookAtActive;
         public float LookSensitivity => lookSensitivity;
-        public float LockAtDamping => lockAtDamping;
+        [Obsolete("Use LookAtDamping instead.")]
+        public float LockAtDamping => lookAtDamping;
+        public float LookAtDamping => lookAtDamping;
         public float Gain => gain;
         public float Smoothing => smoothing;
+        public bool UseLipSync => useLipSync;
+        public bool UseAutoEyeBlink => useAutoEyeBlink;
+        
+        // 눈 깜빡임 설정
+        public float EyeBlinkMean => eyeBlinkMean;
+        public float EyeBlinkMaximumDeviation => eyeBlinkMaximumDeviation;
+        public float EyeBlinkTimescale => eyeBlinkTimescale;
+        public float EyeBlinkClosingSeconds => eyeBlinkClosingSeconds;
+        public float EyeBlinkClosedSeconds => eyeBlinkClosedSeconds;
+        public float EyeBlinkOpeningSeconds => eyeBlinkOpeningSeconds;
     }
 }
 

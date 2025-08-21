@@ -44,6 +44,7 @@ namespace ProjectVG.Core.Audio
         public event Action<float>? OnSfxVolumeChanged;
         public event Action<float>? OnUiVolumeChanged;
         public event Action<float>? OnVoiceVolumeChanged;
+        public event Action? OnInitialized;
         
         #region Unity Lifecycle
         
@@ -76,6 +77,7 @@ namespace ProjectVG.Core.Audio
                 LoadVolumeSettings();
                 
                 _isInitialized = true;
+                OnInitialized?.Invoke();
                 Debug.Log("[AudioManager] 초기화 완료");
             }
             catch (Exception ex)
@@ -247,6 +249,11 @@ namespace ProjectVG.Core.Audio
         {
             // UIController에서 활성 소스 개수 반환 메서드 추가 필요
             return 0;
+        }
+        
+        public VoiceController? GetVoiceController()
+        {
+            return _voiceController;
         }
         
         #endregion

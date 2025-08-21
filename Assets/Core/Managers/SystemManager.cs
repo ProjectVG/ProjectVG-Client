@@ -20,7 +20,7 @@ namespace ProjectVG.Core.Managers
         [SerializeField] private HttpApiClient? _httpApiClient;
         [SerializeField] private AudioManager? _audioManager;
         [SerializeField] private LoadingManager? _loadingManager;
-        [SerializeField] private ChatManager? _chatManager;
+        [SerializeField] private ChatSystemManager? _chatManager;
 
         
         [Header("Settings")]
@@ -211,7 +211,7 @@ namespace ProjectVG.Core.Managers
         {
             try
             {
-                await UnityEngine.SceneManagement.SceneManager.LoadSceneAsync("MainSence");
+                await UnityEngine.SceneManagement.SceneManager.LoadSceneAsync("MainScene");
                 Debug.Log("[SystemManager] MainScene 전환 완료");
             }
             catch (System.Exception ex)

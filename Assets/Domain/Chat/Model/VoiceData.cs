@@ -17,10 +17,6 @@ namespace ProjectVG.Domain.Chat.Model
             Format = format;
         }
         
-        public VoiceData()
-        {
-        }
-        
         public static VoiceData FromBase64(string base64Data, string format = "wav")
         {
             if (string.IsNullOrEmpty(base64Data))

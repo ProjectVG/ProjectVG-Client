@@ -119,3 +119,5 @@ InitTestScene*.unity*
 # 특정 플러그인
 /Assets/Plugins/FiveMinuteChat
 /Assets/Plugins/WebGLTemplates
+/Assets/Domain/Character/Model/Chikuwa/ziraitikuwa
+/Assets/Domain/Character/Model/Chikuwa/model

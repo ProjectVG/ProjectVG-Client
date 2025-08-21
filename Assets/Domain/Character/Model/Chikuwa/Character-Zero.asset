@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f22d39f6e7c71524d911cb4b658d7fd9, type: 3}
+  m_Name: Character-Zero
+  m_EditorClassIdentifier: 
+  characterId: zero
+  characterName: "\uC81C\uB85C"
+  characterPrefab: {fileID: 8051974178353762967, guid: 9be43d9f8e24d634186c522ebce74618, type: 3}
+  thumbnail: {fileID: 2800000, guid: e029dae0a0b46124ba7b0b6b2ac00a76, type: 3}
+  characterDescription: "\uCE58\uC640\uC9F1 \uBAA8\uB378 \uAE30\uBC18"
+  emotionMappings:
+  - emotionKey: 
+    expressionName: 
+    defaultIntensity: 0
+    defaultDurationMs: 0
+  actionMappings:
+  - actionKey: 
+    motionGroup: 
+    motionName: 
+  isLockAtActive: 0
+  lookSensitivity: 1
+  lockAtDamping: 0
+  useLipSync: 1
+  gain: 10
+  smoothing: 1
+  useAutoEyeBlink: 1
+  eyeBlinkMean: 2.5
+  eyeBlinkMaximumDeviation: 2
+  eyeBlinkTimescale: 10
+  eyeBlinkClosingSeconds: 1
+  eyeBlinkClosedSeconds: 0.5
+  eyeBlinkOpeningSeconds: 1.5

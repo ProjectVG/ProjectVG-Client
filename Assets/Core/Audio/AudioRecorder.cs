@@ -98,7 +98,14 @@ namespace ProjectVG.Core.Audio
                 _isRecording = true;
                 _recordingStartTime = Time.time;
                 
-                _recordingClip = Microphone.Start(_currentDevice != null ? _currentDevice : string.Empty, false, _maxRecordingLength, _sampleRate);
+                _recordingClip = Microphone.Start(_currentDevice ?? string.Empty, false, _maxRecordingLength, _sampleRate);
+                if (_recordingClip == null)
+                {
+                    _isRecording = false;
+                    Debug.LogError("[AudioRecorder] 마이크 시작 실패: 반환된 AudioClip이 null입니다.");
+                    OnError?.Invoke("마이크 시작 실패");
+                    return false;
+                }
                 
                 Debug.Log($"[AudioRecorder] 음성 녹음 시작됨 (최대 {_maxRecordingLength}초, {_sampleRate}Hz)");
                 OnRecordingStarted?.Invoke();
@@ -136,7 +143,7 @@ namespace ProjectVG.Core.Audio
                 
                 if (_recordingClip != null)
                 {
-                    AudioClip processedClip = ProcessRecordingClip(actualRecordingDuration);
+                    AudioClip? processedClip = ProcessRecordingClip(actualRecordingDuration);
                     if (processedClip != null)
                     {
                         Debug.Log($"[AudioRecorder] 음성 녹음 완료됨 ({actualRecordingDuration:F1}초, {processedClip.samples} 샘플)");
@@ -155,6 +162,11 @@ namespace ProjectVG.Core.Audio
                 OnError?.Invoke($"녹음 중지 실패: {ex.Message}");
                 _isRecording = false;
                 return null;
+            }
+            finally
+            {
+                // 중복 호출 방지를 위해 성공 분기에서 이미 호출했다면 옵저버 측에서 idempotent 처리 가정
+                OnRecordingStopped?.Invoke();
             }
         }
         
@@ -316,7 +328,7 @@ namespace ProjectVG.Core.Audio
             // 원본 AudioClip 정리하여 메모리 누수 방지
             if (_recordingClip != null)
             {
-                DestroyImmediate(_recordingClip);
+                Destroy(_recordingClip);
             }
             
             _recordingClip = processedClip;
