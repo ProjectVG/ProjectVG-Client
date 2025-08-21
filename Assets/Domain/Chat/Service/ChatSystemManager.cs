@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections;
+using System.Threading;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Core.Audio;
@@ -21,7 +22,7 @@ namespace ProjectVG.Domain.Chat.Service
     {
         [Header("Components")]
         [SerializeField] private ChatBubblePanel? _chatBubblePanel;
-        [SerializeField] private CharacterManager? _chracterManager;
+        [SerializeField] private CharacterManager? _characterManager;
 
         [Header("Chat Settings")]
         [SerializeField] private string _characterId = "44444444-4444-4444-4444-444444444444";
@@ -33,6 +34,7 @@ namespace ProjectVG.Domain.Chat.Service
         private ChatApiService? _chatApiService;
 
         private bool _isInitialized = false;
+        private CancellationTokenSource _cts = new();
         public bool IsInitialized => _isInitialized;
 
         public event Action<string>? OnError;
@@ -90,6 +92,10 @@ namespace ProjectVG.Domain.Chat.Service
                 _messageQueue = new ChatMessageQueue();
                 _chatApiService = ApiServiceManager.Instance.Chat;
 
+                if (_messageQueue != null) {
+                    _messageQueue.OnError += (msg) => OnError?.Invoke(msg);
+                }
+
                 if (_webSocketManager != null) {
                     _webSocketManager.OnChatMessageReceived += ProcessCharacterMessage;
                 }
@@ -104,6 +110,8 @@ namespace ProjectVG.Domain.Chat.Service
 
         private void OnDestroy()
         {
+            _cts.Cancel();
+            _cts.Dispose();
             if (_webSocketManager != null) {
                 _webSocketManager.OnChatMessageReceived -= ProcessCharacterMessage;
             }
@@ -123,10 +131,9 @@ namespace ProjectVG.Domain.Chat.Service
 
             try {
                 // 유저 메시지 전송 시 캐릭터를 Listen 상태로 변경
-                if (_chracterManager != null)
-                {
+                if (_characterManager != null) {
                     var listenAction = new CharacterActionData(CharacterActionType.Listen);
-                    _chracterManager.PlayAction(listenAction);
+                    _characterManager.PlayAction(listenAction);
                 }
 
                 if (_chatApiService != null) {
@@ -186,27 +193,22 @@ namespace ProjectVG.Domain.Chat.Service
                     _chatBubblePanel.CreateBubble(Actor.Character, chatMessage.Text);
                 }
 
-                Debug.Log(_chracterManager);
-                // 캐릭터 액션 실행
-                if (_chracterManager != null)
-                {
-                    Debug.Log(chatMessage.ActionData);
-                    _chracterManager.PlayAction(chatMessage.ActionData);
+                if (_characterManager != null) {
+                    _characterManager.PlayAction(chatMessage.ActionData);
                 }
-                
+
 
                 if (chatMessage.VoiceData != null && _audioManager != null) {
                     _audioManager.PlayVoiceAsync(chatMessage.VoiceData).Forget();
                 }
 
                 float waitTime = CalculateConversationWaitTime(chatMessage);
-                await UniTask.Delay((int)(waitTime * 1000));
+                await UniTask.Delay(TimeSpan.FromSeconds(waitTime), cancellationToken: _cts.Token);
 
                 // 대화 종료 시 캐릭터를 Idle 상태로 변경
-                if (_chracterManager != null)
-                {
+                if (_characterManager != null) {
                     var idleAction = new CharacterActionData(CharacterActionType.Idle);
-                    _chracterManager.PlayAction(idleAction);
+                    _characterManager.PlayAction(idleAction);
                 }
 
                 OnConversationEnd?.Invoke();
@@ -223,15 +225,15 @@ namespace ProjectVG.Domain.Chat.Service
         private float CalculateConversationWaitTime(ChatMessage chatMessage)
         {
             float baseTime = 0f;
-            
+
             if (chatMessage.VoiceData != null && chatMessage.VoiceData.IsPlayable()) {
                 baseTime = chatMessage.VoiceData.Length;
             }
-            
+
             if (baseTime <= 0f) {
                 baseTime = 2f;
             }
-            
+
             return baseTime + 0.5f;
         }
 

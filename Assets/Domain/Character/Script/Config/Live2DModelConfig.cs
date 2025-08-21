@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ProjectVG.Domain.Character.Live2D.Model
 {
@@ -75,7 +76,7 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         [Space(2)]
 
         [Tooltip("시선 추적 사용 여부")]
-        [SerializeField] private bool isLockAtActive = true;
+        [SerializeField] private bool isLookAtActive = true;
         
         [Tooltip("시선 민감도 (값이 클수록 회전이 커짐)")]
         [Range(0f, 30f)]
@@ -83,7 +84,8 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         
         [Tooltip("시선 반응 속도 (값이 작을수록 빠름)")]
         [Range(0f, 5f)]
-        [SerializeField] private float lockAtDamping = 0.0f;
+        [SerializeField, FormerlySerializedAs("lockAtDamping")]
+        private float lookAtDamping = 0.0f;
 
         [Space(5)]
         [Header("────────────────────────────────────────")]
@@ -152,9 +154,11 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         public List<ActionMapping> ActionMappings => actionMappings;
 
         // 세부 설정
-        public bool IsLockAtActive => isLockAtActive;
+        public bool IsLookAtActive => isLookAtActive;
         public float LookSensitivity => lookSensitivity;
-        public float LockAtDamping => lockAtDamping;
+        [Obsolete("Use LookAtDamping instead.")]
+        public float LockAtDamping => lookAtDamping;
+        public float LookAtDamping => lookAtDamping;
         public float Gain => gain;
         public float Smoothing => smoothing;
         public bool UseLipSync => useLipSync;

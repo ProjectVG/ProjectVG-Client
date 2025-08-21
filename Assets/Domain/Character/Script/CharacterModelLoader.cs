@@ -117,9 +117,8 @@ namespace ProjectVG.Domain.Character.Service
 				Debug.LogWarning($"[CharacterModelLoader] Voice AudioSource가 null입니다. 립싱크가 동작하지 않을 수 있습니다: {modelInstance.name}");
 			} else {
 				Debug.Log($"[CharacterModelLoader] Voice AudioSource 설정 완료: {modelInstance.name}, AudioSource: {_voiceAudioSource.name}");
+				mouthController.AudioInput = _voiceAudioSource;
 			}
-
-			mouthController.AudioInput = _voiceAudioSource;
 			mouthController.Gain = config.Gain;
 			mouthController.Smoothing = config.Smoothing;
 			

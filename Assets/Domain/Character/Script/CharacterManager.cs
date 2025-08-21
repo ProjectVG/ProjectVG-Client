@@ -4,6 +4,7 @@ using ProjectVG.Domain.Character.Component;
 using ProjectVG.Core.Audio;
 using ProjectVG.Domain.Chat.Model;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace ProjectVG.Domain.Character.Service
 {
@@ -18,6 +19,7 @@ namespace ProjectVG.Domain.Character.Service
 		private CharacterModelLoader _modelLoader;
 		private GameObject _currentCharacter;
 		private CharacterActionController _currentActionService;
+		private int _loadVersion = 0;
 
         #region Unity Lifecycle
 		void Start()
@@ -35,6 +37,12 @@ namespace ProjectVG.Domain.Character.Service
             if (_modelLoader == null) {
                 _modelLoader = gameObject.AddComponent<CharacterModelLoader>();
                 Debug.Log($"[CharacterManager] CharacterModelLoader가 자동으로 추가되었습니다: {gameObject.name}");
+            }
+
+            if (_modelRegistry == null)
+            {
+                Debug.LogError("[CharacterManager] Live2DModelRegistry가 할당되지 않았습니다. Inspector에서 설정하세요.");
+                return;
             }
 
             // AudioManager에서 Voice AudioSource 가져오기
@@ -69,15 +77,27 @@ namespace ProjectVG.Domain.Character.Service
 		{
 			if (_modelLoader == null) return;
 
+			// 요청 버전 증가(새 요청 식별자)
+			var requestId = Interlocked.Increment(ref _loadVersion);
+
 			// 기존 캐릭터 제거
 			UnloadCurrentCharacter();
 
 			// 새 캐릭터 로드
-			_currentCharacter = await _modelLoader.LoadAndInitializeModelAsync(characterId, _modelTransform);
-			if (_currentCharacter != null)
+			var newCharacter = await _modelLoader.LoadAndInitializeModelAsync(characterId, _modelTransform);
+
+			// 더 최신 요청이 진행되었다면 현재 결과는 폐기
+			if (requestId != _loadVersion)
 			{
-				_currentCharacter.SetActive(true);
+				if (newCharacter != null) Destroy(newCharacter);
+				return;
+			}
+
+			if (newCharacter != null)
+			{
+				_currentCharacter = newCharacter;
 				_currentActionService = _currentCharacter.GetComponent<CharacterActionController>();
+				_currentCharacter.SetActive(true);
 				Debug.Log($"[CharacterManager] 캐릭터 로드 완료: {characterId}");
 			}
 		}
@@ -101,9 +121,7 @@ namespace ProjectVG.Domain.Character.Service
 		/// <param name="actionData">액션 데이터</param>
 		public void PlayAction(CharacterActionData actionData)
 		{
-			Debug.Log(_currentActionService != null && actionData.HasAction());
-            Debug.Log(actionData.HasAction());
-            if (_currentActionService != null && actionData.HasAction())
+			if (_currentActionService != null && actionData.HasAction())
 			{
 				_currentActionService.PlayAction(actionData.ActionType);
 			}

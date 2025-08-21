@@ -211,7 +211,7 @@ namespace ProjectVG.Core.Managers
         {
             try
             {
-                await UnityEngine.SceneManagement.SceneManager.LoadSceneAsync("MainSence");
+                await UnityEngine.SceneManagement.SceneManager.LoadSceneAsync("MainScene");
                 Debug.Log("[SystemManager] MainScene 전환 완료");
             }
             catch (System.Exception ex)

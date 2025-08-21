@@ -708,7 +708,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _chatBubblePanel: {fileID: 2017944365}
-  _chracterManager: {fileID: 873552998}
+  _characterManager: {fileID: 873552998}
   _characterId: 44444444-4444-4444-4444-444444444444
   _userId: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
 --- !u!4 &829067253

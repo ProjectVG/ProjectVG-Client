@@ -79,10 +79,12 @@ namespace ProjectVG.Domain.Chat.Service
         /// <returns></returns>
         public async UniTaskVoid ProcessQueueAsync(Func<ChatMessage, UniTask> processAction)
         {
-            if (_isProcessing)
-                return;
-
-            _isProcessing = true;
+            lock (_queueLock)
+            {
+                if (_isProcessing)
+                    return;
+                _isProcessing = true;
+            }
 
             try {
                 while (true) {
