@@ -19,7 +19,10 @@ namespace ProjectVG.Infrastructure.Network.DTOs.Chat
         
         [JsonProperty("text")]
         public string? Text { get; set; }
-        
+
+        [JsonProperty("action")]
+        public string? Action { get; set; }
+
         [JsonProperty("audio_data")]
         public string? AudioData { get; set; }
         
@@ -28,11 +31,14 @@ namespace ProjectVG.Infrastructure.Network.DTOs.Chat
         
         [JsonProperty("audio_length")]
         public float? AudioLength { get; set; }
-        
+
+        [JsonProperty("used_cost")]
+        public float? UsedCost { get; set; }
+
+        [JsonProperty("remaining_cost")]
+        public float? RemainingCost { get; set; }
+
         [JsonProperty("timestamp")]
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-        
-        [JsonProperty("metadata")]
-        public Dictionary<string, object>? Metadata { get; set; }
     }
 } 

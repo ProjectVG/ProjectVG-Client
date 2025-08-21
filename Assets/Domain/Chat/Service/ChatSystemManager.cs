@@ -36,6 +36,7 @@ namespace ProjectVG.Domain.Chat.Service
         public bool IsInitialized => _isInitialized;
 
         public event Action<string>? OnError;
+        public event Action? OnConversationEnd;
 
         #region Unity Lifecycle
 
@@ -174,21 +175,44 @@ namespace ProjectVG.Domain.Chat.Service
         private async UniTask ProcessMessageAsync(ChatMessage chatMessage)
         {
             try {
-
                 if (_chatBubblePanel != null && !string.IsNullOrEmpty(chatMessage.Text)) {
                     _chatBubblePanel.CreateBubble(Actor.Character, chatMessage.Text);
                 }
 
-                // TODO : 캐릭터 반응을 전달한다. 
+                // TODO : 캐릭터 반응을 전달한다
+                
 
                 if (chatMessage.VoiceData != null && _audioManager != null) {
-                    await _audioManager.PlayVoiceAsync(chatMessage.VoiceData);
+                    _audioManager.PlayVoiceAsync(chatMessage.VoiceData).Forget();
                 }
+
+                float waitTime = CalculateConversationWaitTime(chatMessage);
+                await UniTask.Delay((int)(waitTime * 1000));
+
+                OnConversationEnd?.Invoke();
             }
             catch (Exception ex) {
                 Debug.LogError($"[ChatSystemManager] 캐릭터 메시지 처리 실패: {ex.Message}");
                 OnError?.Invoke($"메시지 처리 실패: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 대화 대기 시간을 계산한다
+        /// </summary>
+        private float CalculateConversationWaitTime(ChatMessage chatMessage)
+        {
+            float baseTime = 0f;
+            
+            if (chatMessage.VoiceData != null && chatMessage.VoiceData.IsPlayable()) {
+                baseTime = chatMessage.VoiceData.Length;
+            }
+            
+            if (baseTime <= 0f) {
+                baseTime = 2f;
+            }
+            
+            return baseTime + 0.5f;
         }
 
         private bool ValidateUserInput(string message)

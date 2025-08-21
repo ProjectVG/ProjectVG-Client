@@ -31,12 +31,6 @@ namespace ProjectVG.Domain.Character.Service
 		void StopAll();
 
 		/// <summary>
-		/// 음성 게이트를 설정한다.
-		/// </summary>
-		/// <param name="isVoicePlaying">음성이 재생 중인지 여부</param>
-		void SetVoiceGate(bool isVoicePlaying);
-
-		/// <summary>
 		/// 현재 액션 상태를 반환한다.
 		/// </summary>
 		/// <returns>액션 상태</returns>
