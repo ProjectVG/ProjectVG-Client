@@ -101,9 +101,11 @@ namespace ProjectVG.Domain.Character.Service
 		/// <param name="actionData">액션 데이터</param>
 		public void PlayAction(CharacterActionData actionData)
 		{
-			if (_currentActionService != null)
+			Debug.Log(_currentActionService != null && actionData.HasAction());
+            Debug.Log(actionData.HasAction());
+            if (_currentActionService != null && actionData.HasAction())
 			{
-				_currentActionService.PlayAction(actionData);
+				_currentActionService.PlayAction(actionData.ActionType);
 			}
 		}
 

@@ -708,11 +708,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _chatBubblePanel: {fileID: 2017944365}
+  _chracterManager: {fileID: 873552998}
   _characterId: 44444444-4444-4444-4444-444444444444
   _userId: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
-  _enableMessageQueue: 1
-  _maxQueueSize: 100
-  _enableLive2DIntegration: 1
 --- !u!4 &829067253
 Transform:
   m_ObjectHideFlags: 0

@@ -122,6 +122,13 @@ namespace ProjectVG.Domain.Chat.Service
             if (!ValidateUserInput(message)) { return; }
 
             try {
+                // 유저 메시지 전송 시 캐릭터를 Listen 상태로 변경
+                if (_chracterManager != null)
+                {
+                    var listenAction = new CharacterActionData(CharacterActionType.Listen);
+                    _chracterManager.PlayAction(listenAction);
+                }
+
                 if (_chatApiService != null) {
                     var response = await _chatApiService.SendChatAsync(
                         message: message,
@@ -179,9 +186,11 @@ namespace ProjectVG.Domain.Chat.Service
                     _chatBubblePanel.CreateBubble(Actor.Character, chatMessage.Text);
                 }
 
+                Debug.Log(_chracterManager);
                 // 캐릭터 액션 실행
-                if (chatMessage.HasActionData() && _chracterManager != null)
+                if (_chracterManager != null)
                 {
+                    Debug.Log(chatMessage.ActionData);
                     _chracterManager.PlayAction(chatMessage.ActionData);
                 }
                 
@@ -192,6 +201,13 @@ namespace ProjectVG.Domain.Chat.Service
 
                 float waitTime = CalculateConversationWaitTime(chatMessage);
                 await UniTask.Delay((int)(waitTime * 1000));
+
+                // 대화 종료 시 캐릭터를 Idle 상태로 변경
+                if (_chracterManager != null)
+                {
+                    var idleAction = new CharacterActionData(CharacterActionType.Idle);
+                    _chracterManager.PlayAction(idleAction);
+                }
 
                 OnConversationEnd?.Invoke();
             }

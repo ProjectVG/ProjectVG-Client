@@ -94,7 +94,7 @@ namespace ProjectVG.Domain.Character.Service
 		{
 			SetupLipSync(modelInstance, config);
 			SetupAutoEyeBlink(modelInstance, config);
-			SetupActionService(modelInstance);
+			SetupActionController(modelInstance);
 		}
 
 		/// <summary>
@@ -164,7 +164,7 @@ namespace ProjectVG.Domain.Character.Service
 		/// <summary>
 		/// 액션 서비스를 설정한다
 		/// </summary>
-		private void SetupActionService(GameObject modelInstance)
+		private void SetupActionController(GameObject modelInstance)
 		{
 			var actionService = modelInstance.GetComponent<CharacterActionController>();
 			if (actionService == null) {
@@ -172,13 +172,13 @@ namespace ProjectVG.Domain.Character.Service
 			}
 
 			var animator = modelInstance.GetComponent<Animator>();
-			if (animator != null) {
-				actionService.Initialize(animator);
-				Debug.Log($"[CharacterModelLoader] CharacterActionController 초기화 완료: {modelInstance.name}");
-			} else {
-				Debug.LogWarning($"[CharacterModelLoader] Animator를 찾을 수 없습니다: {modelInstance.name}");
-			}
-		}
+			if (animator == null) {
+                Debug.LogWarning($"[CharacterModelLoader] Animator를 찾을 수 없습니다: {modelInstance.name}");
+				return;
+            }
+            actionService.Initialize(animator);
+            Debug.Log($"[CharacterModelLoader] CharacterActionController 초기화 완료: {modelInstance.name}");
+        }
 
 		#endregion
 	}
