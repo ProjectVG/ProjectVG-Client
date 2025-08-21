@@ -19,7 +19,7 @@ namespace ProjectVG.Domain.Chat.View
         [SerializeField] private Button? _btnVoiceStop;
         
         
-        private ChatManager? _chatManager;
+        private ChatSystemManager? _chatManager;
         private AudioRecorder? _audioRecorder;
         private STTService? _sttService;
         private bool _isRecording = false;
@@ -72,7 +72,7 @@ namespace ProjectVG.Domain.Chat.View
             SetupChatManager();
         }
         
-        public void SetChatManager(ChatManager chatManager)
+        public void SetChatManager(ChatSystemManager chatManager)
         {
             _chatManager = chatManager;
         }
@@ -239,7 +239,7 @@ namespace ProjectVG.Domain.Chat.View
         {
             if (_chatManager == null)
             {
-                _chatManager = FindAnyObjectByType<ChatManager>();
+                _chatManager = FindAnyObjectByType<ChatSystemManager>();
                 if (_chatManager == null)
                 {
                     Debug.LogWarning("[VoiceInputView] ChatManager를 찾을 수 없습니다. 수동으로 SetChatManager를 호출해주세요.");

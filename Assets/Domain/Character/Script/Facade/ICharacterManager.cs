@@ -3,7 +3,7 @@ namespace ProjectVG.Domain.Character.Service
 	/// <summary>
 	/// 캐릭터 제어를 위한 파사드 인터페이스
 	/// </summary>
-	public interface ICharacterFacade
+	public interface ICharacterManager
 	{
 		/// <summary>
 		/// 파사드를 초기화한다.

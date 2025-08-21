@@ -6,7 +6,7 @@ AudioMixerGroupController:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: SFX
+  m_Name: SFXVolume
   m_AudioMixer: {fileID: 24100000}
   m_GroupID: 603178d5b1e127d429609f70b6dfaf79
   m_Children: []
@@ -128,7 +128,7 @@ AudioMixerGroupController:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: BGM
+  m_Name: BGMVolume
   m_AudioMixer: {fileID: 24100000}
   m_GroupID: 1bf7479df396fed488843a11e4f16671
   m_Children: []
@@ -161,7 +161,7 @@ AudioMixerGroupController:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: UI
+  m_Name: UIVolume
   m_AudioMixer: {fileID: 24100000}
   m_GroupID: 323361331de8fbf46b26000797bc1794
   m_Children: []
@@ -180,7 +180,7 @@ AudioMixerGroupController:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Voice
+  m_Name: VoiceVolume
   m_AudioMixer: {fileID: 24100000}
   m_GroupID: 1c2c7c658d2c3e647adee42f03d62f41
   m_Children: []

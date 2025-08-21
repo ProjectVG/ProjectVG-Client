@@ -20,19 +20,11 @@ namespace ProjectVG.Domain.Character.Service
 		private Live2DModelRegistry _modelRegistry;
 		private readonly Dictionary<string, GameObject> _characterIdToInstance = new Dictionary<string, GameObject>();
 		private string _activeCharacterId;
-		private AudioSource? _voiceAudioSource;
+		private AudioSource _voiceAudioSource;
 
 		#endregion
 
 		#region Unity Lifecycle
-
-		private void Update()
-		{
-			// 립싱크 디버깅을 위한 AudioSource 상태 모니터링
-			if (_voiceAudioSource != null && _voiceAudioSource.isPlaying) {
-				Debug.Log($"[CharacterModelManager] AudioSource 재생중: {_voiceAudioSource.name}, 볼륨: {_voiceAudioSource.volume}, 시간: {_voiceAudioSource.time}");
-			}
-		}
 
 		#endregion
 
@@ -41,7 +33,7 @@ namespace ProjectVG.Domain.Character.Service
 		/// <summary>
 		/// 매니저를 초기화한다
 		/// </summary>
-		public void Initialize(Transform modelRoot, Live2DModelRegistry modelRegistry, AudioSource? voiceAudioSource = null)
+		public void Initialize(Transform modelRoot, Live2DModelRegistry modelRegistry, AudioSource voiceAudioSource)
 		{
 			_modelRoot = modelRoot;
 			_modelRegistry = modelRegistry;

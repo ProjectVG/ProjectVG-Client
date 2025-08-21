@@ -9,7 +9,7 @@ namespace ProjectVG.Domain.Character.Service
 	/// <summary>
 	/// 캐릭터 제어를 단일 진입점으로 제공하는 파사드 구현체.
 	/// </summary>
-	public class CharacterFacade : MonoBehaviour, ICharacterFacade
+	public class CharacterManager : MonoBehaviour, ICharacterManager
 	{
 		[SerializeField] private Transform _modelTransform;
 		[SerializeField] private Live2DModelRegistry _modelRegistry;
@@ -37,7 +37,7 @@ namespace ProjectVG.Domain.Character.Service
 			if (_modelManager == null)
 			{
 				_modelManager = gameObject.AddComponent<CharacterModelManager>();
-				Debug.Log($"[CharacterFacade] CharacterModelManager가 자동으로 추가되었습니다: {gameObject.name}");
+				Debug.Log($"[CharacterManager] CharacterModelManager가 자동으로 추가되었습니다: {gameObject.name}");
 			}
             
             // AudioManager에서 Voice AudioSource 가져오기
@@ -51,7 +51,7 @@ namespace ProjectVG.Domain.Character.Service
                 var scaler = _modelTransform.GetComponent<Live2DModelScaler>();
                 if (scaler == null) {
                     scaler = _modelTransform.gameObject.AddComponent<Live2DModelScaler>();
-                    Debug.Log($"[CharacterFacade] Live2DModelScaler가 자동으로 추가되었습니다: {_modelTransform.name}");
+                    Debug.Log($"[CharacterManager] Live2DModelScaler가 자동으로 추가되었습니다: {_modelTransform.name}");
                 }
             }
         }
@@ -103,7 +103,7 @@ namespace ProjectVG.Domain.Character.Service
 		public CharacterActionHandle ApplyAction(CharacterActionRequest request)
 		{
 			// TODO: 액션 서비스 구현 후 연결
-			Debug.LogWarning($"[CharacterFacade] ApplyAction 아직 구현되지 않음: {request.ActionKey}");
+			Debug.LogWarning($"[CharacterManager] ApplyAction 아직 구현되지 않음: {request.ActionKey}");
 			return new CharacterActionHandle("not_implemented", CharacterActionStatus.Error);
 		}
 
@@ -113,7 +113,7 @@ namespace ProjectVG.Domain.Character.Service
 		public void CancelAction(string actionId)
 		{
 			// TODO: 액션 서비스 구현 후 연결
-			Debug.LogWarning($"[CharacterFacade] CancelAction 아직 구현되지 않음: {actionId}");
+			Debug.LogWarning($"[CharacterManager] CancelAction 아직 구현되지 않음: {actionId}");
 		}
 
 		/// <summary>
@@ -122,7 +122,7 @@ namespace ProjectVG.Domain.Character.Service
 		public void CancelAllActions()
 		{
 			// TODO: 액션 서비스 구현 후 연결
-			Debug.LogWarning("[CharacterFacade] CancelAllActions 아직 구현되지 않음");
+			Debug.LogWarning("[CharacterManager] CancelAllActions 아직 구현되지 않음");
 		}
 
 		/// <summary>
@@ -172,7 +172,7 @@ namespace ProjectVG.Domain.Character.Service
         /// <summary>
         /// AudioManager에서 Voice AudioSource를 가져온다.
         /// </summary>
-        private AudioSource? GetVoiceAudioSource()
+        private AudioSource GetVoiceAudioSource()
         {
             var audioManager = AudioManager.Instance;
             if (audioManager != null && audioManager.IsInitialized)
@@ -183,13 +183,13 @@ namespace ProjectVG.Domain.Character.Service
                     var audioSource = voiceController.GetAudioSource();
                     if (audioSource != null)
                     {
-                        Debug.Log("[CharacterFacade] Voice AudioSource 가져오기 완료");
+                        Debug.Log("[CharacterManager] Voice AudioSource 가져오기 완료");
                         return audioSource;
                     }
                 }
             }
             
-            Debug.LogWarning("[CharacterFacade] AudioManager가 초기화되지 않았거나 Voice AudioSource를 찾을 수 없습니다.");
+            Debug.LogWarning("[CharacterManager] AudioManager가 초기화되지 않았거나 Voice AudioSource를 찾을 수 없습니다.");
             return null;
         }
     }

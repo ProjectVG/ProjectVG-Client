@@ -20,7 +20,7 @@ namespace ProjectVG.Core.Managers
         [SerializeField] private HttpApiClient? _httpApiClient;
         [SerializeField] private AudioManager? _audioManager;
         [SerializeField] private LoadingManager? _loadingManager;
-        [SerializeField] private ChatManager? _chatManager;
+        [SerializeField] private ChatSystemManager? _chatManager;
 
         
         [Header("Settings")]

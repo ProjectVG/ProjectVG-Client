@@ -16,7 +16,7 @@ namespace ProjectVG.Domain.Character.Service
 		/// <param name="modelRoot">모델 위치</param>
 		/// <param name="modelRegistry">모델 등록자</param>
 		/// <param name="voiceAudioSource">음성 AudioSource (선택사항)</param>
-		public void Initialize(Transform modelRoot, Live2DModelRegistry modelRegistry, AudioSource? voiceAudioSource = null);
+		public void Initialize(Transform modelRoot, Live2DModelRegistry modelRegistry, AudioSource voiceAudioSource);
 
         /// <summary>
         /// 캐릭터 모델을 로드한다.

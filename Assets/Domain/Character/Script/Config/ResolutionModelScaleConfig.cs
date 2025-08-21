@@ -40,11 +40,6 @@ namespace ProjectVG.Domain.Character.Config
 			var scale = CalculateScaleForResolution(currentResolution);
 			var clampedScale = Mathf.Clamp(scale, minScale, maxScale);
 			
-			Debug.Log($"[ResolutionModelScaleConfig] 스케일 계산 과정:\n" +
-					 $"계산된 스케일: {scale:F3}배\n" +
-					 $"제한 범위: {minScale:F3} ~ {maxScale:F3}\n" +
-					 $"최종 스케일: {clampedScale:F3}배");
-			
 			return clampedScale;
 		}
 		
@@ -58,18 +53,8 @@ namespace ProjectVG.Domain.Character.Config
 			
 			if (bestRule != null)
 			{
-				Debug.Log($"[ResolutionModelScaleConfig] 최적 규칙 매칭 성공!\n" +
-						 $"해상도: {resolution.x} x {resolution.y}\n" +
-						 $"적용 규칙: {bestRule.Description}\n" +
-						 $"규칙 범위: {bestRule.MinWidth}x{bestRule.MinHeight} ~ {bestRule.MaxWidth}x{bestRule.MaxHeight}\n" +
-						 $"스케일: {bestRule.Scale:F3}배");
 				return bestRule.Scale;
 			}
-			
-			Debug.Log($"[ResolutionModelScaleConfig] 규칙 매칭 없음\n" +
-					 $"해상도: {resolution.x} x {resolution.y}\n" +
-					 $"자동 계산 모드: {scaleMode}\n" +
-					 $"기준 해상도: {referenceResolution.x} x {referenceResolution.y}");
 			
 			// 자동 계산
 			switch (scaleMode)
@@ -134,12 +119,6 @@ namespace ProjectVG.Domain.Character.Config
 				}
 			}
 			
-			Debug.Log($"[ResolutionModelScaleConfig] 최적 규칙 선택 과정:\n" +
-					 $"해상도: {resolution.x} x {resolution.y}\n" +
-					 $"매칭된 규칙 수: {matchingRules.Count}\n" +
-					 $"선택된 규칙: {bestRule?.Description}\n" +
-					 $"적합도 점수: {bestScore:F3}");
-			
 			return bestRule;
 		}
 		
@@ -148,36 +127,21 @@ namespace ProjectVG.Domain.Character.Config
 		/// </summary>
 		private float CalculateRuleFitnessScore(Vector2 resolution, ResolutionScaleRule rule)
 		{
-			// 규칙의 중앙점 계산
 			var ruleCenterWidth = (rule.MinWidth + rule.MaxWidth) / 2f;
 			var ruleCenterHeight = (rule.MinHeight + rule.MaxHeight) / 2f;
 			
-			// 현재 해상도와 규칙 중앙점 간의 거리 계산
 			var widthDistance = Mathf.Abs(resolution.x - ruleCenterWidth);
 			var heightDistance = Mathf.Abs(resolution.y - ruleCenterHeight);
 			
-			// 유클리드 거리 계산
 			var distance = Mathf.Sqrt(widthDistance * widthDistance + heightDistance * heightDistance);
 			
-			// 규칙의 크기 범위 고려 (범위가 작을수록 더 구체적이므로 가중치 부여)
 			var ruleWidthRange = rule.MaxWidth - rule.MinWidth;
 			var ruleHeightRange = rule.MaxHeight - rule.MinHeight;
 			var ruleArea = ruleWidthRange * ruleHeightRange;
 			
-			// 범위가 작을수록 더 구체적이므로 보너스 점수
 			var specificityBonus = Mathf.Max(0, 1000f - ruleArea) / 1000f;
 			
-			// 최종 점수 = 거리 - 구체성 보너스 (점수가 낮을수록 더 적합)
 			var finalScore = distance - specificityBonus;
-			
-			Debug.Log($"[ResolutionModelScaleConfig] 규칙 적합도 계산:\n" +
-					 $"규칙: {rule.Description}\n" +
-					 $"규칙 범위: {rule.MinWidth}x{rule.MinHeight} ~ {rule.MaxWidth}x{rule.MaxHeight}\n" +
-					 $"규칙 중앙: {ruleCenterWidth:F0}x{ruleCenterHeight:F0}\n" +
-					 $"현재 해상도: {resolution.x:F0}x{resolution.y:F0}\n" +
-					 $"거리: {distance:F2}\n" +
-					 $"구체성 보너스: {specificityBonus:F3}\n" +
-					 $"최종 점수: {finalScore:F3}");
 			
 			return finalScore;
 		}
