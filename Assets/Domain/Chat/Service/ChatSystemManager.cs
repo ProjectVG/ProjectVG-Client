@@ -179,7 +179,11 @@ namespace ProjectVG.Domain.Chat.Service
                     _chatBubblePanel.CreateBubble(Actor.Character, chatMessage.Text);
                 }
 
-                // TODO : 캐릭터 반응을 전달한다
+                // 캐릭터 액션 실행
+                if (chatMessage.HasActionData() && _chracterManager != null)
+                {
+                    _chracterManager.PlayAction(chatMessage.ActionData);
+                }
                 
 
                 if (chatMessage.VoiceData != null && _audioManager != null) {
