@@ -157,7 +157,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                 try
                 {
                     var contextTask = _httpListener.GetContextAsync();
-                    var context = await contextTask.WithCancellation(cancellationToken);
+                    var context = await contextTask.AsUniTask().AttachExternalCancellation(cancellationToken);
                     
                     _ = ProcessSingleRequestAsync(context);
                 }

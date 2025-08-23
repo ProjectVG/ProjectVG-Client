@@ -339,9 +339,9 @@ namespace ProjectVG.Infrastructure.Auth.WebGL
                 throw new InvalidOperationException("HttpApiClient를 사용할 수 없습니다.");
             }
             
-            var response = await apiClient.GetAsync<dynamic>("/auth/validate-refresh-cookie");
+            var response = await apiClient.GetAsync<BFFValidationResponse>("/auth/validate-refresh-cookie");
             
-            if (response?.is_valid == true)
+            if (response?.IsValid == true)
             {
                 // BFF에서는 토큰 값 자체를 반환하지 않고 유효성만 확인
                 return new RefreshToken("bff_token", 3600); // 임시 토큰
@@ -370,8 +370,8 @@ namespace ProjectVG.Infrastructure.Auth.WebGL
                 throw new InvalidOperationException("HttpApiClient를 사용할 수 없습니다.");
             }
             
-            var response = await apiClient.GetAsync<dynamic>("/auth/csrf-token");
-            return response?.token?.ToString();
+            var response = await apiClient.GetAsync<CSRFTokenResponse>("/auth/csrf-token");
+            return response?.Token;
         }
         
         private async UniTask<bool> SetSessionViaBFFAsync(string sessionId, int maxAgeSeconds)
@@ -492,5 +492,34 @@ namespace ProjectVG.Infrastructure.Auth.WebGL
         }
         
         #endregion
+    }
+    
+    /// <summary>
+    /// BFF 토큰 검증 응답 모델
+    /// </summary>
+    [Serializable]
+    public class BFFValidationResponse
+    {
+        [JsonProperty("is_valid")]
+        public bool IsValid { get; set; }
+        
+        [JsonProperty("expires_at")]
+        public DateTime? ExpiresAt { get; set; }
+        
+        [JsonProperty("device_id")]
+        public string DeviceId { get; set; }
+    }
+    
+    /// <summary>
+    /// CSRF 토큰 응답 모델
+    /// </summary>
+    [Serializable]
+    public class CSRFTokenResponse
+    {
+        [JsonProperty("token")]
+        public string Token { get; set; }
+        
+        [JsonProperty("expires_at")]
+        public DateTime? ExpiresAt { get; set; }
     }
 }

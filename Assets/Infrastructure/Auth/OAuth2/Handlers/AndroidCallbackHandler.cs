@@ -231,8 +231,8 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
             }
         }
         
-        // 사용자가 브라우저에서 취소한 경우 호출
-        public void OnCallbackCancelled()
+        // 사용자가 브라우저에서 취소한 경우 호출되는 메서드
+        public void HandleCallbackCancellation()
         {
             if (!_isListening)
             {
