@@ -17,8 +17,12 @@ namespace ProjectVG.Infrastructure.Auth.Examples
         [Header("UI 컴포넌트")]
         [SerializeField] private Button loginButton;
         [SerializeField] private Button logoutButton;
+        [SerializeField] private Button refreshButton;
+        [SerializeField] private Button clearButton;
+        [SerializeField] private Button checkButton;
         [SerializeField] private TextMeshProUGUI statusText;
         [SerializeField] private TextMeshProUGUI userInfoText;
+        [SerializeField] private TextMeshProUGUI debugText;
         
         [Header("설정")]
         [SerializeField] private ServerOAuth2Config oauth2Config;
@@ -27,6 +31,8 @@ namespace ProjectVG.Infrastructure.Auth.Examples
         private ServerOAuth2Config OAuth2Config => oauth2Config ?? ServerOAuth2Config.Instance;
         
         private ServerOAuth2Provider _oauth2Provider;
+        private TokenManager _tokenManager;
+        private TokenRefreshService _refreshService;
         private TokenSet _currentTokenSet;
         private bool _isLoggedIn = false;
         
@@ -35,6 +41,7 @@ namespace ProjectVG.Infrastructure.Auth.Examples
         private void Start()
         {
             InitializeOAuth2Provider();
+            InitializeTokenServices();
             SetupEventHandlers();
             UpdateUI();
         }
@@ -44,6 +51,23 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             // 이벤트 핸들러 해제
             if (loginButton != null) loginButton.onClick.RemoveAllListeners();
             if (logoutButton != null) logoutButton.onClick.RemoveAllListeners();
+            if (refreshButton != null) refreshButton.onClick.RemoveAllListeners();
+            if (clearButton != null) clearButton.onClick.RemoveAllListeners();
+            if (checkButton != null) checkButton.onClick.RemoveAllListeners();
+            
+            // Token 서비스 이벤트 해제
+            if (_tokenManager != null)
+            {
+                _tokenManager.OnTokensUpdated -= OnTokensUpdated;
+                _tokenManager.OnTokensExpired -= OnTokensExpired;
+                _tokenManager.OnTokensCleared -= OnTokensCleared;
+            }
+            
+            if (_refreshService != null)
+            {
+                _refreshService.OnTokenRefreshed -= OnTokenRefreshed;
+                _refreshService.OnTokenRefreshFailed -= OnTokenRefreshFailed;
+            }
         }
         
         #endregion
@@ -92,6 +116,21 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             Debug.Log(_oauth2Provider.GetDebugInfo());
         }
         
+        private void InitializeTokenServices()
+        {
+            _tokenManager = TokenManager.Instance;
+            _refreshService = TokenRefreshService.Instance;
+            
+            // 이벤트 구독
+            _tokenManager.OnTokensUpdated += OnTokensUpdated;
+            _tokenManager.OnTokensExpired += OnTokensExpired;
+            _tokenManager.OnTokensCleared += OnTokensCleared;
+            _refreshService.OnTokenRefreshed += OnTokenRefreshed;
+            _refreshService.OnTokenRefreshFailed += OnTokenRefreshFailed;
+            
+            Debug.Log("[ServerOAuth2Example] Token 서비스 초기화 완료");
+        }
+        
         private void SetupEventHandlers()
         {
             if (loginButton != null)
@@ -99,6 +138,15 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             
             if (logoutButton != null)
                 logoutButton.onClick.AddListener(() => _ = OnLogoutButtonClicked());
+            
+            if (refreshButton != null)
+                refreshButton.onClick.AddListener(() => _ = OnRefreshButtonClicked());
+            
+            if (clearButton != null)
+                clearButton.onClick.AddListener(OnClearButtonClicked);
+            
+            if (checkButton != null)
+                checkButton.onClick.AddListener(() => _ = OnCheckButtonClicked());
         }
         
         #endregion
@@ -170,6 +218,9 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             {
                 ShowStatus("로그아웃 중...", Color.blue);
                 
+                // TokenManager에서 토큰 정리
+                _tokenManager.ClearTokens();
+                
                 // 토큰 정리
                 _currentTokenSet?.Clear();
                 _currentTokenSet = null;
@@ -235,6 +286,124 @@ namespace ProjectVG.Infrastructure.Auth.Examples
         
         #endregion
         
+        #region Token Management Buttons
+        
+        private async UniTaskVoid OnRefreshButtonClicked()
+        {
+            try
+            {
+                ShowStatus("토큰 갱신 시작...", Color.yellow);
+                
+                var success = await _refreshService.ForceRefreshAsync();
+                
+                if (success)
+                {
+                    ShowStatus("토큰 갱신 성공!", Color.green);
+                    // 갱신된 토큰으로 현재 토큰 세트 업데이트
+                    _currentTokenSet = _tokenManager.LoadTokens();
+                }
+                else
+                {
+                    ShowStatus("토큰 갱신 실패", Color.red);
+                }
+                
+                UpdateUI();
+            }
+            catch (System.Exception ex)
+            {
+                ShowStatus($"토큰 갱신 오류: {ex.Message}", Color.red);
+                Debug.LogError($"[ServerOAuth2Example] 토큰 갱신 실패: {ex.Message}");
+            }
+        }
+        
+        private void OnClearButtonClicked()
+        {
+            try
+            {
+                _tokenManager.ClearTokens();
+                _currentTokenSet = null;
+                _isLoggedIn = false;
+                ShowStatus("토큰 삭제 완료", Color.blue);
+                UpdateUI();
+            }
+            catch (System.Exception ex)
+            {
+                ShowStatus($"토큰 삭제 오류: {ex.Message}", Color.red);
+                Debug.LogError($"[ServerOAuth2Example] 토큰 삭제 실패: {ex.Message}");
+            }
+        }
+        
+        private async UniTaskVoid OnCheckButtonClicked()
+        {
+            try
+            {
+                ShowStatus("토큰 상태 확인 중...", Color.yellow);
+                
+                var hasValidToken = await _refreshService.EnsureValidTokenAsync();
+                
+                if (hasValidToken)
+                {
+                    ShowStatus("유효한 토큰이 있습니다.", Color.green);
+                    // 유효한 토큰으로 현재 토큰 세트 업데이트
+                    _currentTokenSet = _tokenManager.LoadTokens();
+                }
+                else
+                {
+                    ShowStatus("유효한 토큰이 없습니다.", Color.red);
+                }
+                
+                UpdateUI();
+            }
+            catch (System.Exception ex)
+            {
+                ShowStatus($"토큰 확인 오류: {ex.Message}", Color.red);
+                Debug.LogError($"[ServerOAuth2Example] 토큰 확인 실패: {ex.Message}");
+            }
+        }
+        
+        #endregion
+        
+        #region Token Events
+        
+        private void OnTokensUpdated(TokenSet tokenSet)
+        {
+            Debug.Log("[ServerOAuth2Example] 토큰 업데이트됨");
+            _currentTokenSet = tokenSet;
+            UpdateUI();
+        }
+        
+        private void OnTokensExpired()
+        {
+            Debug.Log("[ServerOAuth2Example] 토큰 만료됨");
+            ShowStatus("토큰이 만료되었습니다.", Color.red);
+            UpdateUI();
+        }
+        
+        private void OnTokensCleared()
+        {
+            Debug.Log("[ServerOAuth2Example] 토큰 삭제됨");
+            _currentTokenSet = null;
+            _isLoggedIn = false;
+            ShowStatus("토큰이 삭제되었습니다.", Color.blue);
+            UpdateUI();
+        }
+        
+        private void OnTokenRefreshed(string newAccessToken)
+        {
+            Debug.Log("[ServerOAuth2Example] 토큰 갱신 성공");
+            ShowStatus("토큰 갱신 성공!", Color.green);
+            UpdateUI();
+        }
+        
+        private void OnTokenRefreshFailed(string error)
+        {
+            Debug.Log($"[ServerOAuth2Example] 토큰 갱신 실패: {error}");
+            ShowStatus($"토큰 갱신 실패: {error}", Color.red);
+            UpdateUI();
+        }
+        
+        #endregion
+        
         #region UI Management
         
         private void UpdateUI()
@@ -244,12 +413,24 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             
             if (logoutButton != null)
                 logoutButton.interactable = _isLoggedIn;
+            
+            if (refreshButton != null)
+                refreshButton.interactable = _isLoggedIn;
+            
+            if (clearButton != null)
+                clearButton.interactable = _isLoggedIn;
+            
+            if (checkButton != null)
+                checkButton.interactable = true; // 항상 활성화
         }
         
         private void SetButtonsEnabled(bool enabled)
         {
             if (loginButton != null) loginButton.interactable = enabled && !_isLoggedIn;
             if (logoutButton != null) logoutButton.interactable = enabled && _isLoggedIn;
+            if (refreshButton != null) refreshButton.interactable = enabled && _isLoggedIn;
+            if (clearButton != null) clearButton.interactable = enabled && _isLoggedIn;
+            if (checkButton != null) checkButton.interactable = enabled;
         }
         
         private void ShowStatus(string message, Color color)
@@ -276,6 +457,16 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             info += $"갱신 필요: {_currentTokenSet.NeedsRefresh()}";
             
             userInfoText.text = info;
+            
+            // 디버그 정보도 업데이트
+            if (debugText != null)
+            {
+                var debugInfo = "=== TokenManager 상태 ===\n";
+                debugInfo += _tokenManager.GetDebugInfo();
+                debugInfo += "\n=== TokenRefreshService 상태 ===\n";
+                debugInfo += _refreshService.GetDebugInfo();
+                debugText.text = debugInfo;
+            }
         }
         
         /// <summary>
@@ -332,6 +523,11 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             if (userInfoText != null)
             {
                 userInfoText.text = "로그인하여 토큰 정보를 확인하세요.";
+            }
+            
+            if (debugText != null)
+            {
+                debugText.text = "토큰 정보가 없습니다.";
             }
         }
         

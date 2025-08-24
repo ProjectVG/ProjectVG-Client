@@ -269,7 +269,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                 // 3. TokenSet 생성
                 var accessTokenModel = new AccessToken(accessToken, expiresIn, "Bearer", "oauth2");
                 var refreshTokenModel = !string.IsNullOrEmpty(refreshToken) 
-                    ? new RefreshToken(refreshToken, expiresIn * 2, userId) 
+                    ? new RefreshToken(refreshToken, expiresIn * 2, userId)  // userId를 DeviceId로 사용
                     : null;
                 
                 var tokenSet = new TokenSet(accessTokenModel, refreshTokenModel);
@@ -283,6 +283,21 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                 Debug.Log($"Expires In: {expiresIn}초");
                 Debug.Log($"User ID: {userId}");
                 Debug.Log("=== 토큰 수신 완료 ===");
+                
+                // TokenManager에 토큰 저장
+                try
+                {
+                    Debug.Log("=== 🔐 ServerOAuth2Provider TokenManager 저장 시작 ===");
+                    var tokenManager = TokenManager.Instance;
+                    tokenManager.SaveTokens(tokenSet);
+                    Debug.Log("[ServerOAuth2Provider] TokenManager에 토큰 저장 완료");
+                    Debug.Log("=== TokenManager 저장 완료 ===");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[ServerOAuth2Provider] TokenManager 토큰 저장 실패: {ex.Message}");
+                    // 토큰 저장 실패해도 토큰은 반환 (사용자가 직접 저장할 수 있도록)
+                }
                 
                 return tokenSet;
             }

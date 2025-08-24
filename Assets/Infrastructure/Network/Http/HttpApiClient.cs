@@ -71,6 +71,32 @@ namespace ProjectVG.Infrastructure.Network.Http
             AddDefaultHeader(AUTHORIZATION_HEADER, $"{BEARER_PREFIX}{token}");
         }
 
+        /// <summary>
+        /// TokenManager에서 자동으로 토큰 설정
+        /// </summary>
+        public void SetAuthTokenFromManager()
+        {
+            try
+            {
+                var tokenManager = ProjectVG.Infrastructure.Auth.TokenManager.Instance;
+                var accessToken = tokenManager.GetAccessToken();
+                
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    SetAuthToken(accessToken);
+                    Debug.Log("[HttpApiClient] TokenManager에서 Access Token 설정 완료");
+                }
+                else
+                {
+                    Debug.LogWarning("[HttpApiClient] TokenManager에서 유효한 Access Token을 찾을 수 없습니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HttpApiClient] TokenManager에서 토큰 설정 실패: {ex.Message}");
+            }
+        }
+
         public async UniTask<T> GetAsync<T>(string endpoint, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
         {
             // 자동 초기화
