@@ -37,7 +37,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             var serverRequest = CreateServerRequest(request);
             LogRequestDetails(serverRequest);
             
-            return await _httpClient.PostAsync<ChatResponse>(CHAT_ENDPOINT, serverRequest, requiresSession: true, cancellationToken: cancellationToken);
+            return await _httpClient.PostAsync<ChatResponse>(CHAT_ENDPOINT, serverRequest, requiresSession: true, requiresAuth: true, cancellationToken: cancellationToken);
         }
 
         /// <summary>

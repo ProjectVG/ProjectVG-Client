@@ -67,7 +67,7 @@ namespace ProjectVG.Infrastructure.Network.Services
                 string forcedLanguage = "ko";
                 string endpoint = $"stt/transcribe?language={forcedLanguage}";
                 
-                var response = await _httpClient.PostFormDataAsync<STTResponse>(endpoint, formData, fileNames, cancellationToken: cancellationToken);
+                var response = await _httpClient.PostFormDataAsync<STTResponse>(endpoint, formData, fileNames, null, requiresAuth: false, cancellationToken: cancellationToken);
                 
                 if (response != null && !string.IsNullOrEmpty(response.Text))
                 {

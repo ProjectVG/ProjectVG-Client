@@ -64,6 +64,18 @@ namespace ProjectVG.Infrastructure.Network.Http
         }
 
         /// <summary>
+        /// 기본 헤더 제거
+        /// </summary>
+        public void RemoveDefaultHeader(string key)
+        {
+            if (defaultHeaders.ContainsKey(key))
+            {
+                defaultHeaders.Remove(key);
+                Debug.Log($"[HttpApiClient] 기본 헤더 제거: {key}");
+            }
+        }
+
+        /// <summary>
         /// 인증 토큰 설정
         /// </summary>
         public void SetAuthToken(string token)
@@ -78,26 +90,31 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             try
             {
+                Debug.Log("[HttpApiClient] TokenManager에서 Access Token 요청 중...");
                 var tokenManager = ProjectVG.Infrastructure.Auth.TokenManager.Instance;
                 var accessToken = tokenManager.GetAccessToken();
                 
                 if (!string.IsNullOrEmpty(accessToken))
                 {
                     SetAuthToken(accessToken);
-                    Debug.Log("[HttpApiClient] TokenManager에서 Access Token 설정 완료");
+                    Debug.Log($"[HttpApiClient] TokenManager에서 Access Token 설정 완료 (토큰 길이: {accessToken.Length})");
                 }
                 else
                 {
                     Debug.LogWarning("[HttpApiClient] TokenManager에서 유효한 Access Token을 찾을 수 없습니다.");
+                    // Authorization 헤더 제거
+                    RemoveDefaultHeader(AUTHORIZATION_HEADER);
                 }
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[HttpApiClient] TokenManager에서 토큰 설정 실패: {ex.Message}");
+                // Authorization 헤더 제거
+                RemoveDefaultHeader(AUTHORIZATION_HEADER);
             }
         }
 
-        public async UniTask<T> GetAsync<T>(string endpoint, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        public async UniTask<T> GetAsync<T>(string endpoint, Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
             // 자동 초기화
             if (!IsInitialized)
@@ -106,8 +123,14 @@ namespace ProjectVG.Infrastructure.Network.Http
                 Initialize(null);
             }
             
+            // 인증이 필요한 경우 TokenManager에서 토큰 설정
+            if (requiresAuth)
+            {
+                SetAuthTokenFromManager();
+            }
+            
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
-            Debug.Log($"[HttpApiClient] GET 요청 시작: {url}");
+            Debug.Log($"[HttpApiClient] GET 요청 시작: {url} (인증 필요: {requiresAuth})");
             Debug.Log($"[HttpApiClient] 헤더: {JsonConvert.SerializeObject(headers)}");
             return await SendJsonRequestAsync<T>(url, UnityWebRequest.kHttpVerbGET, null, headers, cancellationToken);
         }
@@ -115,34 +138,68 @@ namespace ProjectVG.Infrastructure.Network.Http
         /// <summary>
         /// GET 요청 (HTTP 헤더 포함 응답)
         /// </summary>
-        public async UniTask<(T Data, Dictionary<string, string> Headers)> GetWithHeadersAsync<T>(string endpoint, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        public async UniTask<(T Data, Dictionary<string, string> Headers)> GetWithHeadersAsync<T>(string endpoint, Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
+            // 인증이 필요한 경우 TokenManager에서 토큰 설정
+            if (requiresAuth)
+            {
+                SetAuthTokenFromManager();
+            }
+            
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
+            Debug.Log($"[HttpApiClient] GET With Headers 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendJsonRequestWithHeadersAsync<T>(url, UnityWebRequest.kHttpVerbGET, null, headers, cancellationToken);
         }
 
-        public async UniTask<T> PostAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, CancellationToken cancellationToken = default)
+        public async UniTask<T> PostAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
+            // 인증이 필요한 경우 TokenManager에서 토큰 설정
+            if (requiresAuth)
+            {
+                SetAuthTokenFromManager();
+            }
+            
             var url = GetFullUrl(endpoint);
             var jsonData = SerializeData(data, requiresSession);
+            Debug.Log($"[HttpApiClient] POST 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendJsonRequestAsync<T>(url, UnityWebRequest.kHttpVerbPOST, jsonData, headers, cancellationToken);
         }
 
-        public async UniTask<T> PutAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, CancellationToken cancellationToken = default)
+        public async UniTask<T> PutAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
+            // 인증이 필요한 경우 TokenManager에서 토큰 설정
+            if (requiresAuth)
+            {
+                SetAuthTokenFromManager();
+            }
+            
             var url = GetFullUrl(endpoint);
             var jsonData = SerializeData(data, requiresSession);
+            Debug.Log($"[HttpApiClient] PUT 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendJsonRequestAsync<T>(url, UnityWebRequest.kHttpVerbPUT, jsonData, headers, cancellationToken);
         }
 
-        public async UniTask<T> DeleteAsync<T>(string endpoint, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        public async UniTask<T> DeleteAsync<T>(string endpoint, Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
+            // 인증이 필요한 경우 TokenManager에서 토큰 설정
+            if (requiresAuth)
+            {
+                SetAuthTokenFromManager();
+            }
+            
             var url = GetFullUrl(endpoint);
+            Debug.Log($"[HttpApiClient] DELETE 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendJsonRequestAsync<T>(url, UnityWebRequest.kHttpVerbDELETE, null, headers, cancellationToken);
         }
 
-        public async UniTask<T> UploadFileAsync<T>(string endpoint, byte[] fileData, string fileName, string fieldName = "file", Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        public async UniTask<T> UploadFileAsync<T>(string endpoint, byte[] fileData, string fileName, string fieldName = "file", Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
+            // 인증이 필요한 경우 TokenManager에서 토큰 설정
+            if (requiresAuth)
+            {
+                SetAuthTokenFromManager();
+            }
+            
             var url = GetFullUrl(endpoint);
             var formData = new Dictionary<string, object>
             {
@@ -152,17 +209,31 @@ namespace ProjectVG.Infrastructure.Network.Http
             {
                 { fieldName, fileName }
             };
+            Debug.Log($"[HttpApiClient] Upload File 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendFormDataRequestAsync<T>(url, formData, fileNames, headers, cancellationToken);
         }
         
-        public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> headers, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
+            // 인증이 필요한 경우 TokenManager에서 토큰 설정
+            if (requiresAuth)
+            {
+                SetAuthTokenFromManager();
+            }
+            
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
+            Debug.Log($"[HttpApiClient] Post Form Data 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendFormDataRequestAsync<T>(url, formData, null, headers, cancellationToken);
         }
 
-        public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> fileNames, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> fileNames, Dictionary<string, string> headers, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
+            // 인증이 필요한 경우 TokenManager에서 토큰 설정
+            if (requiresAuth)
+            {
+                SetAuthTokenFromManager();
+            }
+            
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
             
             // 파일 크기 검사
@@ -182,6 +253,7 @@ namespace ProjectVG.Infrastructure.Network.Http
                 }
             }
             
+            Debug.Log($"[HttpApiClient] Post Form Data with Files 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendFormDataRequestAsync<T>(url, formData, fileNames, headers, cancellationToken);
         }
 

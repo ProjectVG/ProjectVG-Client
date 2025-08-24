@@ -130,8 +130,8 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                 
                 Debug.Log($"[ServerOAuth2Provider] 최종 URL: {authorizeUrl}");
                 
-                // 3. 서버 API 호출 (GET 요청)
-                var response = await _httpClient.GetAsync<ServerOAuth2AuthorizeResponse>(authorizeUrl);
+                // 3. 서버 API 호출 (GET 요청) - 인증 불필요
+                var response = await _httpClient.GetAsync<ServerOAuth2AuthorizeResponse>(authorizeUrl, requiresAuth: false);
                 
                 if (response == null)
                 {
@@ -227,9 +227,9 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
             {
                 Debug.Log($"[ServerOAuth2Provider] 토큰 요청 시작 - State: {state}");
                 
-                // 1. 서버 토큰 API 호출 (HTTP 헤더 포함)
+                // 1. 서버 토큰 API 호출 (HTTP 헤더 포함) - 인증 불필요
                 var tokenUrl = $"{_config.ServerUrl}/auth/oauth2/token?state={Uri.EscapeDataString(state)}";
-                var (response, headers) = await _httpClient.GetWithHeadersAsync<ServerOAuth2TokenResponse>(tokenUrl);
+                var (response, headers) = await _httpClient.GetWithHeadersAsync<ServerOAuth2TokenResponse>(tokenUrl, requiresAuth: false);
                 
                 if (response == null)
                 {
