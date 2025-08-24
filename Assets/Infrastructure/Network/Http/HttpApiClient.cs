@@ -73,8 +73,26 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         public async UniTask<T> GetAsync<T>(string endpoint, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
         {
+            // 자동 초기화
+            if (!IsInitialized)
+            {
+                Debug.LogWarning("[HttpApiClient] 자동 초기화 수행");
+                Initialize(null);
+            }
+            
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
+            Debug.Log($"[HttpApiClient] GET 요청 시작: {url}");
+            Debug.Log($"[HttpApiClient] 헤더: {JsonConvert.SerializeObject(headers)}");
             return await SendJsonRequestAsync<T>(url, UnityWebRequest.kHttpVerbGET, null, headers, cancellationToken);
+        }
+
+        /// <summary>
+        /// GET 요청 (HTTP 헤더 포함 응답)
+        /// </summary>
+        public async UniTask<(T Data, Dictionary<string, string> Headers)> GetWithHeadersAsync<T>(string endpoint, Dictionary<string, string> headers = null, CancellationToken cancellationToken = default)
+        {
+            var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
+            return await SendJsonRequestWithHeadersAsync<T>(url, UnityWebRequest.kHttpVerbGET, null, headers, cancellationToken);
         }
 
         public async UniTask<T> PostAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, CancellationToken cancellationToken = default)
@@ -205,6 +223,14 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         private async UniTask<T> SendJsonRequestAsync<T>(string url, string method, string jsonData, Dictionary<string, string> headers, CancellationToken cancellationToken)
         {
+            Debug.Log($"[HttpApiClient] SendJsonRequestAsync 시작");
+            Debug.Log($"[HttpApiClient] URL: {url}");
+            Debug.Log($"[HttpApiClient] Method: {method}");
+            Debug.Log($"[HttpApiClient] JSON Data: {jsonData}");
+            Debug.Log($"[HttpApiClient] Headers: {JsonConvert.SerializeObject(headers)}");
+            Debug.Log($"[HttpApiClient] IsInitialized: {IsInitialized}");
+            Debug.Log($"[HttpApiClient] cancellationTokenSource null: {cancellationTokenSource == null}");
+            
             var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
 
             for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
@@ -219,6 +245,43 @@ namespace ProjectVG.Infrastructure.Network.Http
                     if (request.result == UnityWebRequest.Result.Success)
                     {
                         return ParseResponse<T>(request);
+                    }
+                    else
+                    {
+                        await HandleRequestFailure(request, attempt, combinedCancellationToken);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (ex is not ApiException)
+                {
+                    await HandleRequestException(ex, attempt, combinedCancellationToken);
+                }
+            }
+
+            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 요청 실패", 0, "최대 재시도 횟수 초과");
+        }
+
+        private async UniTask<(T Data, Dictionary<string, string> Headers)> SendJsonRequestWithHeadersAsync<T>(string url, string method, string jsonData, Dictionary<string, string> headers, CancellationToken cancellationToken)
+        {
+            var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
+
+            for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
+            {
+                try
+                {
+                    using var request = CreateJsonRequest(url, method, jsonData, headers);
+                    
+                    var operation = request.SendWebRequest();
+                    await operation.WithCancellation(combinedCancellationToken);
+
+                    if (request.result == UnityWebRequest.Result.Success)
+                    {
+                        var data = ParseResponse<T>(request);
+                        var responseHeaders = ExtractResponseHeaders(request);
+                        return (data, responseHeaders);
                     }
                     else
                     {
@@ -304,7 +367,21 @@ namespace ProjectVG.Infrastructure.Network.Http
 
         private CancellationToken CreateCombinedCancellationToken(CancellationToken cancellationToken)
         {
-            return CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellationTokenSource.Token).Token;
+            if (cancellationTokenSource == null)
+            {
+                Debug.LogError("[HttpApiClient] cancellationTokenSource가 null입니다. HttpApiClient가 초기화되지 않았습니다.");
+                return cancellationToken;
+            }
+            
+            try
+            {
+                return CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellationTokenSource.Token).Token;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HttpApiClient] CreateCombinedCancellationToken 실패: {ex.Message}");
+                return cancellationToken;
+            }
         }
 
         private async UniTask HandleRequestFailure(UnityWebRequest request, int attempt, CancellationToken cancellationToken)
@@ -441,6 +518,48 @@ namespace ProjectVG.Infrastructure.Network.Http
             {
                 throw new ApiException($"응답 파싱 실패: {originalException.Message} (폴백도 실패: {fallbackEx.Message})", responseCode, responseText);
             }
+        }
+
+        /// <summary>
+        /// HTTP 응답 헤더 추출
+        /// </summary>
+        private Dictionary<string, string> ExtractResponseHeaders(UnityWebRequest request)
+        {
+            var headers = new Dictionary<string, string>();
+            
+            // UnityWebRequest에서 사용 가능한 헤더들
+            var responseHeaders = request.GetResponseHeader("X-Access-Token");
+            if (!string.IsNullOrEmpty(responseHeaders))
+                headers["X-Access-Token"] = responseHeaders;
+                
+            responseHeaders = request.GetResponseHeader("X-Refresh-Token");
+            if (!string.IsNullOrEmpty(responseHeaders))
+                headers["X-Refresh-Token"] = responseHeaders;
+                
+            responseHeaders = request.GetResponseHeader("X-Expires-In");
+            if (!string.IsNullOrEmpty(responseHeaders))
+                headers["X-Expires-In"] = responseHeaders;
+                
+            responseHeaders = request.GetResponseHeader("X-User-Id");
+            if (!string.IsNullOrEmpty(responseHeaders))
+                headers["X-User-Id"] = responseHeaders;
+                
+            // 기타 헤더들도 추가 가능
+            responseHeaders = request.GetResponseHeader("Content-Type");
+            if (!string.IsNullOrEmpty(responseHeaders))
+                headers["Content-Type"] = responseHeaders;
+                
+            responseHeaders = request.GetResponseHeader("Authorization");
+            if (!string.IsNullOrEmpty(responseHeaders))
+                headers["Authorization"] = responseHeaders;
+            
+            Debug.Log($"[HttpApiClient] 응답 헤더 추출: {headers.Count}개 헤더");
+            foreach (var header in headers)
+            {
+                Debug.Log($"[HttpApiClient] 헤더: {header.Key} = {header.Value}");
+            }
+            
+            return headers;
         }
 
         private bool ShouldRetry(long responseCode)

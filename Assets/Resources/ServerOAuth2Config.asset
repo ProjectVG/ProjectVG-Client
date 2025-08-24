@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a7fa5cf92f687c4aa7ac92837c95546, type: 3}
+  m_Name: ServerOAuth2Config
+  m_EditorClassIdentifier: 
+  clientId: test-client-id
+  scope: openid profile email
+  webGLRedirectUri: http://localhost:3000/auth/callback
+  androidRedirectUri: com.yourgame://auth/callback
+  iosRedirectUri: com.yourgame://auth/callback
+  windowsRedirectUri: http://localhost:3000/auth/callback
+  macosRedirectUri: http://localhost:3000/auth/callback
+  pkceCodeVerifierLength: 64
+  stateLength: 16
+  timeoutSeconds: 300
+  showDebugInfo: 0
