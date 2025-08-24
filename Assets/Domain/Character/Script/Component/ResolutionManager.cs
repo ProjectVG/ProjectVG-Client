@@ -26,15 +26,15 @@ namespace ProjectVG.Domain.Character.Manager
 		
 		private void Start()
 		{
-			Initialize();
+			// Initialize();
 		}
 		
 		private void Update()
 		{
-			if (applyOnResolutionChange && HasResolutionChanged())
-			{
-				ApplyScaleToAllModels();
-			}
+			// if (applyOnResolutionChange && HasResolutionChanged())
+			// {
+			// 	ApplyScaleToAllModels();
+			// }
 		}
 		
 		#endregion

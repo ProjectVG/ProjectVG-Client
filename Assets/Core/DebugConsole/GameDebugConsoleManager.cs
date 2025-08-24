@@ -56,6 +56,7 @@ namespace ProjectVG.Core.Utils
         {
             Application.logMessageReceived += OnLogMessageReceived;
             SetupUI();
+            ValidateButtonSetup();
         }
         
         void OnDestroy()
@@ -102,8 +103,8 @@ namespace ProjectVG.Core.Utils
                 return;
             }
             
-            _consolePanel.SetActive(false);
-            _isConsoleVisible = false;
+            _consolePanel.SetActive(true);
+            _isConsoleVisible = true;
             
             SetupLayoutGroup();
             
@@ -115,19 +116,36 @@ namespace ProjectVG.Core.Utils
         
         private void SetupUI()
         {
+            Debug.Log("[DEBUG_CONSOLE] SetupUI called");
+            
             if (_clearButton != null)
             {
                 _clearButton.onClick.AddListener(ClearLogs);
+                Debug.Log("[DEBUG_CONSOLE] Clear button listener added");
+            }
+            else
+            {
+                Debug.LogWarning("[DEBUG_CONSOLE] _clearButton is null!");
             }
             
             if (_toggleButton != null)
             {
                 _toggleButton.onClick.AddListener(ToggleConsole);
+                Debug.Log("[DEBUG_CONSOLE] Toggle button listener added");
+            }
+            else
+            {
+                Debug.LogWarning("[DEBUG_CONSOLE] _toggleButton is null!");
             }
             
             if (_filterInput != null)
             {
                 _filterInput.onValueChanged.AddListener(OnFilterChanged);
+                Debug.Log("[DEBUG_CONSOLE] Filter input listener added");
+            }
+            else
+            {
+                Debug.LogWarning("[DEBUG_CONSOLE] _filterInput is null!");
             }
         }
         
@@ -341,11 +359,18 @@ namespace ProjectVG.Core.Utils
         
         public void ToggleConsole()
         {
+            Debug.Log($"[DEBUG_CONSOLE] ToggleConsole called. Current state: {_isConsoleVisible}");
+            
             _isConsoleVisible = !_isConsoleVisible;
             
             if (_consolePanel != null)
             {
                 _consolePanel.SetActive(_isConsoleVisible);
+                Debug.Log($"[DEBUG_CONSOLE] Console panel set to: {_isConsoleVisible}");
+            }
+            else
+            {
+                Debug.LogWarning("[DEBUG_CONSOLE] _consolePanel is null!");
             }
             
             if (_isConsoleVisible)
@@ -516,6 +541,35 @@ namespace ProjectVG.Core.Utils
             }
             contentSizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             contentSizeFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        }
+        
+        public void ValidateButtonSetup()
+        {
+            Debug.Log("[DEBUG_CONSOLE] === Button Setup Validation ===");
+            
+            if (_toggleButton == null)
+            {
+                Debug.LogError("[DEBUG_CONSOLE] _toggleButton is null! Please assign it in the inspector.");
+                return;
+            }
+            
+            Debug.Log($"[DEBUG_CONSOLE] Toggle button found: {_toggleButton.name}");
+            Debug.Log($"[DEBUG_CONSOLE] Toggle button active: {_toggleButton.gameObject.activeInHierarchy}");
+            Debug.Log($"[DEBUG_CONSOLE] Toggle button interactable: {_toggleButton.interactable}");
+            Debug.Log($"[DEBUG_CONSOLE] Toggle button onClick event count: {_toggleButton.onClick.GetPersistentEventCount()}");
+            
+            if (_consolePanel == null)
+            {
+                Debug.LogError("[DEBUG_CONSOLE] _consolePanel is null! Please assign it in the inspector.");
+            }
+            else
+            {
+                Debug.Log($"[DEBUG_CONSOLE] Console panel found: {_consolePanel.name}");
+                Debug.Log($"[DEBUG_CONSOLE] Console panel active: {_consolePanel.activeInHierarchy}");
+            }
+            
+            Debug.Log($"[DEBUG_CONSOLE] Console visible state: {_isConsoleVisible}");
+            Debug.Log("[DEBUG_CONSOLE] === End Validation ===");
         }
     }
 } 
