@@ -53,6 +53,15 @@ ExportedObj/
 *.VC.db
 *.vsconfig
 
+# Claude AI related files
+CLAUDE.md
+claude.md
+*CLAUDE.md
+*claude.md
+.claude/
+claude-*
+*claude*
+
 # Unity 메타 파일
 *.pidb.meta
 *.pdb.meta
