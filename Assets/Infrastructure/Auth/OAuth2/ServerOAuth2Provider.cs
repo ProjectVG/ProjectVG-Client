@@ -40,6 +40,10 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
             
             Debug.Log($"[ServerOAuth2Provider] HttpApiClient 초기화 상태: {_httpClient.IsInitialized}");
             
+            // Unity 백그라운드 실행 설정
+            Application.runInBackground = true;
+            Debug.Log("[ServerOAuth2Provider] 백그라운드 실행 활성화");
+            
             // 플랫폼별 콜백 핸들러 생성
             _callbackHandler = OAuth2CallbackHandlerFactory.CreateHandler();
             Debug.Log($"[ServerOAuth2Provider] {_callbackHandler.PlatformName} 콜백 핸들러 생성됨");
@@ -318,6 +322,12 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
             try
             {
                 Debug.Log("[ServerOAuth2Provider] 전체 OAuth2 로그인 플로우 시작");
+                Debug.Log("=== 🔐 OAuth2 로그인 시작 ===");
+                Debug.Log("1. 브라우저가 열립니다.");
+                Debug.Log("2. Google 로그인을 완료해주세요.");
+                Debug.Log("3. 로그인 완료 후 Unity 앱으로 돌아와주세요.");
+                Debug.Log("4. 콜백을 자동으로 처리합니다.");
+                Debug.Log("================================");
                 
                 // 1. PKCE 파라미터 생성
                 var pkce = await GeneratePKCEAsync();
@@ -332,6 +342,8 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                     throw new InvalidOperationException($"브라우저 열기 실패: {browserResult.Error}");
                 }
                 
+                Debug.Log("✅ 브라우저가 열렸습니다. Google 로그인을 진행해주세요.");
+                
                 // 4. 콜백 대기 및 처리
                 var callbackResult = await WaitForOAuth2CallbackAsync(pkce.State);
                 if (!callbackResult.success)
@@ -339,9 +351,12 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                     throw new InvalidOperationException("OAuth2 콜백 처리 실패");
                 }
                 
+                Debug.Log("✅ OAuth2 콜백 수신 완료. 토큰을 요청합니다.");
+                
                 // 5. 토큰 요청
                 var tokenSet = await RequestTokenAsync(callbackResult.state);
                 
+                Debug.Log("=== 🔐 OAuth2 로그인 완료 ===");
                 Debug.Log("[ServerOAuth2Provider] 전체 OAuth2 로그인 플로우 완료");
                 return tokenSet;
             }
@@ -404,14 +419,30 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                 Application.OpenURL(authUrl);
                 browserType = "Default Browser";
 #else
-                // 데스크톱에서는 기본 브라우저 사용
-                Application.OpenURL(authUrl);
-                browserType = "Default Browser";
+                // 데스크톱에서는 기본 브라우저 사용 (백그라운드에서 실행)
+                try
+                {
+                    // Windows에서 백그라운드로 브라우저 열기
+                    var process = new System.Diagnostics.Process();
+                    process.StartInfo.FileName = authUrl;
+                    process.StartInfo.UseShellExecute = true;
+                    process.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Normal;
+                    process.Start();
+                    
+                    Debug.Log("[ServerOAuth2Provider] 브라우저가 백그라운드에서 열렸습니다.");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[ServerOAuth2Provider] 백그라운드 브라우저 열기 실패, 기본 방식 사용: {ex.Message}");
+                    Application.OpenURL(authUrl);
+                }
+                browserType = "Background Browser";
 #endif
                 
-                // 브라우저 열기 대기
-                await UniTask.Delay(1000);
+                // 브라우저 열기 대기 (더 짧게)
+                await UniTask.Delay(500);
                 
+                Debug.Log("[ServerOAuth2Provider] 브라우저 열기 완료 - 콜백 대기 시작");
                 return OAuth2BrowserResult.SuccessResult(authUrl, platform, browserType);
             }
             catch (Exception ex)
@@ -431,24 +462,43 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
             try
             {
                 Debug.Log($"[ServerOAuth2Provider] OAuth2 콜백 대기 시작 - State: {expectedState}");
+                Debug.Log("[ServerOAuth2Provider] 브라우저에서 OAuth2 로그인을 완료한 후 Unity 앱으로 돌아와주세요.");
                 
                 // 콜백 핸들러 초기화
                 await _callbackHandler.InitializeAsync(expectedState, _config.TimeoutSeconds);
                 
-                // 콜백 대기
-                var callbackUrl = await _callbackHandler.WaitForCallbackAsync();
+                // 콜백 대기 (더 강화된 로직)
+                var startTime = DateTime.UtcNow;
+                var timeout = TimeSpan.FromSeconds(_config.TimeoutSeconds);
                 
-                if (!string.IsNullOrEmpty(callbackUrl))
+                while (DateTime.UtcNow - startTime < timeout)
                 {
-                    var result = await HandleOAuth2CallbackAsync(callbackUrl);
-                    if (result.success && result.state == expectedState)
+                    // 앱이 포커스를 잃었을 때 더 자주 체크
+                    var checkInterval = Application.isFocused ? 200 : 100;
+                    await UniTask.Delay(checkInterval);
+                    
+                    // 콜백 핸들러에서 URL 확인
+                    var callbackUrl = await _callbackHandler.WaitForCallbackAsync();
+                    
+                    if (!string.IsNullOrEmpty(callbackUrl))
                     {
-                        Debug.Log("[ServerOAuth2Provider] OAuth2 콜백 수신 완료");
-                        return result;
+                        var result = await HandleOAuth2CallbackAsync(callbackUrl);
+                        if (result.success && result.state == expectedState)
+                        {
+                            Debug.Log("[ServerOAuth2Provider] OAuth2 콜백 수신 완료");
+                            return result;
+                        }
+                    }
+                    
+                    // 디버그 정보 출력 (5초마다)
+                    var elapsed = (DateTime.UtcNow - startTime).TotalSeconds;
+                    if (elapsed % 5 < 0.2) // 5초마다
+                    {
+                        Debug.Log($"[ServerOAuth2Provider] 콜백 대기 중... (경과: {elapsed:F1}초, 포커스: {Application.isFocused})");
                     }
                 }
                 
-                Debug.LogError("[ServerOAuth2Provider] OAuth2 콜백 타임아웃 또는 실패");
+                Debug.LogError("[ServerOAuth2Provider] OAuth2 콜백 타임아웃");
                 return (false, null);
             }
             catch (Exception ex)

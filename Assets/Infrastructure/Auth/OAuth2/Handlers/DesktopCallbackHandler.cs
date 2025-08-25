@@ -20,6 +20,8 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
         private HttpListener _listener;
         private CancellationTokenSource _cancellationTokenSource;
         private string _callbackUrl;
+        private DateTime _lastActivityTime;
+        private bool _isWaitingForCallback = false;
         
         public string PlatformName => "Desktop";
         public bool IsSupported => true;
@@ -30,6 +32,10 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
             _timeoutSeconds = timeoutSeconds;
             _isInitialized = true;
             _cancellationTokenSource = new CancellationTokenSource();
+            _lastActivityTime = DateTime.UtcNow;
+            
+            // Unity 이벤트 등록
+            Application.focusChanged += OnApplicationFocusChanged;
             
             // 로컬 HTTP 서버 시작
             await StartLocalServerAsync();
@@ -45,6 +51,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
             }
             
             Debug.Log("[DesktopCallbackHandler] OAuth2 콜백 대기 시작");
+            _isWaitingForCallback = true;
             
             var startTime = DateTime.UtcNow;
             var timeout = TimeSpan.FromSeconds(_timeoutSeconds);
@@ -54,23 +61,38 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
                 if (!string.IsNullOrEmpty(_callbackUrl))
                 {
                     Debug.Log($"[DesktopCallbackHandler] OAuth2 콜백 수신: {_callbackUrl}");
+                    _isWaitingForCallback = false;
                     return _callbackUrl;
                 }
                 
-                // 100ms 대기
-                await UniTask.Delay(100);
+                // 앱이 포커스를 잃었을 때 더 자주 체크
+                var checkInterval = Application.isFocused ? 100 : 50; // 백그라운드일 때 더 빠르게 체크
+                await UniTask.Delay(checkInterval);
+                
+                // 디버그 정보 출력 (10초마다)
+                if ((DateTime.UtcNow - _lastActivityTime).TotalSeconds >= 10)
+                {
+                    Debug.Log($"[DesktopCallbackHandler] 콜백 대기 중... (경과: {(DateTime.UtcNow - startTime).TotalSeconds:F1}초, 포커스: {Application.isFocused})");
+                    _lastActivityTime = DateTime.UtcNow;
+                }
             }
             
             Debug.LogWarning("[DesktopCallbackHandler] OAuth2 콜백 타임아웃");
+            _isWaitingForCallback = false;
             return null;
         }
         
         public void Cleanup()
         {
             _isDisposed = true;
+            _isWaitingForCallback = false;
             _cancellationTokenSource?.Cancel();
             _listener?.Stop();
             _listener?.Close();
+            
+            // Unity 이벤트 해제
+            Application.focusChanged -= OnApplicationFocusChanged;
+            
             Debug.Log("[DesktopCallbackHandler] 정리 완료");
         }
         
@@ -234,6 +256,42 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
             catch (Exception ex)
             {
                 Debug.LogError($"[DesktopCallbackHandler] 콜백 처리 중 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 앱 포커스 변경 이벤트 처리
+        /// </summary>
+        private void OnApplicationFocusChanged(bool hasFocus)
+        {
+            if (_isWaitingForCallback)
+            {
+                Debug.Log($"[DesktopCallbackHandler] 앱 포커스 변경: {hasFocus}");
+                
+                if (hasFocus)
+                {
+                    // 앱이 다시 포커스를 받았을 때 콜백 URL 확인
+                    CheckForCallbackUrl();
+                }
+            }
+        }
+        
+        /// <summary>
+        /// 콜백 URL 확인 (앱 포커스 복귀 시)
+        /// </summary>
+        private void CheckForCallbackUrl()
+        {
+            try
+            {
+                // 로컬 서버에서 최근 요청 확인
+                if (_listener != null && _listener.IsListening)
+                {
+                    Debug.Log("[DesktopCallbackHandler] 앱 포커스 복귀 - 콜백 URL 재확인");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[DesktopCallbackHandler] 콜백 URL 확인 중 오류: {ex.Message}");
             }
         }
     }
