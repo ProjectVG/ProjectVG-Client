@@ -93,18 +93,12 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
         /// 서버 OAuth2 인증 시작
         /// </summary>
         /// <param name="pkce">PKCE 파라미터</param>
-        /// <param name="scope">OAuth2 스코프</param>
         /// <returns>Google OAuth2 URL</returns>
-        public async Task<string> StartServerOAuth2Async(PKCEParameters pkce, string scope)
+        public async Task<string> StartServerOAuth2Async(PKCEParameters pkce)
         {
             if (pkce == null || !pkce.IsValid())
             {
                 throw new ArgumentException("유효하지 않은 PKCE 파라미터입니다.", nameof(pkce));
-            }
-            
-            if (string.IsNullOrEmpty(scope))
-            {
-                scope = _config.Scope;
             }
             
             try
@@ -115,10 +109,6 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                 // 1. JavaScript와 동일한 방식으로 쿼리 파라미터 생성
                 var queryParams = new Dictionary<string, string>
                 {
-                    { "client_id", _config.ClientId },
-                    { "redirect_uri", _config.GetCurrentPlatformRedirectUri() },
-                    { "response_type", "code" },
-                    { "scope", scope },
                     { "state", pkce.State },
                     { "code_challenge", pkce.CodeChallenge },
                     { "code_challenge_method", "S256" },
@@ -129,8 +119,9 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                 Debug.Log($"[ServerOAuth2Provider] 쿼리 파라미터: {JsonConvert.SerializeObject(queryParams)}");
                 
                 // 2. 쿼리 파라미터를 URL에 추가
+                string provider = "/google";
                 var queryString = string.Join("&", queryParams.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
-                var authorizeUrl = $"{_config.ServerUrl}/auth/oauth2/authorize?{queryString}";
+                var authorizeUrl = $"{_config.ServerUrl}/auth/oauth2/authorize{provider}?{queryString}";
                 
                 Debug.Log($"[ServerOAuth2Provider] 최종 URL: {authorizeUrl}");
                 
@@ -317,23 +308,17 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
         /// </summary>
         /// <param name="scope">OAuth2 스코프</param>
         /// <returns>JWT 토큰 세트</returns>
-        public async Task<TokenSet> LoginWithServerOAuth2Async(string scope)
+        public async Task<TokenSet> LoginWithServerOAuth2Async()
         {
             try
             {
                 Debug.Log("[ServerOAuth2Provider] 전체 OAuth2 로그인 플로우 시작");
-                Debug.Log("=== 🔐 OAuth2 로그인 시작 ===");
-                Debug.Log("1. 브라우저가 열립니다.");
-                Debug.Log("2. Google 로그인을 완료해주세요.");
-                Debug.Log("3. 로그인 완료 후 Unity 앱으로 돌아와주세요.");
-                Debug.Log("4. 콜백을 자동으로 처리합니다.");
-                Debug.Log("================================");
                 
                 // 1. PKCE 파라미터 생성
                 var pkce = await GeneratePKCEAsync();
                 
                 // 2. 서버 OAuth2 인증 시작
-                var authUrl = await StartServerOAuth2Async(pkce, scope);
+                var authUrl = await StartServerOAuth2Async(pkce);
                 
                 // 3. 브라우저에서 OAuth2 로그인 진행
                 var browserResult = await OpenOAuth2BrowserAsync(authUrl);
@@ -357,7 +342,6 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                 var tokenSet = await RequestTokenAsync(callbackResult.state);
                 
                 Debug.Log("=== 🔐 OAuth2 로그인 완료 ===");
-                Debug.Log("[ServerOAuth2Provider] 전체 OAuth2 로그인 플로우 완료");
                 return tokenSet;
             }
             catch (Exception ex)
@@ -526,8 +510,6 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
             var info = $"ServerOAuth2Provider Debug Info:\n";
             info += $"Is Configured: {IsConfigured}\n";
             info += $"Server URL: {_config?.ServerUrl}\n";
-            info += $"Client ID: {_config?.ClientId}\n";
-            info += $"Scope: {_config?.Scope}\n";
             info += $"Platform: {_config?.GetCurrentPlatformName()}\n";
             info += $"Redirect URI: {_config?.GetCurrentPlatformRedirectUri()}\n";
             info += $"Client Redirect URI: {GetClientRedirectUri()}\n";

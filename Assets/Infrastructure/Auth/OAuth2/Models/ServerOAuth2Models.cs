@@ -9,17 +9,6 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Models
     [Serializable]
     public class ServerOAuth2AuthorizeRequest
     {
-        [JsonProperty("client_id")]
-        public string ClientId { get; set; }
-        
-        [JsonProperty("redirect_uri")]
-        public string RedirectUri { get; set; }
-        
-        [JsonProperty("response_type")]
-        public string ResponseType { get; set; } = "code";
-        
-        [JsonProperty("scope")]
-        public string Scope { get; set; }
         
         [JsonProperty("state")]
         public string State { get; set; }

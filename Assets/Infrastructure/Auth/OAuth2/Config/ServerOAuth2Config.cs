@@ -11,9 +11,6 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Config
     public class ServerOAuth2Config : ScriptableObject
     {
         [Header("OAuth2 설정")]
-        [SerializeField] private string clientId = "test-client-id";
-        
-        [SerializeField] private string scope = "openid profile email";
         
         [Header("플랫폼별 리다이렉트 URI")]
         [SerializeField] private string webGLRedirectUri = "http://localhost:3000/auth/callback";
@@ -23,9 +20,9 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Config
         [SerializeField] private string macosRedirectUri = "http://localhost:3000/auth/callback";
         
         [Header("고급 설정")]
-        [SerializeField] private int pkceCodeVerifierLength = 64; // PKCE 표준에 맞게 64바이트 (43자 이상)
-        [SerializeField] private int stateLength = 16; // JavaScript와 동일하게 16바이트
-        [SerializeField] private float timeoutSeconds = 300f; // 5분
+        [SerializeField] private int pkceCodeVerifierLength = 64;
+        [SerializeField] private int stateLength = 16;
+        [SerializeField] private float timeoutSeconds = 300f;
         
         // Singleton instance
         private static ServerOAuth2Config _instance;
@@ -50,16 +47,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Config
         /// 서버 URL (NetworkConfig에서 가져옴)
         /// </summary>
         public string ServerUrl => ProjectVG.Infrastructure.Network.Configs.NetworkConfig.HttpServerAddress;
-        
-        /// <summary>
-        /// 클라이언트 ID
-        /// </summary>
-        public string ClientId => clientId;
-        
-        /// <summary>
-        /// OAuth2 스코프
-        /// </summary>
-        public string Scope => scope;
+       
         
         /// <summary>
         /// 현재 플랫폼의 리다이렉트 URI
@@ -111,9 +99,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Config
             }
             
             // 기본 필수 값 검사
-            var hasRequiredFields = !string.IsNullOrEmpty(clientId) &&
-                                   !string.IsNullOrEmpty(scope) &&
-                                   !string.IsNullOrEmpty(GetCurrentPlatformRedirectUri());
+            var hasRequiredFields = !string.IsNullOrEmpty(GetCurrentPlatformRedirectUri());
             
             // PKCE 설정 검사
             var hasValidPKCE = pkceCodeVerifierLength >= 43 && pkceCodeVerifierLength <= 128 &&
@@ -128,18 +114,6 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Config
             {
                 Debug.LogError($"[ServerOAuth2Config] 설정 유효성 검사 실패:");
                 
-                if (string.IsNullOrEmpty(clientId))
-                    Debug.LogError($"  - clientId: 비어있음 (실제 클라이언트 ID로 설정 필요)");
-                else if (clientId.Contains("your-game-client"))
-                    Debug.LogError($"  - clientId: '{clientId}' (기본값입니다. 실제 클라이언트 ID로 변경하세요)");
-                else
-                    Debug.LogError($"  - clientId: '{clientId}'");
-                    
-                if (string.IsNullOrEmpty(scope))
-                    Debug.LogError($"  - scope: 비어있음");
-                else
-                    Debug.LogError($"  - scope: '{scope}'");
-                    
                 if (string.IsNullOrEmpty(GetCurrentPlatformRedirectUri()))
                     Debug.LogError($"  - redirectUri: 비어있음");
                 else if (GetCurrentPlatformRedirectUri().Contains("your-domain"))
@@ -160,7 +134,6 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Config
             {
                 Debug.Log($"[ServerOAuth2Config] 설정 유효성 검사 통과");
                 Debug.Log($"  - 서버: {ServerUrl} (NetworkConfig에서 가져옴)");
-                Debug.Log($"  - 클라이언트 ID: {clientId}");
                 Debug.Log($"  - 플랫폼: {GetCurrentPlatformName()}");
                 Debug.Log($"  - 리다이렉트 URI: {GetCurrentPlatformRedirectUri()}");
             }
@@ -196,8 +169,6 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Config
             var instance = CreateInstance<ServerOAuth2Config>();
             
             // JavaScript 클라이언트와 동일한 기본값으로 초기화
-            instance.clientId = "test-client-id";
-            instance.scope = "openid profile email";
             instance.webGLRedirectUri = "http://localhost:3000/auth/callback";
             instance.androidRedirectUri = "com.yourgame://auth/callback";
             instance.iosRedirectUri = "com.yourgame://auth/callback";
@@ -222,8 +193,6 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Config
             {
                 Debug.Log($"[ServerOAuth2Config] 현재 플랫폼: {GetCurrentPlatformName()}");
                 Debug.Log($"[ServerOAuth2Config] 서버 URL: {ServerUrl}");
-                Debug.Log($"[ServerOAuth2Config] 클라이언트 ID: {ClientId}");
-                Debug.Log($"[ServerOAuth2Config] 스코프: {Scope}");
                 Debug.Log($"[ServerOAuth2Config] 리다이렉트 URI: {GetCurrentPlatformRedirectUri()}");
                 Debug.Log($"[ServerOAuth2Config] 설정 유효: {IsValid()}");
             }

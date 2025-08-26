@@ -14,10 +14,10 @@ namespace ProjectVG.Infrastructure.Auth
     /// </summary>
     public class TokenManager : MonoBehaviour
     {
-        private const string ACCESS_TOKEN_KEY = "oauth2_access_token";
-        private const string REFRESH_TOKEN_KEY = "oauth2_refresh_token";
-        private const string TOKEN_EXPIRY_KEY = "oauth2_token_expiry";
-        private const string USER_ID_KEY = "oauth2_user_id";
+        private const string ACCESS_TOKEN_KEY = "access_token";
+        private const string REFRESH_TOKEN_KEY = "refresh_token";
+        private const string TOKEN_EXPIRY_KEY = "token_expiry";
+        private const string USER_ID_KEY = "user_id";
         private const string ENCRYPTION_KEY = "ProjectVG_OAuth2_Secure_Key_2024";
         
         private static TokenManager _instance;

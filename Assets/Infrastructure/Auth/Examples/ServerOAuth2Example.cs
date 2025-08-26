@@ -173,7 +173,7 @@ namespace ProjectVG.Infrastructure.Auth.Examples
                 SetButtonsEnabled(false);
                 
                 // 전체 OAuth2 로그인 플로우 실행
-                _currentTokenSet = await _oauth2Provider.LoginWithServerOAuth2Async(OAuth2Config.Scope);
+                _currentTokenSet = await _oauth2Provider.LoginWithServerOAuth2Async();
                 
                 if (_currentTokenSet?.IsValid() == true)
                 {
@@ -258,7 +258,7 @@ namespace ProjectVG.Infrastructure.Auth.Examples
                         
                                                  // TODO: 서버 OAuth2 토큰 갱신 API 호출
                          // 현재는 전체 재로그인 플로우 실행
-                         var newTokenSet = await _oauth2Provider.LoginWithServerOAuth2Async(OAuth2Config.Scope);
+                         var newTokenSet = await _oauth2Provider.LoginWithServerOAuth2Async();
                         
                         if (newTokenSet?.IsValid() == true)
                         {
