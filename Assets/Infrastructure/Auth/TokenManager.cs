@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
@@ -14,9 +15,8 @@ namespace ProjectVG.Infrastructure.Auth
     /// </summary>
     public class TokenManager : MonoBehaviour
     {
-        private const string ACCESS_TOKEN_KEY = "access_token";
+        // AccessToken은 메모리에만 저장하므로 ACCESS_TOKEN_KEY, TOKEN_EXPIRY_KEY 는 제거
         private const string REFRESH_TOKEN_KEY = "refresh_token";
-        private const string TOKEN_EXPIRY_KEY = "token_expiry";
         private const string USER_ID_KEY = "user_id";
         private const string ENCRYPTION_KEY = "ProjectVG_OAuth2_Secure_Key_2024";
         
@@ -54,6 +54,13 @@ namespace ProjectVG.Infrastructure.Auth
                 _instance = this;
                 DontDestroyOnLoad(gameObject);
                 LoadTokensFromStorage();
+                
+                // 앱 시작 시 RefreshToken이 있으면 자동으로 AccessToken 복구 시도
+                if (HasRefreshToken && !IsRefreshTokenExpired())
+                {
+                    Debug.Log("[TokenManager] RefreshToken 발견 - 자동 AccessToken 복구 시작");
+                    StartCoroutine(AutoRecoverAccessTokenCoroutine());
+                }
             }
             else if (_instance != this)
             {
@@ -74,20 +81,10 @@ namespace ProjectVG.Infrastructure.Auth
             
             try
             {
+                // AccessToken은 메모리에만 저장 (영속적 저장 안함)
                 _currentAccessToken = tokenSet.AccessToken;
                 _currentRefreshToken = tokenSet.RefreshToken;
                 _currentUserId = tokenSet.RefreshToken?.DeviceId;
-                
-                // Access Token 저장 (암호화)
-                var accessTokenData = new TokenStorageData
-                {
-                    Token = _currentAccessToken.Token,
-                    ExpiresAt = _currentAccessToken.ExpiresAt,
-                    TokenType = _currentAccessToken.TokenType,
-                    Scope = _currentAccessToken.Scope
-                };
-                var encryptedAccessToken = EncryptData(JsonConvert.SerializeObject(accessTokenData));
-                PlayerPrefs.SetString(ACCESS_TOKEN_KEY, encryptedAccessToken);
                 
                 // Refresh Token 저장 (강력한 암호화)
                 string encryptedRefreshToken = null;
@@ -109,8 +106,7 @@ namespace ProjectVG.Infrastructure.Auth
                     PlayerPrefs.DeleteKey(REFRESH_TOKEN_KEY);
                 }
                 
-                // 만료 시간 저장
-                PlayerPrefs.SetString(TOKEN_EXPIRY_KEY, _currentAccessToken.ExpiresAt.ToString("O"));
+                // AccessToken 만료 시간은 메모리에만 보관 (PlayerPrefs 저장 안함)
                 
                 // User ID 저장
                 if (!string.IsNullOrEmpty(_currentUserId))
@@ -121,9 +117,8 @@ namespace ProjectVG.Infrastructure.Auth
                 PlayerPrefs.Save();
                 
                 Debug.Log("=== 🔐 TokenManager 토큰 저장 완료 ===");
-                Debug.Log($"[TokenManager] Access Token 저장 위치: PlayerPrefs['{ACCESS_TOKEN_KEY}']");
+                Debug.Log($"[TokenManager] Access Token 저장: 메모리 전용 (영속적 저장 안함)");
                 Debug.Log($"[TokenManager] Access Token 만료: {_currentAccessToken.ExpiresAt}");
-                Debug.Log($"[TokenManager] Access Token 암호화: {!string.IsNullOrEmpty(encryptedAccessToken)}");
                 
                 if (_currentRefreshToken != null)
                 {
@@ -137,7 +132,6 @@ namespace ProjectVG.Infrastructure.Auth
                 }
                 
                 Debug.Log($"[TokenManager] User ID 저장 위치: PlayerPrefs['{USER_ID_KEY}'] = {_currentUserId}");
-                Debug.Log($"[TokenManager] 만료 시간 저장 위치: PlayerPrefs['{TOKEN_EXPIRY_KEY}'] = {_currentAccessToken.ExpiresAt:O}");
                 Debug.Log("=== 토큰 저장 완료 ===");
                 
                 OnTokensUpdated?.Invoke(tokenSet);
@@ -226,22 +220,10 @@ namespace ProjectVG.Infrastructure.Auth
             
             try
             {
+                // AccessToken은 메모리에만 업데이트 (영속적 저장 안함)
                 _currentAccessToken = new AccessToken(newAccessToken, expiresInSeconds, "Bearer", "oauth2");
                 
-                // Access Token만 업데이트
-                var accessTokenData = new TokenStorageData
-                {
-                    Token = _currentAccessToken.Token,
-                    ExpiresAt = _currentAccessToken.ExpiresAt,
-                    TokenType = _currentAccessToken.TokenType,
-                    Scope = _currentAccessToken.Scope
-                };
-                var encryptedAccessToken = EncryptData(JsonConvert.SerializeObject(accessTokenData));
-                PlayerPrefs.SetString(ACCESS_TOKEN_KEY, encryptedAccessToken);
-                PlayerPrefs.SetString(TOKEN_EXPIRY_KEY, _currentAccessToken.ExpiresAt.ToString("O"));
-                PlayerPrefs.Save();
-                
-                Debug.Log("[TokenManager] Access Token 갱신 완료");
+                Debug.Log("[TokenManager] Access Token 갱신 완료 (메모리 전용)");
                 Debug.Log($"[TokenManager] 새로운 만료 시간: {_currentAccessToken.ExpiresAt}");
                 
                 var tokenSet = new TokenSet(_currentAccessToken, _currentRefreshToken);
@@ -261,13 +243,13 @@ namespace ProjectVG.Infrastructure.Auth
         {
             try
             {
+                // 메모리에서 AccessToken 제거
                 _currentAccessToken = null;
                 _currentRefreshToken = null;
                 _currentUserId = null;
                 
-                PlayerPrefs.DeleteKey(ACCESS_TOKEN_KEY);
+                // RefreshToken만 PlayerPrefs에서 삭제 (기존 ACCESS_TOKEN_KEY, TOKEN_EXPIRY_KEY 삭제 로직 제거)
                 PlayerPrefs.DeleteKey(REFRESH_TOKEN_KEY);
-                PlayerPrefs.DeleteKey(TOKEN_EXPIRY_KEY);
                 PlayerPrefs.DeleteKey(USER_ID_KEY);
                 PlayerPrefs.Save();
                 
@@ -288,20 +270,9 @@ namespace ProjectVG.Infrastructure.Auth
         {
             try
             {
-                // Access Token 로드
-                if (PlayerPrefs.HasKey(ACCESS_TOKEN_KEY))
-                {
-                    var encryptedAccessToken = PlayerPrefs.GetString(ACCESS_TOKEN_KEY);
-                    var decryptedAccessToken = DecryptData(encryptedAccessToken);
-                    var accessTokenData = JsonConvert.DeserializeObject<TokenStorageData>(decryptedAccessToken);
-                    
-                    _currentAccessToken = new AccessToken(
-                        accessTokenData.Token,
-                        accessTokenData.ExpiresAt,
-                        accessTokenData.TokenType,
-                        accessTokenData.Scope
-                    );
-                }
+                // AccessToken은 저장소에서 로드하지 않음 (메모리 전용)
+                // 앱 시작 시 AccessToken은 null 상태로 시작
+                _currentAccessToken = null;
                 
                 // Refresh Token 로드
                 if (PlayerPrefs.HasKey(REFRESH_TOKEN_KEY))
@@ -324,13 +295,8 @@ namespace ProjectVG.Infrastructure.Auth
                 }
                 
                 Debug.Log("=== 🔍 TokenManager 저장소에서 토큰 로드 완료 ===");
-                Debug.Log($"[TokenManager] Access Token 로드 위치: PlayerPrefs['{ACCESS_TOKEN_KEY}']");
-                Debug.Log($"[TokenManager] Access Token 존재: {_currentAccessToken != null}");
-                if (_currentAccessToken != null)
-                {
-                    Debug.Log($"[TokenManager] Access Token 만료: {_currentAccessToken.ExpiresAt}");
-                    Debug.Log($"[TokenManager] Access Token 유효: {!_currentAccessToken.IsExpired()}");
-                }
+                Debug.Log($"[TokenManager] Access Token: 메모리 전용 (영속적 로드 안함)");
+                Debug.Log($"[TokenManager] Access Token 상태: null (앱 시작 시 기본값)");
                 
                 Debug.Log($"[TokenManager] Refresh Token 로드 위치: PlayerPrefs['{REFRESH_TOKEN_KEY}']");
                 Debug.Log($"[TokenManager] Refresh Token 존재: {_currentRefreshToken != null}");
@@ -341,7 +307,6 @@ namespace ProjectVG.Infrastructure.Auth
                 }
                 
                 Debug.Log($"[TokenManager] User ID 로드 위치: PlayerPrefs['{USER_ID_KEY}'] = {_currentUserId}");
-                Debug.Log($"[TokenManager] 만료 시간 로드 위치: PlayerPrefs['{TOKEN_EXPIRY_KEY}']");
                 Debug.Log("=== 토큰 로드 완료 ===");
             }
             catch (Exception ex)
@@ -418,10 +383,9 @@ namespace ProjectVG.Infrastructure.Auth
         {
             var info = "TokenManager Debug Info:\n";
             info += $"=== 저장 위치 정보 ===\n";
-            info += $"Access Token 저장: PlayerPrefs['{ACCESS_TOKEN_KEY}']\n";
+            info += $"Access Token 저장: 메모리 전용 (영속적 저장 안함)\n";
             info += $"Refresh Token 저장: PlayerPrefs['{REFRESH_TOKEN_KEY}']\n";
             info += $"User ID 저장: PlayerPrefs['{USER_ID_KEY}']\n";
-            info += $"만료 시간 저장: PlayerPrefs['{TOKEN_EXPIRY_KEY}']\n";
             info += $"=== 토큰 상태 ===\n";
             info += $"Has Valid Tokens: {HasValidTokens}\n";
             info += $"Has Refresh Token: {HasRefreshToken}\n";
@@ -444,6 +408,55 @@ namespace ProjectVG.Infrastructure.Auth
             }
             
             return info;
+        }
+        
+        /// <summary>
+        /// 앱 시작 시 RefreshToken으로 AccessToken 자동 복구
+        /// </summary>
+        private IEnumerator AutoRecoverAccessTokenCoroutine()
+        {
+            // TokenRefreshService가 초기화될 때까지 대기
+            yield return new WaitForSeconds(0.5f);
+            
+            if (TokenRefreshService.Instance != null)
+            {
+                Debug.Log("[TokenManager] TokenRefreshService를 통해 AccessToken 복구 시도");
+                
+                // 비동기 호출을 코루틴에서 처리
+                StartCoroutine(TryRefreshTokenCoroutine());
+            }
+            else
+            {
+                Debug.LogWarning("[TokenManager] TokenRefreshService가 아직 초기화되지 않았습니다.");
+            }
+        }
+        
+        /// <summary>
+        /// RefreshToken으로 AccessToken 복구 코루틴
+        /// </summary>
+        private IEnumerator TryRefreshTokenCoroutine()
+        {
+            var refreshTask = TokenRefreshService.Instance.RefreshAccessTokenAsync();
+            
+            // UniTask를 코루틴에서 기다림
+            yield return new WaitUntil(() => refreshTask.Status != Cysharp.Threading.Tasks.UniTaskStatus.Pending);
+            
+            if (refreshTask.Status == Cysharp.Threading.Tasks.UniTaskStatus.Succeeded)
+            {
+                bool success = refreshTask.GetAwaiter().GetResult();
+                if (success)
+                {
+                    Debug.Log("[TokenManager] 앱 시작 시 AccessToken 자동 복구 성공");
+                }
+                else
+                {
+                    Debug.LogWarning("[TokenManager] 앱 시작 시 AccessToken 자동 복구 실패");
+                }
+            }
+            else
+            {
+                Debug.LogError("[TokenManager] AccessToken 복구 중 오류 발생");
+            }
         }
     }
     
