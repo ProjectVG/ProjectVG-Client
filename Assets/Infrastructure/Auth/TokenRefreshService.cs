@@ -169,13 +169,7 @@ namespace ProjectVG.Infrastructure.Auth
                     throw new InvalidOperationException($"토큰 갱신 실패: {response?.Message ?? "응답이 null입니다."}");
                 }
                 
-                // 새로운 토큰 생성
-                var accessToken = new AccessToken(
-                    response.AccessToken,
-                    response.ExpiresIn,
-                    "Bearer",
-                    "oauth2"
-                );
+                var accessToken = new AccessToken(response.AccessToken);
                 
                 var newRefreshToken = !string.IsNullOrEmpty(response.RefreshToken)
                     ? new RefreshToken(response.RefreshToken, response.ExpiresIn * 2, response.UserId)  // UserId를 DeviceId로 사용
@@ -223,19 +217,6 @@ namespace ProjectVG.Infrastructure.Auth
             return false;
         }
         
-        /// <summary>
-        /// 디버그 정보 출력
-        /// </summary>
-        public string GetDebugInfo()
-        {
-            var info = "TokenRefreshService Debug Info:\n";
-            info += $"Is Refreshing: {_isRefreshing}\n";
-            info += $"Has Valid Tokens: {_tokenManager.HasValidTokens}\n";
-            info += $"Has Refresh Token: {_tokenManager.HasRefreshToken}\n";
-            info += $"Access Token Expired: {_tokenManager.IsAccessTokenExpired()}\n";
-            info += $"Refresh Token Expired: {_tokenManager.IsRefreshTokenExpired()}\n";
-            return info;
-        }
         
         private void OnDestroy()
         {

@@ -175,7 +175,7 @@ namespace ProjectVG.Infrastructure.Auth.Examples
                 // 전체 OAuth2 로그인 플로우 실행
                 _currentTokenSet = await _oauth2Provider.LoginWithServerOAuth2Async();
                 
-                if (_currentTokenSet?.IsValid() == true)
+                if (_currentTokenSet?.HasRefreshToken() == true)
                 {
                     _isLoggedIn = true;
                     ShowStatus("서버 OAuth2 로그인 성공!", Color.green);
@@ -256,11 +256,10 @@ namespace ProjectVG.Infrastructure.Auth.Examples
                     {
                         Debug.Log("[ServerOAuth2Example] 토큰 갱신 시작");
                         
-                                                 // TODO: 서버 OAuth2 토큰 갱신 API 호출
                          // 현재는 전체 재로그인 플로우 실행
                          var newTokenSet = await _oauth2Provider.LoginWithServerOAuth2Async();
                         
-                        if (newTokenSet?.IsValid() == true)
+                        if (newTokenSet?.HasRefreshToken() == true)
                         {
                             _currentTokenSet = newTokenSet;
                             Debug.Log("[ServerOAuth2Example] 토큰 갱신 성공");
@@ -453,20 +452,9 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             info += $"Access Token: {_currentTokenSet.AccessToken?.Token?.Substring(0, Math.Min(20, _currentTokenSet.AccessToken.Token.Length))}...\n";
             info += $"Access Token 만료: {_currentTokenSet.AccessToken?.ExpiresAt:yyyy-MM-dd HH:mm:ss}\n";
             info += $"Refresh Token: {(string.IsNullOrEmpty(_currentTokenSet.RefreshToken?.Token) ? "없음" : "있음")}\n";
-            info += $"토큰 유효: {_currentTokenSet.IsValid()}\n";
             info += $"갱신 필요: {_currentTokenSet.NeedsRefresh()}";
             
             userInfoText.text = info;
-            
-            // 디버그 정보도 업데이트
-            if (debugText != null)
-            {
-                var debugInfo = "=== TokenManager 상태 ===\n";
-                debugInfo += _tokenManager.GetDebugInfo();
-                debugInfo += "\n=== TokenRefreshService 상태 ===\n";
-                debugInfo += _refreshService.GetDebugInfo();
-                debugText.text = debugInfo;
-            }
         }
         
         /// <summary>
@@ -488,8 +476,6 @@ namespace ProjectVG.Infrastructure.Auth.Examples
                 Debug.Log($"✅ Access Token: {_currentTokenSet.AccessToken.Token}");
                 Debug.Log($"   - 만료 시간: {_currentTokenSet.AccessToken.ExpiresAt:yyyy-MM-dd HH:mm:ss}");
                 Debug.Log($"   - 만료까지: {(_currentTokenSet.AccessToken.ExpiresAt - DateTime.UtcNow).TotalMinutes:F1}분");
-                Debug.Log($"   - 토큰 타입: {_currentTokenSet.AccessToken.TokenType}");
-                Debug.Log($"   - 스코프: {_currentTokenSet.AccessToken.Scope}");
             }
             else
             {
@@ -511,7 +497,6 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             
             // 토큰 세트 상태
             Debug.Log($"📊 토큰 세트 상태:");
-            Debug.Log($"   - 유효성: {_currentTokenSet.IsValid()}");
             Debug.Log($"   - 갱신 필요: {_currentTokenSet.NeedsRefresh()}");
             Debug.Log($"   - Refresh Token 보유: {_currentTokenSet.HasRefreshToken()}");
             
@@ -542,26 +527,7 @@ namespace ProjectVG.Infrastructure.Auth.Examples
         {
             return _currentTokenSet;
         }
-        
-        /// <summary>
-        /// 로그인 상태 조회
-        /// </summary>
-        public bool IsLoggedIn()
-        {
-            return _isLoggedIn && _currentTokenSet?.IsValid() == true;
-        }
-        
-        /// <summary>
-        /// 유효한 Access Token 조회
-        /// </summary>
-        public string GetValidAccessToken()
-        {
-            if (IsLoggedIn() && _currentTokenSet?.AccessToken?.IsValid() == true)
-            {
-                return _currentTokenSet.AccessToken.Token;
-            }
-            return null;
-        }
+      
         
         #endregion
     }

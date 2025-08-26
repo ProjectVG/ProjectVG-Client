@@ -117,15 +117,6 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             }
         }
 
-        /// <summary>
-        /// 토큰 상태 확인
-        /// </summary>
-        public void CheckTokenStatus()
-        {
-            Debug.Log("=== Token Status ===");
-            Debug.Log(_tokenManager.GetDebugInfo());
-            Debug.Log("===================");
-        }
 
         /// <summary>
         /// Guest 로그인 상태 확인
@@ -199,12 +190,6 @@ namespace ProjectVG.Infrastructure.Auth.Examples
             GUI.enabled = true;
 
             GUILayout.Space(10);
-
-            // 상태 확인 버튼들
-            if (GUILayout.Button("토큰 상태 확인"))
-            {
-                CheckTokenStatus();
-            }
 
             if (GUILayout.Button("Guest 로그인 상태 확인"))
             {

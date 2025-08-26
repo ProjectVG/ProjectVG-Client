@@ -36,14 +36,6 @@ namespace ProjectVG.Infrastructure.Auth.Models
         }
         
         /// <summary>
-        /// 토큰 세트 유효성 검사
-        /// </summary>
-        public bool IsValid()
-        {
-            return AccessToken != null && AccessToken.IsValid();
-        }
-        
-        /// <summary>
         /// Access Token이 만료되었는지 확인
         /// </summary>
         public bool IsAccessTokenExpired()
@@ -56,7 +48,7 @@ namespace ProjectVG.Infrastructure.Auth.Models
         /// </summary>
         public bool HasRefreshToken()
         {
-            return RefreshToken != null && RefreshToken.IsValid();
+            return RefreshToken != null && !IsRefreshTokenExpired();
         }
         
         /// <summary>
@@ -120,7 +112,6 @@ namespace ProjectVG.Infrastructure.Auth.Models
         {
             var info = $"TokenSet Debug Info:\n";
             info += $"Created At: {CreatedAt:yyyy-MM-dd HH:mm:ss} UTC\n";
-            info += $"Is Valid: {IsValid()}\n";
             info += $"Has Refresh Token: {HasRefreshToken()}\n";
             info += $"Needs Refresh: {NeedsRefresh()}\n";
             
@@ -130,8 +121,6 @@ namespace ProjectVG.Infrastructure.Auth.Models
                 info += $"  Token: {AccessToken.Token?.Substring(0, Math.Min(20, AccessToken.Token.Length))}...\n";
                 info += $"  Expires At: {AccessToken.ExpiresAt:yyyy-MM-dd HH:mm:ss} UTC\n";
                 info += $"  Is Expired: {AccessToken.IsExpired()}\n";
-                info += $"  Token Type: {AccessToken.TokenType}\n";
-                info += $"  Scope: {AccessToken.Scope}\n";
             }
             
             if (RefreshToken != null)

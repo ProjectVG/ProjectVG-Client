@@ -6,6 +6,7 @@ using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
 using ProjectVG.Domain.Chat.Model;
+using ProjectVG.Infrastructure.Auth;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -22,21 +23,19 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         private bool _isConnected = false;
         private bool _isConnecting = false;
         private int _reconnectAttempts = 0;
-        private string _sessionId;
         private bool _autoReconnect = true;
         private float _reconnectDelay = 5f;
         private int _maxReconnectAttempts = 10;
         private float _maxReconnectDelay = 60f;
         private bool _useExponentialBackoff = true;
         private bool _isShutdown = false;
-
-        // 순환 의존성 해결: 직접 참조 대신 이벤트 사용
-        public event Action<string> OnSessionMessageReceived;
         
-        // 새로운 설계: 세션 연결/해제 이벤트
-        public event Action<string> OnSessionConnected;     // 세션 ID와 함께 연결 완료 
-        public event Action OnSessionDisconnected;          // 세션 연결 해제
+        private TokenManager _tokenManager;
+        private TokenRefreshService _tokenRefreshService;
 
+        // 메시지 이벤트
+        public event Action<string> OnMessageReceived;
+        
         public event Action OnConnected;
         public event Action OnDisconnected;
         public event Action<string> OnError;
@@ -44,7 +43,6 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 
         public bool IsConnected => _isConnected;
         public bool IsConnecting => _isConnecting;
-        public string SessionId => _sessionId;
         public bool AutoReconnect => _autoReconnect;
         public int ReconnectAttempts => _reconnectAttempts;
         
@@ -53,6 +51,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         protected override void Awake()
         {
             base.Awake();
+            _tokenManager = TokenManager.Instance;
+            _tokenRefreshService = TokenRefreshService.Instance;
         }
 
         private void OnDestroy()
@@ -75,6 +75,11 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 			}
 			_cancellationTokenSource = new CancellationTokenSource();
 			InitializeNativeWebSocket();
+			
+			// TokenManager 이벤트 구독 - 토큰 변경 시 연결 상태 관리
+			_tokenManager.OnTokensUpdated += OnTokensUpdated;
+			_tokenManager.OnTokensCleared += OnTokensCleared;
+			
 #pragma warning disable CS4014
 			StartConnectionMonitoring();
 #pragma warning restore CS4014
@@ -83,7 +88,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         /// <summary>
         /// 서버와 웹소켓 연결 시도
         /// </summary>
-        public async UniTask<bool> ConnectAsync(string sessionId = null, CancellationToken cancellationToken = default)
+        public async UniTask<bool> ConnectAsync(CancellationToken cancellationToken = default)
         {
             if (_isConnected || _isConnecting)
             {
@@ -91,17 +96,42 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 return _isConnected;
             }
 
+            Console.WriteLine($"[WebSocket] ConnectAsync 호출 - 연결 상태: {_isConnected}, 연결 중: {_isConnecting}");
+            Console.WriteLine($"[WebSocket] 토큰 상태 - AccessToken: {_tokenManager.GetAccessToken()?.Substring(0, 10) ?? "null"}, RefreshToken: {_tokenManager.GetRefreshToken()?.Substring(0, 10) ?? "null"}");
+
+            // 로그인 상태 확인
+            if (!_tokenManager.HasValidTokens)
+            {
+                Debug.LogWarning("[WebSocket] 유효한 Access Token이 없어 연결할 수 없습니다.");
+                
+                // Refresh Token으로 Access Token 재요청 시도
+                if (_tokenManager.HasRefreshToken && !_tokenManager.IsRefreshTokenExpired())
+                {
+                    Debug.Log("[WebSocket] Refresh Token으로 Access Token 갱신 시도");
+                    var refreshSuccess = await _tokenRefreshService.RefreshAccessTokenAsync();
+                    if (!refreshSuccess)
+                    {
+                        Debug.LogError("[WebSocket] 토큰 갱신 실패 - 연결 불가");
+                        return false;
+                    }
+                }
+                else
+                {
+                    Debug.LogError("[WebSocket] 유효한 Refresh Token도 없습니다. 재로그인이 필요합니다.");
+                    return false;
+                }
+            }
+
             _isConnecting = true;
-            _sessionId = sessionId;
 
             try
             {
                 var combinedCancellationToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cancellationTokenSource.Token).Token;
                 
-                var wsUrl = GetWebSocketUrl(sessionId);
+                var wsUrl = GetWebSocketUrlWithToken();
                 Debug.Log($"[WebSocket] 환경: {NetworkConfig.CurrentEnvironment}");
                 Debug.Log($"[WebSocket] 서버 주소(환경기반): {NetworkConfig.WebSocketServerAddress}");
-                Debug.Log($"[WebSocket] 연결 시도 URL: {wsUrl}");
+                Debug.Log($"[WebSocket] 연결 시도 URL: {wsUrl.Substring(0, Math.Min(wsUrl.Length, 100))}...");
 
                 var success = await _nativeWebSocket.ConnectAsync(wsUrl, combinedCancellationToken);
                 
@@ -126,7 +156,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
             catch (Exception ex)
             {
-                var error = $"WebSocket 연결 중 예외 발생: {ex.Message}\n환경: {NetworkConfig.CurrentEnvironment}\n서버 주소: {NetworkConfig.WebSocketServerAddress}\n요청 URL: {GetWebSocketUrl(sessionId)}";
+                var error = $"WebSocket 연결 중 예외 발생: {ex.Message}\n환경: {NetworkConfig.CurrentEnvironment}\n서버 주소: {NetworkConfig.WebSocketServerAddress}";
                 Debug.LogError($"[WebSocket] {error}");
                 OnError?.Invoke(error);
                 return false;
@@ -185,6 +215,13 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
             _isShutdown = true;
 
+            // 이벤트 구독 해제
+            if (_tokenManager != null)
+            {
+                _tokenManager.OnTokensUpdated -= OnTokensUpdated;
+                _tokenManager.OnTokensCleared -= OnTokensCleared;
+            }
+
             _autoReconnect = false;
             DisconnectAsync().Forget();
             
@@ -211,13 +248,14 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _nativeWebSocket.OnMessageReceived += OnNativeMessageReceived;
         }
 
-        private string GetWebSocketUrl(string sessionId = null)
+        private string GetWebSocketUrlWithToken()
         {
             string baseUrl = NetworkConfig.GetWebSocketUrl();
+            string accessToken = _tokenManager.GetAccessToken();
             
-            if (!string.IsNullOrEmpty(sessionId))
+            if (!string.IsNullOrEmpty(accessToken))
             {
-                return $"{baseUrl}?sessionId={sessionId}";
+                return $"{baseUrl}?token={accessToken}";
             }
             
             return baseUrl;
@@ -243,7 +281,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             
             if (!_isConnected)
             {
-                await ConnectAsync(_sessionId);
+                await ConnectAsync();
             }
         }
         
@@ -254,9 +292,9 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             {
                 await UniTask.Delay(TimeSpan.FromSeconds(30), cancellationToken: token);
                 
-                if (!_isConnected && !_isConnecting && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts)
+                if (!_isConnected && !_isConnecting && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts && _tokenManager.HasValidTokens)
                 {
-                    await ConnectAsync(_sessionId);
+                    await ConnectAsync();
                 }
             }
         }
@@ -276,15 +314,7 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _isConnected = false;
             _isConnecting = false;
             
-            string previousSessionId = _sessionId;
-            _sessionId = null;
-            
-            Debug.LogWarning("[WebSocket] 세션이 끊어졌습니다. 재연결을 시도합니다.");
-            
-            if (!string.IsNullOrEmpty(previousSessionId))
-            {
-                OnSessionDisconnected?.Invoke();
-            }
+            Debug.LogWarning("[WebSocket] 연결이 끊어졌습니다. 재연결을 시도합니다.");
             
             OnDisconnected?.Invoke();
             
@@ -398,46 +428,18 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
 
                 switch (messageType)
                 {
-                    case "session":
-                        ProcessSessionMessage(dataToken.ToString(Formatting.None));
-                        break;
                     case "chat":
                         ProcessChatMessage(dataToken.ToString(Formatting.None));
                         break;
                     default:
-                        Debug.LogWarning($"[WebSocket] 알 수 없는 메시지 타입: {messageType}");
+                        Debug.Log($"[WebSocket] 메시지 타입: {messageType}");
+                        OnMessageReceived?.Invoke(message);
                         break;
                 }
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[WebSocket] 메시지 처리 중 오류: {ex.Message}");
-            }
-        }
-
-        private void ProcessSessionMessage(string data)
-        {
-            try
-            {
-                Debug.Log($"[WebSocket] 세션 메시지 수신: {data?.Substring(0, Math.Min(50, data?.Length ?? 0))}...");
-                
-                var jsonObject = JObject.Parse(data);
-                string sessionId = jsonObject["session_id"]?.ToString();
-                
-                if (!string.IsNullOrEmpty(sessionId))
-                {
-                    _sessionId = sessionId;
-                    Debug.Log($"[WebSocket] 세션 연결 완료: {sessionId}");
-                    OnSessionConnected?.Invoke(sessionId);
-                }
-                
-                OnSessionMessageReceived?.Invoke(data);
-                
-                Debug.Log($"[WebSocket] 세션 메시지 처리 완료");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[WebSocket] 세션 메시지 처리 중 오류: {ex.Message}");
             }
         }
 
@@ -466,6 +468,32 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 Debug.LogError($"[WebSocket] 채팅 메시지 처리 중 오류: {ex.Message}");
                 Debug.LogError($"[WebSocket] 원시 데이터: {data}");
             }
+        }
+        
+        /// <summary>
+        /// 토큰 업데이트 이벤트 핸들러 - 로그인 완료 시 자동 연결
+        /// </summary>
+        private void OnTokensUpdated(ProjectVG.Infrastructure.Auth.Models.TokenSet tokenSet)
+        {
+            Debug.Log("[WebSocket] 토큰이 업데이트되었습니다. 연결을 시도합니다.");
+            
+            // 로그인 완료 시 WebSocket 자동 연결
+            if (!_isConnected && !_isConnecting)
+            {
+                ConnectAsync().Forget();
+            }
+        }
+        
+        /// <summary>
+        /// 토큰 클리어 이벤트 핸들러 - 로그아웃 시 연결 해제
+        /// </summary>
+        private void OnTokensCleared()
+        {
+            Debug.Log("[WebSocket] 토큰이 클리어되었습니다. 연결을 해제합니다.");
+            
+            // 로그아웃 시 WebSocket 연결 해제
+            _autoReconnect = false;
+            DisconnectAsync().Forget();
         }
         
         #endregion

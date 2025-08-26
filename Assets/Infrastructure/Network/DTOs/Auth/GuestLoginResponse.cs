@@ -44,12 +44,7 @@ namespace ProjectVG.Infrastructure.Network.DTOs.Auth
                 return null;
             }
 
-            var accessToken = new AccessToken(
-                Tokens.AccessToken,
-                Tokens.ExpiresIn,
-                "Bearer",
-                "api"
-            );
+            var accessToken = new AccessToken(Tokens.AccessToken);
 
             RefreshToken refreshToken = null;
             if (!string.IsNullOrEmpty(Tokens.RefreshToken))

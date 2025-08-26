@@ -262,7 +262,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2
                 }
                 
                 // 3. TokenSet 생성
-                var accessTokenModel = new AccessToken(accessToken, expiresIn, "Bearer", "oauth2");
+                var accessTokenModel = new AccessToken(accessToken);
                 var refreshTokenModel = !string.IsNullOrEmpty(refreshToken) 
                     ? new RefreshToken(refreshToken, expiresIn * 2, userId)  // userId를 DeviceId로 사용
                     : null;

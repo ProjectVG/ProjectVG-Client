@@ -16,7 +16,6 @@ namespace ProjectVG.Core.Managers
     {
         [Header("Core Managers")]
         [SerializeField] private WebSocketManager? _webSocketManager;
-        [SerializeField] private SessionManager? _sessionManager;
         [SerializeField] private HttpApiClient? _httpApiClient;
         [SerializeField] private AudioManager? _audioManager;
         [SerializeField] private LoadingManager? _loadingManager;
@@ -35,7 +34,6 @@ namespace ProjectVG.Core.Managers
         public bool IsInitialized { get; private set; }
 
         public WebSocketManager? WebSocketManager => _webSocketManager;
-        public SessionManager? SessionManager => _sessionManager;
         public AudioManager? AudioManager => _audioManager;
         public LoadingManager? LoadingManager => _loadingManager;
 
@@ -174,17 +172,8 @@ namespace ProjectVG.Core.Managers
         public void Shutdown()
         {
             try { _httpApiClient?.Shutdown(); } catch {}
-            try { _sessionManager?.Shutdown(); } catch {}
             try { _webSocketManager?.Shutdown(); } catch {}
             Debug.Log("[SystemManager] 시스템 종료 완료");
-        }
-        
-        [ContextMenu("Log Manager Status")]
-        public void LogManagerStatus()
-        {
-            Debug.Log($"[SystemManager] Initialized: {IsInitialized}");
-            Debug.Log($"[SystemManager] Current Camera: {(_camera != null ? _camera.name : "null")}");
-            Debug.Log($"[SystemManager] WS: {(WebSocketManager != null ? "OK" : "null")}, Session: {(SessionManager != null ? "OK" : "null")}, Audio: {(AudioManager != null ? "OK" : "null")}, Loading: {(LoadingManager != null ? "OK" : "null")}");
         }
 
         [ContextMenu("Update Camera")]
@@ -230,7 +219,6 @@ namespace ProjectVG.Core.Managers
             if (_createManagersIfNotExist)
             {
                 _webSocketManager = WebSocketManager.Instance;
-                _sessionManager = SessionManager.Instance;
                 _httpApiClient = HttpApiClient.Instance;
                 _audioManager = AudioManager.Instance;
                 _loadingManager = LoadingManager.Instance;
@@ -239,21 +227,14 @@ namespace ProjectVG.Core.Managers
 
         private async UniTask InitializeManagersAsync()
         {
-            if (_webSocketManager == null || _sessionManager == null || _httpApiClient == null)
+            if (_webSocketManager == null || _httpApiClient == null)
             {
                 throw new InvalidOperationException("필수 매니저 인스턴스를 찾을 수 없습니다.");
             }
             _loadingManager?.BeginLoadingUI();
             _audioManager?.Initialize();
             _webSocketManager.Initialize();
-            _sessionManager.Initialize(_webSocketManager);
-            _httpApiClient.Initialize(_sessionManager);
-
-            bool connected = await _sessionManager.EnsureConnectionAsync();
-            if (!connected)
-            {
-                throw new InvalidOperationException("세션 연결 실패");
-            }
+            _httpApiClient.Initialize();
         }
     }
     

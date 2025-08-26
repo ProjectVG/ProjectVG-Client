@@ -108,6 +108,7 @@ namespace ProjectVG.Infrastructure.Auth.Services
 
                 Debug.Log("[GuestAuthService] Guest 로그인 성공");
                 Debug.Log($"[GuestAuthService] 사용자 ID: {response.User?.UserId}");
+                Debug.Log($"[GuestAuthService] AccessToken : {tokenSet.AccessToken.Token}");
                 Debug.Log($"[GuestAuthService] AccessToken 만료: {tokenSet.AccessToken.ExpiresAt}");
 
                 // 성공 이벤트 발생

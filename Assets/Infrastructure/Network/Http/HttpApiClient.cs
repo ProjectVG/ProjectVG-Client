@@ -19,10 +19,10 @@ namespace ProjectVG.Infrastructure.Network.Http
         private const string ACCEPT_HEADER = "application/json";
         private const string AUTHORIZATION_HEADER = "Authorization";
         private const string BEARER_PREFIX = "Bearer ";
+        private const string DEFAULT_FILE_NAME = "file.wav";
 
         private readonly Dictionary<string, string> defaultHeaders = new Dictionary<string, string>();
         private CancellationTokenSource cancellationTokenSource;
-        private SessionManager _sessionManager;
         public bool IsInitialized { get; private set; }
         
         #region Unity Lifecycle
@@ -44,9 +44,8 @@ namespace ProjectVG.Infrastructure.Network.Http
         /// <summary>
         /// 초기화 실행
         /// </summary>
-        public void Initialize(SessionManager sessionManager)
+        public void Initialize()
         {
-            _sessionManager = sessionManager;
             cancellationTokenSource?.Cancel();
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = new CancellationTokenSource();
@@ -55,83 +54,55 @@ namespace ProjectVG.Infrastructure.Network.Http
             IsInitialized = true;
         }
         
-        /// <summary>
-        /// 기본 헤더 추가
-        /// </summary>
         public void AddDefaultHeader(string key, string value)
         {
             defaultHeaders[key] = value;
         }
 
-        /// <summary>
-        /// 기본 헤더 제거
-        /// </summary>
         public void RemoveDefaultHeader(string key)
         {
-            if (defaultHeaders.ContainsKey(key))
-            {
-                defaultHeaders.Remove(key);
-                Debug.Log($"[HttpApiClient] 기본 헤더 제거: {key}");
-            }
+            defaultHeaders.Remove(key);
         }
 
-        /// <summary>
-        /// 인증 토큰 설정
-        /// </summary>
         public void SetAuthToken(string token)
         {
             AddDefaultHeader(AUTHORIZATION_HEADER, $"{BEARER_PREFIX}{token}");
         }
 
-        /// <summary>
-        /// TokenManager에서 자동으로 토큰 설정
-        /// </summary>
-        public void SetAuthTokenFromManager()
+        private void EnsureAuthToken(bool requiresAuth)
         {
+            if (!requiresAuth) return;
+            
             try
             {
-                Debug.Log("[HttpApiClient] TokenManager에서 Access Token 요청 중...");
                 var tokenManager = ProjectVG.Infrastructure.Auth.TokenManager.Instance;
                 var accessToken = tokenManager.GetAccessToken();
-                
+
+                Debug.Log($"[HttpApiClient] Access Token: {accessToken}");
+
                 if (!string.IsNullOrEmpty(accessToken))
                 {
                     SetAuthToken(accessToken);
-                    Debug.Log($"[HttpApiClient] TokenManager에서 Access Token 설정 완료 (토큰 길이: {accessToken.Length})");
                 }
                 else
                 {
-                    Debug.LogWarning("[HttpApiClient] TokenManager에서 유효한 Access Token을 찾을 수 없습니다.");
-                    // Authorization 헤더 제거
+                    Debug.LogWarning("[HttpApiClient] 유효한 Access Token을 찾을 수 없습니다.");
                     RemoveDefaultHeader(AUTHORIZATION_HEADER);
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[HttpApiClient] TokenManager에서 토큰 설정 실패: {ex.Message}");
-                // Authorization 헤더 제거
+                Debug.LogError($"[HttpApiClient] 토큰 설정 실패: {ex.Message}");
                 RemoveDefaultHeader(AUTHORIZATION_HEADER);
             }
         }
 
         public async UniTask<T> GetAsync<T>(string endpoint, Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
-            // 자동 초기화
-            if (!IsInitialized)
-            {
-                Debug.LogWarning("[HttpApiClient] 자동 초기화 수행");
-                Initialize(null);
-            }
-            
-            // 인증이 필요한 경우 TokenManager에서 토큰 설정
-            if (requiresAuth)
-            {
-                SetAuthTokenFromManager();
-            }
+            EnsureInitialized();
+            EnsureAuthToken(requiresAuth);
             
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
-            Debug.Log($"[HttpApiClient] GET 요청 시작: {url} (인증 필요: {requiresAuth})");
-            Debug.Log($"[HttpApiClient] 헤더: {JsonConvert.SerializeObject(headers)}");
             return await SendJsonRequestAsync<T>(url, UnityWebRequest.kHttpVerbGET, null, headers, cancellationToken);
         }
 
@@ -140,120 +111,70 @@ namespace ProjectVG.Infrastructure.Network.Http
         /// </summary>
         public async UniTask<(T Data, Dictionary<string, string> Headers)> GetWithHeadersAsync<T>(string endpoint, Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
-            // 인증이 필요한 경우 TokenManager에서 토큰 설정
-            if (requiresAuth)
-            {
-                SetAuthTokenFromManager();
-            }
+            EnsureInitialized();
+            EnsureAuthToken(requiresAuth);
             
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
-            Debug.Log($"[HttpApiClient] GET With Headers 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendJsonRequestWithHeadersAsync<T>(url, UnityWebRequest.kHttpVerbGET, null, headers, cancellationToken);
         }
 
-        public async UniTask<T> PostAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, bool requiresAuth = false, CancellationToken cancellationToken = default)
+        public async UniTask<T> PostAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
-            // 인증이 필요한 경우 TokenManager에서 토큰 설정
-            if (requiresAuth)
-            {
-                SetAuthTokenFromManager();
-            }
+            EnsureInitialized();
+            EnsureAuthToken(requiresAuth);
             
             var url = GetFullUrl(endpoint);
-            var jsonData = SerializeData(data, requiresSession);
-            Debug.Log($"[HttpApiClient] POST 요청 시작: {url} (인증 필요: {requiresAuth})");
+            var jsonData = SerializeData(data);
             return await SendJsonRequestAsync<T>(url, UnityWebRequest.kHttpVerbPOST, jsonData, headers, cancellationToken);
         }
 
-        public async UniTask<T> PutAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresSession = false, bool requiresAuth = false, CancellationToken cancellationToken = default)
+        public async UniTask<T> PutAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
-            // 인증이 필요한 경우 TokenManager에서 토큰 설정
-            if (requiresAuth)
-            {
-                SetAuthTokenFromManager();
-            }
+            EnsureInitialized();
+            EnsureAuthToken(requiresAuth);
             
             var url = GetFullUrl(endpoint);
-            var jsonData = SerializeData(data, requiresSession);
-            Debug.Log($"[HttpApiClient] PUT 요청 시작: {url} (인증 필요: {requiresAuth})");
+            var jsonData = SerializeData(data);
             return await SendJsonRequestAsync<T>(url, UnityWebRequest.kHttpVerbPUT, jsonData, headers, cancellationToken);
         }
 
         public async UniTask<T> DeleteAsync<T>(string endpoint, Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
-            // 인증이 필요한 경우 TokenManager에서 토큰 설정
-            if (requiresAuth)
-            {
-                SetAuthTokenFromManager();
-            }
+            EnsureInitialized();
+            EnsureAuthToken(requiresAuth);
             
             var url = GetFullUrl(endpoint);
-            Debug.Log($"[HttpApiClient] DELETE 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendJsonRequestAsync<T>(url, UnityWebRequest.kHttpVerbDELETE, null, headers, cancellationToken);
         }
 
         public async UniTask<T> UploadFileAsync<T>(string endpoint, byte[] fileData, string fileName, string fieldName = "file", Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
-            // 인증이 필요한 경우 TokenManager에서 토큰 설정
-            if (requiresAuth)
-            {
-                SetAuthTokenFromManager();
-            }
+            EnsureInitialized();
+            EnsureAuthToken(requiresAuth);
             
             var url = GetFullUrl(endpoint);
-            var formData = new Dictionary<string, object>
-            {
-                { fieldName, fileData }
-            };
-            var fileNames = new Dictionary<string, string>
-            {
-                { fieldName, fileName }
-            };
-            Debug.Log($"[HttpApiClient] Upload File 요청 시작: {url} (인증 필요: {requiresAuth})");
+            var formData = new Dictionary<string, object> { { fieldName, fileData } };
+            var fileNames = new Dictionary<string, string> { { fieldName, fileName } };
+            
             return await SendFormDataRequestAsync<T>(url, formData, fileNames, headers, cancellationToken);
         }
         
         public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> headers, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
-            // 인증이 필요한 경우 TokenManager에서 토큰 설정
-            if (requiresAuth)
-            {
-                SetAuthTokenFromManager();
-            }
+            EnsureInitialized();
+            EnsureAuthToken(requiresAuth);
             
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
-            Debug.Log($"[HttpApiClient] Post Form Data 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendFormDataRequestAsync<T>(url, formData, null, headers, cancellationToken);
         }
 
         public async UniTask<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, object> formData, Dictionary<string, string> fileNames, Dictionary<string, string> headers, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
-            // 인증이 필요한 경우 TokenManager에서 토큰 설정
-            if (requiresAuth)
-            {
-                SetAuthTokenFromManager();
-            }
+            EnsureInitialized();
+            EnsureAuthToken(requiresAuth);
+            ValidateFileSize(formData);
             
             var url = IsFullUrl(endpoint) ? endpoint : GetFullUrl(endpoint);
-            
-            // 파일 크기 검사
-            if (NetworkConfig.EnableFileSizeCheck)
-            {
-                foreach (var kvp in formData)
-                {
-                    if (kvp.Value is byte[] byteData)
-                    {
-                        if (byteData.Length > NetworkConfig.MaxFileSize)
-                        {
-                            var fileSizeMB = byteData.Length / 1024.0 / 1024.0;
-                            var maxSizeMB = NetworkConfig.MaxFileSize / 1024.0 / 1024.0;
-                            throw new FileSizeExceededException(fileSizeMB, maxSizeMB);
-                        }
-                    }
-                }
-            }
-            
-            Debug.Log($"[HttpApiClient] Post Form Data with Files 요청 시작: {url} (인증 필요: {requiresAuth})");
             return await SendFormDataRequestAsync<T>(url, formData, fileNames, headers, cancellationToken);
         }
 
@@ -271,6 +192,34 @@ namespace ProjectVG.Infrastructure.Network.Http
         
         #region Private Methods
 
+        private void EnsureInitialized()
+        {
+            if (!IsInitialized)
+            {
+                Initialize();
+            }
+        }
+        
+        private void ValidateFileSize(Dictionary<string, object> formData)
+        {
+            if (!NetworkConfig.EnableFileSizeCheck) return;
+            
+            foreach (var kvp in formData)
+            {
+                if (kvp.Value is byte[] byteData && byteData.Length > NetworkConfig.MaxFileSize)
+                {
+                    var fileSizeMB = byteData.Length / 1024.0 / 1024.0;
+                    var maxSizeMB = NetworkConfig.MaxFileSize / 1024.0 / 1024.0;
+                    throw new FileSizeExceededException(fileSizeMB, maxSizeMB);
+                }
+            }
+        }
+        
+        private string SerializeData(object data)
+        {
+            return data == null ? null : JsonConvert.SerializeObject(data);
+        }
+        
         private void ApplyNetworkConfig()
         {
         }
@@ -292,244 +241,146 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             return url.StartsWith("http://") || url.StartsWith("https://");
         }
-
-        private string SerializeData(object data, bool requiresSession = false)
-        {
-            if (data == null) return null;
-            
-            var jsonData = JsonConvert.SerializeObject(data);
-            
-            if (requiresSession && data is ChatRequest chatRequest && string.IsNullOrEmpty(chatRequest.sessionId))
-            {
-                var sessionId = _sessionManager?.SessionId ?? "";
-                if (!string.IsNullOrEmpty(sessionId))
-                {
-                    var jsonObject = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonData);
-                    jsonObject["session_id"] = sessionId;
-                    jsonData = JsonConvert.SerializeObject(jsonObject);
-                }
-                else
-                {
-                    Debug.LogWarning("[HttpApiClient] 세션 연결이 필요한 요청이지만 세션 ID를 획득할 수 없습니다.");
-                }
-            }
-            
-            return jsonData;
-        }
-
-		
-
         private async UniTask<T> SendJsonRequestAsync<T>(string url, string method, string jsonData, Dictionary<string, string> headers, CancellationToken cancellationToken)
         {
-            Debug.Log($"[HttpApiClient] SendJsonRequestAsync 시작");
-            Debug.Log($"[HttpApiClient] URL: {url}");
-            Debug.Log($"[HttpApiClient] Method: {method}");
-            Debug.Log($"[HttpApiClient] JSON Data: {jsonData}");
-            Debug.Log($"[HttpApiClient] Headers: {JsonConvert.SerializeObject(headers)}");
-            Debug.Log($"[HttpApiClient] IsInitialized: {IsInitialized}");
-            Debug.Log($"[HttpApiClient] cancellationTokenSource null: {cancellationTokenSource == null}");
-            
-            var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
-
-            for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
+            return await ExecuteRequestWithRetry<T>(async (attempt, token) =>
             {
-                try
-                {
-                    using var request = CreateJsonRequest(url, method, jsonData, headers);
+                using var request = CreateJsonRequest(url, method, jsonData, headers);
+                var operation = request.SendWebRequest();
+                await operation.WithCancellation(token);
+                
+                if (request.result == UnityWebRequest.Result.Success)
+                    return ParseResponse<T>(request);
                     
-                    var operation = request.SendWebRequest();
-                    await operation.WithCancellation(combinedCancellationToken);
-
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        return ParseResponse<T>(request);
-                    }
-                    else
-                    {
-                        await HandleRequestFailure(request, attempt, combinedCancellationToken);
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex) when (ex is not ApiException)
-                {
-                    await HandleRequestException(ex, attempt, combinedCancellationToken);
-                }
-            }
-
-            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 요청 실패", 0, "최대 재시도 횟수 초과");
+                await HandleRequestFailure(request, attempt, token);
+                return default(T);
+            }, cancellationToken);
         }
 
         private async UniTask<(T Data, Dictionary<string, string> Headers)> SendJsonRequestWithHeadersAsync<T>(string url, string method, string jsonData, Dictionary<string, string> headers, CancellationToken cancellationToken)
         {
+            return await ExecuteRequestWithRetry<(T, Dictionary<string, string>)>(async (attempt, token) =>
+            {
+                using var request = CreateJsonRequest(url, method, jsonData, headers);
+                var operation = request.SendWebRequest();
+                await operation.WithCancellation(token);
+                
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    var data = ParseResponse<T>(request);
+                    var responseHeaders = ExtractResponseHeaders(request);
+                    return (data, responseHeaders);
+                }
+                    
+                await HandleRequestFailure(request, attempt, token);
+                return default;
+            }, cancellationToken);
+        }
+
+        private async UniTask<T> SendFormDataRequestAsync<T>(string url, Dictionary<string, object> formData, Dictionary<string, string> fileNames, Dictionary<string, string> headers, CancellationToken cancellationToken)
+        {
+            fileNames ??= new Dictionary<string, string>();
+            
+            return await ExecuteRequestWithRetry<T>(async (attempt, token) =>
+            {
+                var form = CreateFormData(formData, fileNames);
+                using var request = UnityWebRequest.Post(url, form);
+                SetupRequest(request, headers);
+                request.timeout = (int)NetworkConfig.UploadTimeout;
+                
+                var operation = request.SendWebRequest();
+                await operation.WithCancellation(token);
+                
+                if (request.result == UnityWebRequest.Result.Success)
+                    return ParseResponse<T>(request);
+                    
+                await HandleRequestFailure(request, attempt, token, isFileUpload: true);
+                return default(T);
+            }, cancellationToken);
+        }
+
+        private CancellationToken CreateCombinedCancellationToken(CancellationToken cancellationToken)
+        {
+            if (cancellationTokenSource?.Token.CanBeCanceled == true)
+            {
+                try
+                {
+                    return CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellationTokenSource.Token).Token;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[HttpApiClient] CancellationToken 생성 실패: {ex.Message}");
+                }
+            }
+            
+            return cancellationToken;
+        }
+
+        private async UniTask<T> ExecuteRequestWithRetry<T>(Func<int, CancellationToken, UniTask<T>> requestFunc, CancellationToken cancellationToken)
+        {
             var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
 
             for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
             {
                 try
                 {
-                    using var request = CreateJsonRequest(url, method, jsonData, headers);
-                    
-                    var operation = request.SendWebRequest();
-                    await operation.WithCancellation(combinedCancellationToken);
-
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        var data = ParseResponse<T>(request);
-                        var responseHeaders = ExtractResponseHeaders(request);
-                        return (data, responseHeaders);
-                    }
-                    else
-                    {
-                        await HandleRequestFailure(request, attempt, combinedCancellationToken);
-                    }
+                    return await requestFunc(attempt, combinedCancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
                     throw;
                 }
-                catch (Exception ex) when (ex is not ApiException)
+                catch (ApiException) when (attempt == NetworkConfig.MaxRetryCount)
                 {
-                    await HandleRequestException(ex, attempt, combinedCancellationToken);
+                    throw;
+                }
+                catch (Exception ex) when (ex is not ApiException && attempt < NetworkConfig.MaxRetryCount)
+                {
+                    await DelayForRetry(attempt, combinedCancellationToken);
                 }
             }
 
             throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 요청 실패", 0, "최대 재시도 횟수 초과");
         }
-
-		
-
-		
         
-
-
-        private async UniTask<T> SendFormDataRequestAsync<T>(string url, Dictionary<string, object> formData, Dictionary<string, string> fileNames, Dictionary<string, string> headers, CancellationToken cancellationToken)
-        {
-            fileNames = fileNames ?? new Dictionary<string, string>();
-            var combinedCancellationToken = CreateCombinedCancellationToken(cancellationToken);
-
-            for (int attempt = 0; attempt <= NetworkConfig.MaxRetryCount; attempt++)
-            {
-                try
-                {
-                    var form = new WWWForm();
-                    Debug.Log($"[HttpApiClient] 폼 데이터 전송 시작 - URL: {url}");
-                    Debug.Log($"[HttpApiClient] 실제 전송 URL: {url}");
-                    
-                    foreach (var kvp in formData)
-                    {
-                        if (kvp.Value is byte[] byteData)
-                        {
-                            string fileName = fileNames.ContainsKey(kvp.Key) ? fileNames[kvp.Key] : "file.wav";
-                            form.AddBinaryData(kvp.Key, byteData, fileName);
-                            Debug.Log($"[HttpApiClient] 바이너리 데이터 추가 - 필드: {kvp.Key}, 파일명: {fileName}, 크기: {byteData.Length} bytes");
-                        }
-                        else
-                        {
-                            form.AddField(kvp.Key, kvp.Value.ToString());
-                            Debug.Log($"[HttpApiClient] 필드 추가 - {kvp.Key}: {kvp.Value}");
-                        }
-                    }
-                    
-                    using var request = UnityWebRequest.Post(url, form);
-                    // 파일 업로드 시 Content-Type은 UnityWebRequest가 자동으로 설정하도록 함
-                    SetupRequest(request, headers);
-                    request.timeout = (int)NetworkConfig.UploadTimeout; // Use UploadTimeout
-                    
-                    var operation = request.SendWebRequest();
-                    await operation.WithCancellation(combinedCancellationToken);
-
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        return ParseResponse<T>(request);
-                    }
-                    else
-                    {
-                        await HandleFileUploadFailure(request, attempt, combinedCancellationToken);
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex) when (ex is not ApiException)
-                {
-                    await HandleFileUploadException(ex, attempt, combinedCancellationToken);
-                }
-            }
-
-            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, "최대 재시도 횟수 초과");
-        }
-
-        private CancellationToken CreateCombinedCancellationToken(CancellationToken cancellationToken)
-        {
-            if (cancellationTokenSource == null)
-            {
-                Debug.LogError("[HttpApiClient] cancellationTokenSource가 null입니다. HttpApiClient가 초기화되지 않았습니다.");
-                return cancellationToken;
-            }
-            
-            try
-            {
-                return CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellationTokenSource.Token).Token;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[HttpApiClient] CreateCombinedCancellationToken 실패: {ex.Message}");
-                return cancellationToken;
-            }
-        }
-
-        private async UniTask HandleRequestFailure(UnityWebRequest request, int attempt, CancellationToken cancellationToken)
+        private async UniTask HandleRequestFailure(UnityWebRequest request, int attempt, CancellationToken cancellationToken, bool isFileUpload = false)
         {
             var error = new ApiException(request.error, request.responseCode, request.downloadHandler?.text);
+            var requestType = isFileUpload ? "파일 업로드" : "API 요청";
             
             if (ShouldRetry(request.responseCode) && attempt < NetworkConfig.MaxRetryCount)
             {
-                Debug.LogWarning($"[HttpApiClient] API 요청 실패 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {error.Message}");
-                await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
+                Debug.LogWarning($"[HttpApiClient] {requestType} 실패 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {error.Message}");
+                await DelayForRetry(attempt, cancellationToken);
                 return;
             }
             
             throw error;
         }
-
-        private async UniTask HandleRequestException(Exception ex, int attempt, CancellationToken cancellationToken)
+        
+        private async UniTask DelayForRetry(int attempt, CancellationToken cancellationToken)
         {
-            if (attempt < NetworkConfig.MaxRetryCount)
-            {
-                Debug.LogWarning($"[HttpApiClient] API 요청 예외 발생 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {ex.Message}");
-                await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
-                return;
-            }
-            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 요청 실패", 0, ex.Message);
+            await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
         }
-
-        private async UniTask HandleFileUploadFailure(UnityWebRequest request, int attempt, CancellationToken cancellationToken)
+        
+        private WWWForm CreateFormData(Dictionary<string, object> formData, Dictionary<string, string> fileNames)
         {
-            var error = new ApiException(request.error, request.responseCode, request.downloadHandler?.text);
+            var form = new WWWForm();
             
-            if (ShouldRetry(request.responseCode) && attempt < NetworkConfig.MaxRetryCount)
+            foreach (var kvp in formData)
             {
-                Debug.LogWarning($"[HttpApiClient] 파일 업로드 실패 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {error.Message}");
-                await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
-                return;
+                if (kvp.Value is byte[] byteData)
+                {
+                    string fileName = fileNames.ContainsKey(kvp.Key) ? fileNames[kvp.Key] : DEFAULT_FILE_NAME;
+                    form.AddBinaryData(kvp.Key, byteData, fileName);
+                }
+                else
+                {
+                    form.AddField(kvp.Key, kvp.Value.ToString());
+                }
             }
             
-            throw error;
-        }
-
-        private async UniTask HandleFileUploadException(Exception ex, int attempt, CancellationToken cancellationToken)
-        {
-            if (attempt < NetworkConfig.MaxRetryCount)
-            {
-                Debug.LogWarning($"[HttpApiClient] 파일 업로드 예외 발생 (시도 {attempt + 1}/{NetworkConfig.MaxRetryCount + 1}): {ex.Message}");
-                await UniTask.Delay(TimeSpan.FromSeconds(NetworkConfig.RetryDelay * (attempt + 1)), cancellationToken: cancellationToken);
-                return;
-            }
-            throw new ApiException($"{NetworkConfig.MaxRetryCount + 1}번 시도 후 파일 업로드 실패", 0, ex.Message);
+            return form;
         }
 
 		
@@ -577,23 +428,14 @@ namespace ProjectVG.Infrastructure.Network.Http
                 }
             }
             
-            // 디버깅: Content-Type 헤더 확인
-            string contentType = request.GetRequestHeader("Content-Type");
-            Debug.Log($"[HttpApiClient] 요청 헤더 설정 완료 - Content-Type: {contentType}");
         }
 
         private T ParseResponse<T>(UnityWebRequest request)
         {
             var responseText = request.downloadHandler?.text;
             
-            Debug.Log($"[HttpApiClient] 응답 파싱 - Status: {request.responseCode}, Content-Length: {request.downloadHandler?.data?.Length ?? 0}");
-            Debug.Log($"[HttpApiClient] 응답 텍스트: '{responseText}'");
-            
             if (string.IsNullOrEmpty(responseText))
-            {
-                Debug.LogWarning("[HttpApiClient] 응답 텍스트가 비어있습니다.");
                 return default(T);
-            }
 
             try
             {
@@ -601,7 +443,6 @@ namespace ProjectVG.Infrastructure.Network.Http
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[HttpApiClient] JSON 파싱 실패: {ex.Message}");
                 return TryFallbackParse<T>(responseText, request.responseCode, ex);
             }
         }
@@ -614,47 +455,26 @@ namespace ProjectVG.Infrastructure.Network.Http
             }
             catch (Exception fallbackEx)
             {
-                throw new ApiException($"응답 파싱 실패: {originalException.Message} (폴백도 실패: {fallbackEx.Message})", responseCode, responseText);
+                var errorMessage = $"JSON 파싱 실패: {originalException.Message} (Unity JsonUtility 폴백도 실패: {fallbackEx.Message})";
+                Debug.LogError($"[HttpApiClient] {errorMessage}");
+                throw new ApiException(errorMessage, responseCode, responseText);
             }
         }
 
-        /// <summary>
-        /// HTTP 응답 헤더 추출
-        /// </summary>
         private Dictionary<string, string> ExtractResponseHeaders(UnityWebRequest request)
         {
             var headers = new Dictionary<string, string>();
-            
-            // UnityWebRequest에서 사용 가능한 헤더들
-            var responseHeaders = request.GetResponseHeader("X-Access-Token");
-            if (!string.IsNullOrEmpty(responseHeaders))
-                headers["X-Access-Token"] = responseHeaders;
-                
-            responseHeaders = request.GetResponseHeader("X-Refresh-Token");
-            if (!string.IsNullOrEmpty(responseHeaders))
-                headers["X-Refresh-Token"] = responseHeaders;
-                
-            responseHeaders = request.GetResponseHeader("X-Expires-In");
-            if (!string.IsNullOrEmpty(responseHeaders))
-                headers["X-Expires-In"] = responseHeaders;
-                
-            responseHeaders = request.GetResponseHeader("X-User-Id");
-            if (!string.IsNullOrEmpty(responseHeaders))
-                headers["X-User-Id"] = responseHeaders;
-                
-            // 기타 헤더들도 추가 가능
-            responseHeaders = request.GetResponseHeader("Content-Type");
-            if (!string.IsNullOrEmpty(responseHeaders))
-                headers["Content-Type"] = responseHeaders;
-                
-            responseHeaders = request.GetResponseHeader("Authorization");
-            if (!string.IsNullOrEmpty(responseHeaders))
-                headers["Authorization"] = responseHeaders;
-            
-            Debug.Log($"[HttpApiClient] 응답 헤더 추출: {headers.Count}개 헤더");
-            foreach (var header in headers)
+            var headerNames = new[] 
             {
-                Debug.Log($"[HttpApiClient] 헤더: {header.Key} = {header.Value}");
+                "X-Access-Token", "X-Refresh-Token", "X-Expires-In", "X-User-Id",
+                "Content-Type", "Authorization"
+            };
+            
+            foreach (var headerName in headerNames)
+            {
+                var headerValue = request.GetResponseHeader(headerName);
+                if (!string.IsNullOrEmpty(headerValue))
+                    headers[headerName] = headerValue;
             }
             
             return headers;
