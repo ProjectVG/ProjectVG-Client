@@ -14,7 +14,7 @@ namespace ProjectVG.Infrastructure.Network.Services
     public class ChatApiService
     {
         private readonly HttpApiClient _httpClient;
-        private const string CHAT_ENDPOINT = "chat";
+        private const string CHAT_ENDPOINT = "/api/v1/chat";
         private const string DEFAULT_ACTION = "chat";
 
         public ChatApiService()
