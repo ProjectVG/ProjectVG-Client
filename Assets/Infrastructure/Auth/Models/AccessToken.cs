@@ -20,5 +20,10 @@ namespace ProjectVG.Infrastructure.Auth.Models
         {
             return DateTime.UtcNow >= ExpiresAt;
         }
+        
+        public bool IsExpiringSoon(int minutesBeforeExpiry)
+        {
+            return DateTime.UtcNow.AddMinutes(minutesBeforeExpiry) >= ExpiresAt;
+        }
     }
 }
