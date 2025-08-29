@@ -18,7 +18,7 @@ namespace ProjectVG.Domain.Character.Service
 
 		private CharacterModelLoader _modelLoader;
 		private GameObject _currentCharacter;
-		private CharacterActionController _currentActionService;
+		private CharacterActionController _actionController;
 		private int _loadVersion = 0;
 
         #region Unity Lifecycle
@@ -89,7 +89,7 @@ namespace ProjectVG.Domain.Character.Service
 			if (newCharacter != null)
 			{
 				_currentCharacter = newCharacter;
-				_currentActionService = _currentCharacter.GetComponent<CharacterActionController>();
+				_actionController = _currentCharacter.GetComponent<CharacterActionController>();
 				_currentCharacter.SetActive(true);
 				Debug.Log($"[CharacterManager] 캐릭터 로드 완료: {characterId}");
 			}
@@ -104,7 +104,7 @@ namespace ProjectVG.Domain.Character.Service
 			{
 				Destroy(_currentCharacter);
 				_currentCharacter = null;
-				_currentActionService = null;
+				_actionController = null;
 			}
 		}
 
@@ -114,9 +114,9 @@ namespace ProjectVG.Domain.Character.Service
 		/// <param name="actionData">액션 데이터</param>
 		public void PlayAction(CharacterActionData actionData)
 		{
-			if (_currentActionService != null && actionData.HasAction())
+			if (_actionController != null && actionData.HasAction())
 			{
-				_currentActionService.PlayAction(actionData.ActionType);
+				_actionController.PlayAction(actionData.ActionType);
 			}
 		}
 
@@ -125,7 +125,7 @@ namespace ProjectVG.Domain.Character.Service
 		/// </summary>
 		public void StopCurrentAction()
 		{
-			_currentActionService?.StopCurrentAction();
+			_actionController?.StopCurrentAction();
 		}
 
 		/// <summary>
@@ -134,7 +134,7 @@ namespace ProjectVG.Domain.Character.Service
 		/// <returns>액션 재생 중이면 true</returns>
 		public bool IsActionPlaying()
 		{
-			return _currentActionService?.IsPlaying() ?? false;
+			return _actionController?.IsPlaying() ?? false;
 		}
 
 		/// <summary>

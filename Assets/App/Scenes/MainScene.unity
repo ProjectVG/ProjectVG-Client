@@ -920,8 +920,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _chatBubblePanel: {fileID: 2017944365}
   _characterManager: {fileID: 873552998}
-  _characterId: 44444444-4444-4444-4444-444444444444
-  _userId: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
+  _characterId: 11111111-1111-1111-1111-111111111111
 --- !u!4 &829067253
 Transform:
   m_ObjectHideFlags: 0
