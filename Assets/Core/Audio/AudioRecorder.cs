@@ -1,4 +1,5 @@
 #nullable enable
+#if !UNITY_WEBGL || UNITY_EDITOR
 using System;
 using UnityEngine;
 using System.Collections.Generic;
@@ -36,7 +37,12 @@ namespace ProjectVG.Core.Audio
         // 프로퍼티
         public bool IsRecording => _isRecording;
         public float RecordingDuration => _isRecording ? Time.time - _recordingStartTime : 0f;
-        public bool IsRecordingAvailable => Microphone.devices.Length > 0;
+        public bool IsRecordingAvailable => 
+#if UNITY_WEBGL && !UNITY_EDITOR
+            false;
+#else
+            Microphone.devices.Length > 0;
+#endif
         public float RecordingProgress => _isRecording ? Mathf.Clamp01(RecordingDuration / _maxRecordingLength) : 0f;
         
         #region Unity Lifecycle
@@ -98,7 +104,14 @@ namespace ProjectVG.Core.Audio
                 _isRecording = true;
                 _recordingStartTime = Time.time;
                 
+#if UNITY_WEBGL && !UNITY_EDITOR
+                Debug.LogWarning("[AudioRecorder] WebGL에서는 마이크로폰이 지원되지 않습니다.");
+                OnError?.Invoke("WebGL에서는 음성 녹음이 지원되지 않습니다.");
+                _isRecording = false;
+                return false;
+#else
                 _recordingClip = Microphone.Start(_currentDevice ?? string.Empty, false, _maxRecordingLength, _sampleRate);
+#endif
                 if (_recordingClip == null)
                 {
                     _isRecording = false;
@@ -354,4 +367,5 @@ namespace ProjectVG.Core.Audio
         
         #endregion
     }
-} 
+}
+#endif 

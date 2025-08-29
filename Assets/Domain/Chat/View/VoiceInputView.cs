@@ -1,4 +1,5 @@
 #nullable enable
+#if !UNITY_WEBGL || UNITY_EDITOR
 using System;
 using UnityEngine;
 using UnityEngine.UI;
@@ -336,4 +337,5 @@ namespace ProjectVG.Domain.Chat.View
         
         #endregion
     }
-} 
+}
+#endif 
