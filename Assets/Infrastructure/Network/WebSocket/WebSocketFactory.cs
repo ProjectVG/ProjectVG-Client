@@ -34,6 +34,10 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                     Debug.Log($"[WebSocketFactory] 데스크톱 플랫폼 ({Application.platform}): DesktopWebSocket 사용");
                     return new DesktopWebSocket();
                     
+                case RuntimePlatform.WebGLPlayer:
+                    Debug.Log($"[WebSocketFactory] WebGL 플랫폼: WebGLWebSocket 사용");
+                    return new WebGLWebSocket();
+                    
                 default:
                     Debug.LogWarning($"[WebSocketFactory] 지원되지 않는 플랫폼 ({Application.platform}): DesktopWebSocket 사용");
                     return new DesktopWebSocket();
@@ -51,6 +55,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                     return new DesktopWebSocket();
                 case WebSocketType.Mobile:
                     return new MobileWebSocket();
+                case WebSocketType.WebGL:
+                    return new WebGLWebSocket();
                 default:
                     return CreateWebSocket();
             }
@@ -63,7 +69,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             Auto,
             Desktop,
-            Mobile
+            Mobile,
+            WebGL
         }
     }
 } 

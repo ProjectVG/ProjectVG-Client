@@ -228,7 +228,15 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             defaultHeaders.Clear();
             defaultHeaders["Content-Type"] = NetworkConfig.ContentType;
+            
+#if !UNITY_WEBGL || UNITY_EDITOR
             defaultHeaders["User-Agent"] = NetworkConfig.UserAgent;
+#else
+            // WebGL에서는 커스텀 헤더로 클라이언트 식별
+            defaultHeaders["X-Client-Type"] = "ProjectVG-WebGL";
+            defaultHeaders["X-Client-Version"] = Application.version;
+#endif
+            
             defaultHeaders["Accept"] = ACCEPT_HEADER;
         }
 

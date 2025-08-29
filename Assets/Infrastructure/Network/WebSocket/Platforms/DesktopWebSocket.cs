@@ -160,6 +160,11 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
             }
         }
 
+        public void DispatchMessageQueue()
+        {
+            // DesktopWebSocket은 네이티브 소켓을 사용하므로 메시지 큐 처리 불필요
+        }
+
         public void Dispose()
         {
             if (_isDisposed)

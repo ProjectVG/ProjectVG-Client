@@ -2,27 +2,25 @@ using System;
 using System.Threading;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
-using UnityEngine.Networking;
+using NativeWebSocket;
 
 namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
 {
     /// <summary>
     /// WebGL 플랫폼용 WebSocket 구현체
-    /// UnityWebRequest.WebSocket을 사용합니다.
+    /// NativeWebSocket 패키지를 사용합니다.
     /// </summary>
     public class WebGLWebSocket : INativeWebSocket
     {
-        public bool IsConnected { get; private set; }
-        public bool IsConnecting { get; private set; }
+        public bool IsConnected => _webSocket?.State == WebSocketState.Open;
+        public bool IsConnecting => _webSocket?.State == WebSocketState.Connecting;
         
         public event Action OnConnected;
         public event Action OnDisconnected;
         public event Action<string> OnError;
-#pragma warning disable CS0067
         public event Action<string> OnMessageReceived;
-#pragma warning restore CS0067
 
-        private UnityWebRequest _webRequest;
+        private NativeWebSocket.WebSocket _webSocket;
         private CancellationTokenSource _cancellationTokenSource;
         private bool _isDisposed = false;
 
@@ -38,42 +36,36 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                 return IsConnected;
             }
 
-            IsConnecting = true;
+            if (_isDisposed)
+            {
+                Debug.LogError("[WebGL WebSocket] Cannot connect: WebSocket is disposed");
+                return false;
+            }
 
             try
             {
-                var combinedCancellationToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cancellationTokenSource.Token).Token;
-                
-                // UnityWebRequest.WebSocket 사용
-                _webRequest = UnityWebRequest.Get(url);
-                _webRequest.SetRequestHeader("Upgrade", "websocket");
-                _webRequest.SetRequestHeader("Connection", "Upgrade");
-                
-                var operation = _webRequest.SendWebRequest();
-                await operation.WithCancellation(combinedCancellationToken);
+                var wsUrl = url.Replace("http://", "ws://").Replace("https://", "wss://");
+                Debug.Log($"[WebGL WebSocket] 연결 시도: {wsUrl}");
 
-                if (_webRequest.result == UnityWebRequest.Result.Success)
-                {
-                    IsConnected = true;
-                    IsConnecting = false;
-                    OnConnected?.Invoke();
-                    
-                    // 메시지 수신 루프 시작
-                    _ = ReceiveLoopAsync();
-                    
-                    return true;
-                }
-                else
-                {
-                    var error = $"WebGL WebSocket 연결 실패: {_webRequest.error}";
-                    Debug.LogError(error);
-                    OnError?.Invoke(error);
-                    return false;
-                }
+                _webSocket = new NativeWebSocket.WebSocket(wsUrl);
+
+                _webSocket.OnOpen += OnNativeConnected;
+                _webSocket.OnMessage += OnNativeMessageReceived;
+                _webSocket.OnError += OnNativeError;
+                _webSocket.OnClose += OnNativeDisconnected;
+
+                await _webSocket.Connect();
+
+                Debug.Log("[WebGL WebSocket] 연결 성공");
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.Log("[WebGL WebSocket] 연결이 취소되었습니다.");
+                return false;
             }
             catch (Exception ex)
             {
-                IsConnecting = false;
                 var error = $"WebGL WebSocket 연결 중 예외 발생: {ex.Message}";
                 Debug.LogError(error);
                 OnError?.Invoke(error);
@@ -83,27 +75,23 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
 
         public async UniTask DisconnectAsync()
         {
-            if (!IsConnected)
+            if (!IsConnected && !IsConnecting)
             {
                 return;
             }
 
             try
             {
-                IsConnected = false;
-                IsConnecting = false;
+                if (_webSocket != null && _webSocket.State == WebSocketState.Open)
+                {
+                    await _webSocket.Close();
+                }
                 
-                _webRequest?.Abort();
-                _webRequest?.Dispose();
-                _webRequest = null;
-                
-                await UniTask.CompletedTask; // 비동기 작업 시뮬레이션
-                
-                OnDisconnected?.Invoke();
+                Debug.Log("[WebGL WebSocket] 연결 해제됨");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"WebGL WebSocket 연결 해제 중 오류: {ex.Message}");
+                Debug.LogError($"[WebGL WebSocket] 연결 해제 중 오류: {ex.Message}");
             }
         }
 
@@ -111,49 +99,87 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
         {
             if (!IsConnected)
             {
-                Debug.LogWarning("WebGL WebSocket이 연결되지 않았습니다.");
+                Debug.LogWarning("[WebGL WebSocket] 연결되지 않은 상태에서 메시지 전송 시도");
+                return false;
+            }
+
+            if (_isDisposed)
+            {
+                Debug.LogError("[WebGL WebSocket] WebSocket이 해제된 상태입니다.");
                 return false;
             }
 
             try
             {
-                // TODO : WebGL에서는 WebSocket 메시지 전송을 위한 별도 구현 필요
-                await UniTask.CompletedTask; 
-                return true;
+                if (_webSocket != null && _webSocket.State == WebSocketState.Open)
+                {
+                    await _webSocket.SendText(message);
+                    Debug.Log($"[WebGL WebSocket] 메시지 전송 성공: {message.Substring(0, Math.Min(message.Length, 50))}...");
+                    return true;
+                }
+                else
+                {
+                    Debug.LogWarning("[WebGL WebSocket] WebSocket이 연결되지 않았습니다.");
+                    return false;
+                }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"WebGL WebSocket 메시지 전송 실패: {ex.Message}");
+                Debug.LogError($"[WebGL WebSocket] 메시지 전송 실패: {ex.Message}");
                 return false;
             }
         }
 
-        private async UniTask ReceiveLoopAsync()
+        private void OnNativeConnected()
         {
+            if (_isDisposed) return;
+
+            Debug.Log($"[WebGL WebSocket] 연결 성공! Platform: {Application.platform}, IsWebGL: {Application.platform == RuntimePlatform.WebGLPlayer}");
+            OnConnected?.Invoke();
+        }
+
+        private void OnNativeMessageReceived(byte[] data)
+        {
+            if (_isDisposed) return;
+
             try
             {
-                while (IsConnected && !_isDisposed)
-                {
-                    // TODO : WebGL에서는 WebSocket 메시지 수신을 위한 별도 구현 필요
-                    await UniTask.Delay(100); 
-                }
+                var message = System.Text.Encoding.UTF8.GetString(data);
+                Debug.Log($"[WebGL WebSocket] 메시지 수신! Platform: {Application.platform}");
+                Debug.Log($"[WebGL WebSocket] 데이터 크기: {data.Length} bytes");
+                Debug.Log($"[WebGL WebSocket] 메시지 내용: {message.Substring(0, Math.Min(message.Length, 200))}...");
+                OnMessageReceived?.Invoke(message);
             }
             catch (Exception ex)
             {
-                if (!_isDisposed)
-                {
-                    Debug.LogError($"WebGL WebSocket 수신 루프 오류: {ex.Message}");
-                    OnError?.Invoke(ex.Message);
-                }
+                Debug.LogError($"[WebGL WebSocket] 메시지 처리 중 오류: {ex.Message}");
             }
-            finally
-            {
-                IsConnected = false;
-                if (!_isDisposed)
-                {
-                    OnDisconnected?.Invoke();
-                }
-            }
+        }
+
+        private void OnNativeError(string error)
+        {
+            if (_isDisposed) return;
+
+            Debug.LogError($"[WebGL WebSocket] 오류 발생: {error}");
+            OnError?.Invoke(error);
+        }
+
+        private void OnNativeDisconnected(WebSocketCloseCode closeCode)
+        {
+            if (_isDisposed) return;
+
+            Debug.Log($"[WebGL WebSocket] 연결 해제됨 - Code: {closeCode}");
+            OnDisconnected?.Invoke();
+        }
+
+        public void DispatchMessageQueue()
+        {
+#if !UNITY_WEBGL || UNITY_EDITOR
+            _webSocket?.DispatchMessageQueue();
+            Debug.Log($"[WebGL WebSocket] DispatchMessageQueue 호출됨 - Platform: {Application.platform}");
+#else
+            Debug.Log($"[WebGL WebSocket] WebGL에서는 DispatchMessageQueue 생략 - Platform: {Application.platform}");
+#endif
         }
 
         public void Dispose()
@@ -162,9 +188,23 @@ namespace ProjectVG.Infrastructure.Network.WebSocket.Platforms
                 return;
                 
             _isDisposed = true;
+
+            if (_webSocket != null)
+            {
+                _webSocket.OnOpen -= OnNativeConnected;
+                _webSocket.OnMessage -= OnNativeMessageReceived;
+                _webSocket.OnError -= OnNativeError;
+                _webSocket.OnClose -= OnNativeDisconnected;
+
+                if (_webSocket.State == WebSocketState.Open)
+                {
+                    _webSocket.Close();
+                }
+                _webSocket = null;
+            }
+
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
-            _webRequest?.Dispose();
         }
     }
 } 

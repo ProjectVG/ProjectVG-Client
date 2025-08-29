@@ -55,6 +55,14 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             _tokenRefreshService = TokenRefreshService.Instance;
         }
 
+        private void Update()
+        {
+#if !UNITY_WEBGL || UNITY_EDITOR
+            // NativeWebSocket의 메시지 큐 처리 (WebGL 제외)
+            _nativeWebSocket?.DispatchMessageQueue();
+#endif
+        }
+
         private void OnDestroy()
         {
             Shutdown();

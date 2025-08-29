@@ -25,5 +25,8 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         
         // 메시지 전송
         UniTask<bool> SendMessageAsync(string message, CancellationToken cancellationToken = default);
+        
+        // 메시지 큐 처리 (NativeWebSocket 패키지용)
+        void DispatchMessageQueue();
     }
 } 
