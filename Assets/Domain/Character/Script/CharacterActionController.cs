@@ -1,13 +1,14 @@
 #nullable enable
-using UnityEngine;
+using Live2D.Cubism.Core;
 using Live2D.Cubism.Framework.Motion;
 using Live2D.Cubism.Framework.MotionFade;
-using Live2D.Cubism.Core;
 using ProjectVG.Domain.Character.Live2D.Model;
+using ProjectVG.Domain.Chat.Model;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using ProjectVG.Domain.Chat.Model;
+using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace ProjectVG.Domain.Character.Service
 {
@@ -30,10 +31,6 @@ namespace ProjectVG.Domain.Character.Service
 		private Live2DModelConfig.MotionClipMapping? _currentMotionClip;
 		private bool _isPlayingAction = false;
 		
-		// Auto Idle System
-		private bool _enableAutoIdle = true;
-		private float _autoIdleInterval = 5f;
-		private Coroutine? _autoIdleCoroutine;
 		
 		// Motion Control System
 		private Coroutine? _currentMotionCoroutine;
@@ -44,20 +41,18 @@ namespace ProjectVG.Domain.Character.Service
 		public System.Action? OnMotionLoop;
 		public System.Action? OnMotionReturnToIdle;
 
-		/// <summary>
-		/// 서비스를 초기화한다.
-		/// </summary>
-		/// <param name="motionController">Live2D Motion Controller</param>
-		/// <param name="motionClips">Motion Clip Mappings</param>
-		/// <param name="enableAutoIdle">Auto Idle 활성화 여부</param>
-		/// <param name="autoIdleInterval">Auto Idle 간격</param>
-		public void Initialize(CubismMotionController motionController, List<Live2DModelConfig.MotionClipMapping> motionClips, bool enableAutoIdle = true, float autoIdleInterval = 5f)
+        #region Unity Lifecycle
+
+        /// <summary>
+        /// 서비스를 초기화한다.
+        /// </summary>
+        /// <param name="motionController">Live2D Motion Controller</param>
+        /// <param name="motionClips">Motion Clip Mappings</param>
+        public void Initialize(CubismMotionController motionController, List<Live2DModelConfig.MotionClipMapping> motionClips)
 		{
 			_motionController = motionController;
 			_fadeController = GetComponent<CubismFadeController>();
 			_motionClips = motionClips;
-			_enableAutoIdle = enableAutoIdle;
-			_autoIdleInterval = autoIdleInterval;
 			_currentAction = CharacterActionType.Idle;
 			_isPlayingAction = false;
 			
@@ -76,7 +71,7 @@ namespace ProjectVG.Domain.Character.Service
 			SetupDefaultCallbacks();
 			
 			// 모션 클립 구성 디버깅
-			Debug.Log($"===============[CharacterActionController] 초기화 완료 - Motion Clips: {_motionClips?.Count ?? 0}개, Auto Idle: {_enableAutoIdle}");
+			Debug.Log($"===============[CharacterActionController] 초기화 완료 - Motion Clips: {_motionClips?.Count ?? 0}개");
 			if (_motionClips != null)
 			{
 				foreach (var clip in _motionClips)
@@ -91,21 +86,21 @@ namespace ProjectVG.Domain.Character.Service
 		}
 
 		/// <summary>
-		/// GameObject가 활성화될 때 Auto Idle을 시작한다.
+		/// GameObject가 활성화될 때 Idle 모션을 시작한다.
 		/// </summary>
 		private void OnEnable()
 		{
-			if (_enableAutoIdle && _currentAction == CharacterActionType.Idle && _motionController != null)
+			if (_currentAction == CharacterActionType.Idle && _motionController != null)
 			{
 				// CubismMotionController가 완전히 초기화될 때까지 잠시 대기
-				StartCoroutine(DelayedAutoIdleStart());
+				StartCoroutine(DelayedIdleStart());
 			}
 		}
 
-		/// <summary>
-		/// CubismMotionController 초기화 대기 후 Auto Idle 시작
-		/// </summary>
-		private IEnumerator DelayedAutoIdleStart()
+        /// <summary>
+        /// CubismMotionController 초기화 대기 후 Idle 모션 시작
+        /// </summary>
+        private IEnumerator DelayedIdleStart()
 		{
 			// 1프레임 대기 (CubismMotionController OnEnable 완료 대기)
 			yield return null;
@@ -113,9 +108,9 @@ namespace ProjectVG.Domain.Character.Service
 			// 추가로 0.1초 대기 (초기화 완료 확인)
 			yield return new WaitForSeconds(0.1f);
 			
-			if (_enableAutoIdle && _currentAction == CharacterActionType.Idle && _motionController != null)
+			if (_currentAction == CharacterActionType.Idle && _motionController != null)
 			{
-				StartAutoIdle();
+				PlayRandomIdleMotion();
 			}
 		}
 
@@ -127,10 +122,13 @@ namespace ProjectVG.Domain.Character.Service
 			StopAllMotionCoroutines();
 		}
 
-		/// <summary>
-		/// 기본 모션 종료 콜백을 설정한다.
-		/// </summary>
-		private void SetupDefaultCallbacks()
+        #endregion
+
+
+        /// <summary>
+        /// 기본 모션 종료 콜백을 설정한다.
+        /// </summary>
+        private void SetupDefaultCallbacks()
 		{
 			OnMotionStop = () => {
 				Debug.Log("[CharacterActionController] 모션 정지");
@@ -170,10 +168,10 @@ namespace ProjectVG.Domain.Character.Service
 
             try
 			{
-				// 기존 Auto Idle 중지 (새 액션이 트리거될 때)
+				// 기존 모션 중지 (새 액션이 트리거될 때)
 				if (_currentAction == CharacterActionType.Idle && actionType != CharacterActionType.Idle)
 				{
-					StopAutoIdle();
+					StopAllMotionCoroutines();
 				}
 
 				_currentAction = actionType;
@@ -232,34 +230,11 @@ namespace ProjectVG.Domain.Character.Service
 			_isPlayingAction = false;
 			_currentMotionClip = null;
 			
-			if (_enableAutoIdle)
-			{
-				StartAutoIdle();
-			}
-			else
-			{
-				PlayRandomIdleMotion();
-			}
+			PlayRandomIdleMotion();
 
 			Debug.Log("[CharacterActionController] 강제 중지 후 Idle로 복귀");
 		}
 
-		/// <summary>
-		/// Auto Idle 기능을 켜거나 끈다.
-		/// </summary>
-		public void SetAutoIdle(bool enabled)
-		{
-			_enableAutoIdle = enabled;
-			
-			if (_enableAutoIdle && _currentAction == CharacterActionType.Idle)
-			{
-				StartAutoIdle();
-			}
-			else if (!_enableAutoIdle)
-			{
-				StopAutoIdle();
-			}
-		}
 
 		/// <summary>
 		/// 액션이 재생 중인지 확인한다.
@@ -320,22 +295,61 @@ namespace ProjectVG.Domain.Character.Service
 			var selectedMotion = groupMotions[Random.Range(0, groupMotions.Count)];
 			_currentMotionClip = selectedMotion;
 			
-			// 모션 재생 (CubismFadeController가 자동 페이드 처리)
-			_motionController.PlayAnimation(selectedMotion.animationClip, isLoop: false, priority: CubismMotionPriority.PriorityNormal);
-			_isPlayingAction = true;
+			// Priority 충돌 방지를 위해 이전 모션을 강제 중지
+			_motionController.StopAllAnimation();
 			
-			// 모션 종료 처리 설정
-			_currentMotionEndCallback = endCallback;
-			StopAllMotionCoroutines();
-			_currentMotionCoroutine = StartCoroutine(WaitForMotionEnd(selectedMotion.animationClip.length, endCallback));
+			// 짧은 대기 후 모션 재생 (Priority 충돌 방지)
+			AnimationClip? clip = selectedMotion.animationClip;
+			if (clip != null)
+			{
+                StartCoroutine(DelayedMotionPlay(clip, CubismMotionPriority.PriorityNormal, endCallback));
+			}
+		}
+		
+		/// <summary>
+		/// 짧은 딜레이 후 모션을 재생한다. (Priority 충돌 방지)
+		/// </summary>
+		private IEnumerator DelayedMotionPlay(AnimationClip clip, int priority, System.Action? endCallback)
+		{
+			yield return new WaitForSeconds(0.1f); // Priority 충돌 방지용 짧은 대기
 			
-			Debug.Log($"[CharacterActionController] 모션 재생: {selectedMotion.Id} (그룹: {motionGroup}), 길이: {selectedMotion.animationClip.length}s");
+			if (_motionController != null)
+			{
+				// 모션 재생 (CubismFadeController가 자동 페이드 처리)
+				_motionController.PlayAnimation(clip, priority: 2, isLoop: false);
+				_isPlayingAction = true; 
+				
+				// 모션 종료 처리 설정
+				_currentMotionEndCallback = endCallback;
+				StopAllMotionCoroutines();
+				_currentMotionCoroutine = StartCoroutine(WaitForMotionEnd(clip.length, endCallback));
+				
+				Debug.Log($"[CharacterActionController] 모션 재생: {_currentMotionClip?.Id} (그룹: {_currentMotionClip?.MotionGroup}), 길이: {clip.length}s");
+			}
 		}
 		
 		/// <summary>
 		/// Idle 모션을 다양하게 순차 재생한다.
 		/// </summary>
 		private void PlayRandomIdleMotion()
+		{
+			// Idle 모션은 항상 재귀적으로 다음 Idle 모션 재생 (0.3초 딜레이 후)
+			System.Action recursiveIdleCallback = () => {
+				Debug.Log("[CharacterActionController] Idle 모션 종료 - 0.3초 후 다음 Idle 모션 재생");
+				if (_currentAction == CharacterActionType.Idle)
+				{
+					StartCoroutine(DelayedIdleMotionStart()); // 딜레이 후 다음 Idle 모션 재생
+				}
+			};
+			
+			// Idle 모션 전용 재생 (PlayRandomMotionFromGroup 대신 직접 처리)
+			PlayIdleMotionDirect(recursiveIdleCallback);
+		}
+		
+		/// <summary>
+		/// Idle 모션을 직접 재생한다. (Priority 충돌 없이)
+		/// </summary>
+		private void PlayIdleMotionDirect(System.Action? endCallback)
 		{
 			if (_motionClips == null || _motionController == null) return;
 			
@@ -355,22 +369,31 @@ namespace ProjectVG.Domain.Character.Service
 			var selectedIdle = idleMotions[Random.Range(0, idleMotions.Count)];
 			_currentMotionClip = selectedIdle;
 			
-			// Idle 모션을 루프 없이 재생 (끝나면 다음 Idle 모션 재생)
-			_motionController.PlayAnimation(selectedIdle.animationClip, isLoop: false, priority: CubismMotionPriority.PriorityIdle);
-			_isPlayingAction = false; // Idle은 Action이 아니므로 false
+			// Priority 충돌 방지를 위해 이전 모션을 강제 중지
+			_motionController.StopAllAnimation();
 			
-			// 모션 종료 후 다음 Idle 모션 재생
-			_currentMotionEndCallback = () => {
-				if (_currentAction == CharacterActionType.Idle)
-				{
-					PlayRandomIdleMotion(); // 다음 Idle 모션 재생
-				}
-			};
+			// 짧은 대기 후 Idle 모션 재생 (PriorityIdle 사용)
+			AnimationClip? idleClip = selectedIdle.animationClip;
+			if (idleClip != null)
+			{
+				StartCoroutine(DelayedMotionPlay(idleClip, CubismMotionPriority.PriorityIdle, endCallback));
+			}
 			
-			StopAllMotionCoroutines();
-			_currentMotionCoroutine = StartCoroutine(WaitForMotionEnd(selectedIdle.animationClip.length, _currentMotionEndCallback));
+			// Idle 모션 전용 설정
+			_isPlayingAction = false; // Idle은 Action이 아님
+		}
+		
+		/// <summary>
+		/// 0.3초 딜레이 후 Idle 모션을 재생한다.
+		/// </summary>
+		private IEnumerator DelayedIdleMotionStart()
+		{
+			yield return new WaitForSeconds(0.0f);
 			
-			Debug.Log($"[CharacterActionController] Idle 모션 시작: {selectedIdle.Id}, 길이: {selectedIdle.animationClip.length}s");
+			if (_currentAction == CharacterActionType.Idle)
+			{
+				PlayRandomIdleMotion();
+			}
 		}
 		
 		/// <summary>
@@ -452,73 +475,13 @@ namespace ProjectVG.Domain.Character.Service
 			}
 		}
 
-		#region Auto Idle & Motion End Handling
-
-		/// <summary>
-		/// Auto Idle을 시작한다.
-		/// </summary>
-		private void StartAutoIdle()
-		{
-			Debug.Log("[CharacterActionController] Auto Idle 시작 요청");
-            if (!_enableAutoIdle || _currentAction != CharacterActionType.Idle)
-			{
-				Debug.Log($"[CharacterActionController] Auto Idle 시작 조건 불충족 - EnableAutoIdle: {_enableAutoIdle}, CurrentAction: {_currentAction}");
-				return;
-			}
-
-			// idle 그룹 모션이 있는지 확인
-			if (_motionClips != null)
-			{
-				var idleClips = _motionClips.Where(c => c.MotionGroup.Equals("idle", System.StringComparison.OrdinalIgnoreCase) && c.animationClip != null).ToList();
-				if (idleClips.Count == 0)
-				{
-					Debug.LogWarning("[CharacterActionController] Auto Idle을 시작할 수 없습니다. 'idle' 그룹의 모션 클립이 없습니다. Live2DModelConfig에서 motionGroup을 'idle'로 설정한 AnimationClip을 추가하세요.");
-					return;
-				}
-			}
-
-			StopAutoIdle(); // 기존 Auto Idle 중지
-			_autoIdleCoroutine = StartCoroutine(AutoIdleCoroutine());
-			Debug.Log("[CharacterActionController] Auto Idle 코루틴 시작됨");
-		}
-
-		/// <summary>
-		/// Auto Idle을 중지한다.
-		/// </summary>
-		private void StopAutoIdle()
-		{
-			if (_autoIdleCoroutine != null)
-			{
-				StopCoroutine(_autoIdleCoroutine);
-				_autoIdleCoroutine = null;
-			}
-		}
-
-		/// <summary>
-		/// Auto Idle 코루틴
-		/// </summary>
-		private IEnumerator AutoIdleCoroutine()
-		{
-			while (_enableAutoIdle && _currentAction == CharacterActionType.Idle)
-			{
-				// 현재 모션이 끝났는지 확인
-				if (!IsMotionPlaying())
-				{
-					PlayRandomIdleMotion();
-				}
-				
-				yield return new WaitForSeconds(_autoIdleInterval);
-			}
-		}
-
+		#region Motion Control Helpers
 
 		/// <summary>
 		/// 모든 모션 관련 코루틴을 중지한다.
 		/// </summary>
 		private void StopAllMotionCoroutines()
 		{
-			StopAutoIdle();
-			
 			if (_currentMotionCoroutine != null)
 			{
 				StopCoroutine(_currentMotionCoroutine);

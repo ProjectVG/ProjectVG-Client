@@ -599,7 +599,7 @@ Transform:
   m_GameObject: {fileID: 364439184}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 647.5694, y: 818.4147, z: 8.117435}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -920,7 +920,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _chatBubblePanel: {fileID: 2017944365}
   _characterManager: {fileID: 873552998}
-  _characterId: 11111111-1111-1111-1111-111111111111
+  _characterId: 22222222-2222-2222-2222-222222222222
 --- !u!4 &829067253
 Transform:
   m_ObjectHideFlags: 0

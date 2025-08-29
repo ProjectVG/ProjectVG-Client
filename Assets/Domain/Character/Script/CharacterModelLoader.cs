@@ -133,7 +133,7 @@ namespace ProjectVG.Domain.Character.Service
 			var mouthController = modelInstance.GetComponent<CubismMouthController>();
 			if (mouthController == null) {
 				mouthController = modelInstance.AddComponent<CubismMouthController>();
-				Debug.Log($"[CharacterModelLoader] CubismMouthController 컴포넌트를 추가했습니다: {modelInstance.name}");
+				Debug.Log($"[CharacterModelLoader] CubismAudioMouthInput 컴포넌트를 추가했습니다: {modelInstance.name}");
 			}
             mouthController.BlendMode = CubismParameterBlendMode.Additive;
 
@@ -260,7 +260,7 @@ namespace ProjectVG.Domain.Character.Service
 			string modelId = modelInstance.name;
 			if (_modelRegistry != null && _modelRegistry.TryGetConfig(modelId, out var config))
 			{
-				actionService.Initialize(motionController, config.MotionClips, config.EnableAutoIdle, config.AutoIdleInterval);
+				actionService.Initialize(motionController, config.MotionClips);
 				Debug.Log($"[CharacterModelLoader] CharacterActionController 초기화 완료: {modelInstance.name}, Motion Clips: {config.MotionClips?.Count ?? 0}개, Auto Idle: {config.EnableAutoIdle}");
 			}
 			else
