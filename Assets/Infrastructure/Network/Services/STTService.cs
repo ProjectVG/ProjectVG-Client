@@ -65,9 +65,9 @@ namespace ProjectVG.Infrastructure.Network.Services
                 
                 // 서버 API에 맞게 language 파라미터만 사용
                 string forcedLanguage = "ko";
-                string endpoint = $"stt/transcribe?language={forcedLanguage}";
+                string endpoint = $"/api/v1/stt/transcribe?language={forcedLanguage}";
                 
-                var response = await _httpClient.PostFormDataAsync<STTResponse>(endpoint, formData, fileNames, cancellationToken: cancellationToken);
+                var response = await _httpClient.PostFormDataAsync<STTResponse>(endpoint, formData, fileNames, null, requiresAuth: false, cancellationToken: cancellationToken);
                 
                 if (response != null && !string.IsNullOrEmpty(response.Text))
                 {

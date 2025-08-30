@@ -26,15 +26,15 @@ namespace ProjectVG.Domain.Character.Component
 		
 		private void Start()
 		{
-			Initialize();
+			// Initialize();
 		}
 		
 		private void Update()
 		{
-			if (applyOnResolutionChange && HasResolutionChanged())
-			{
-				ApplyCameraScale();
-			}
+			// if (applyOnResolutionChange && HasResolutionChanged())
+			// {
+			// 	ApplyCameraScale();
+			// }
 		}
 		
 		#endregion

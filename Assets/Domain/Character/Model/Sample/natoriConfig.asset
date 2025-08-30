@@ -20,4 +20,4 @@ MonoBehaviour:
   isLockAtActive: 1
   gain: 10
   smoothing: 1
-  modelPrefab: {fileID: 6181935751025943507, guid: 43e77a085e1072e4dbc6393f20643f3b, type: 3}
+  modelPrefab: {fileID: 7609475132481125670, guid: 9e7b6e32e30a8e144aac535afecd9340, type: 3}

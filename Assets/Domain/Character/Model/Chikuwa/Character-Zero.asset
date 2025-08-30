@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterId: zero
   characterName: "\uC81C\uB85C"
-  characterPrefab: {fileID: 8051974178353762967, guid: 9be43d9f8e24d634186c522ebce74618, type: 3}
-  thumbnail: {fileID: 2800000, guid: e029dae0a0b46124ba7b0b6b2ac00a76, type: 3}
+  characterPrefab: {fileID: 7609475132481125670, guid: 9e7b6e32e30a8e144aac535afecd9340, type: 3}
+  thumbnail: {fileID: 2800000, guid: a443448c8422da640825449c667a9378, type: 3}
   characterDescription: "\uCE58\uC640\uC9F1 \uBAA8\uB378 \uAE30\uBC18"
   emotionMappings:
   - emotionKey: 
@@ -26,9 +26,9 @@ MonoBehaviour:
   - actionKey: 
     motionGroup: 
     motionName: 
-  isLockAtActive: 0
+  isLookAtActive: 1
   lookSensitivity: 1
-  lockAtDamping: 0
+  lookAtDamping: 0
   useLipSync: 1
   gain: 10
   smoothing: 1

@@ -53,13 +53,6 @@ namespace ProjectVG.Domain.Character.Service
             // 임시로 zero 캐릭터 로드
             LoadCharacter("zero");
 
-            if (_modelTransform != null) {
-                var scaler = _modelTransform.GetComponent<Live2DModelScaler>();
-                if (scaler == null) {
-                    scaler = _modelTransform.gameObject.AddComponent<Live2DModelScaler>();
-                    Debug.Log($"[CharacterManager] Live2DModelScaler가 자동으로 추가되었습니다: {_modelTransform.name}");
-                }
-            }
         }
         public void Shutdown()
         {

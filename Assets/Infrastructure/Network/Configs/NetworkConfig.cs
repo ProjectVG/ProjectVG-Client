@@ -203,11 +203,11 @@ namespace ProjectVG.Infrastructure.Network.Configs
         public static bool IsJsonMessageType => Instance.wsMessageType?.ToLower() == "json";
         public static bool IsBinaryMessageType => Instance.wsMessageType?.ToLower() == "binary";
         
-        // HTTP URL 유틸 복원
+        // HTTP URL 유틸 복원 - /api/v1 자동 추가 제거
         public static string GetFullApiUrl(string endpoint)
         {
             var baseUrl = HttpServerAddress;
-            return $"{baseUrl.TrimEnd('/')}/{Instance.apiPath.TrimStart('/').TrimEnd('/')}/{Instance.apiVersion.TrimStart('/').TrimEnd('/')}/{endpoint.TrimStart('/')}";
+            return $"{baseUrl.TrimEnd('/')}/{endpoint.TrimStart('/')}";
         }
         public static string GetUserApiUrl(string path = "") => GetFullApiUrl($"users/{path.TrimStart('/')}");
         public static string GetCharacterApiUrl(string path = "") => GetFullApiUrl($"characters/{path.TrimStart('/')}");
