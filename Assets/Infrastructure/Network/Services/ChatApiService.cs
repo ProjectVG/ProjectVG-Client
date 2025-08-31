@@ -4,6 +4,7 @@ using UnityEngine;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Http;
 using ProjectVG.Infrastructure.Network.DTOs.Chat;
+using ProjectVG.Infrastructure.Network.Configs;
 using Newtonsoft.Json;
 
 namespace ProjectVG.Infrastructure.Network.Services
@@ -14,7 +15,7 @@ namespace ProjectVG.Infrastructure.Network.Services
     public class ChatApiService
     {
         private readonly HttpApiClient _httpClient;
-        private const string CHAT_ENDPOINT = "/api/v1/chat";
+        private const string CHAT_ENDPOINT = "chat";
 
         public ChatApiService()
         {
@@ -33,7 +34,7 @@ namespace ProjectVG.Infrastructure.Network.Services
             ValidateHttpClient();
             
             
-            return await _httpClient.PostAsync<ChatResponse>(CHAT_ENDPOINT, request, requiresAuth: true, cancellationToken: cancellationToken);
+            return await _httpClient.PostAsync<ChatResponse>($"api/v1/{CHAT_ENDPOINT}", request, requiresAuth: true, cancellationToken: cancellationToken);
         }
 
         #region Private Methods

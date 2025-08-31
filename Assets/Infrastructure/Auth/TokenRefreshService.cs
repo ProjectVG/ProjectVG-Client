@@ -5,6 +5,7 @@ using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Auth.OAuth2;
 using ProjectVG.Infrastructure.Auth.OAuth2.Config;
 using ProjectVG.Infrastructure.Network.Http;
+using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Auth.Models;
 using ProjectVG.Infrastructure.Auth.OAuth2.Models;
 
@@ -159,7 +160,7 @@ namespace ProjectVG.Infrastructure.Auth
                 };
                 
                 var response = await httpClient.PostAsync<ServerOAuth2TokenResponse>(
-                    "/api/v1/auth/oauth2/refresh",
+                    "api/v1/auth/oauth2/refresh",
                     refreshRequest,
                     requiresAuth: false  // 토큰 갱신은 인증 불필요
                 );

@@ -6,6 +6,7 @@ using ProjectVG.Infrastructure.Auth.Utils;
 using ProjectVG.Infrastructure.Auth.Models;
 using ProjectVG.Infrastructure.Network.DTOs.Auth;
 using ProjectVG.Infrastructure.Network.Http;
+using ProjectVG.Infrastructure.Network.Configs;
 
 namespace ProjectVG.Infrastructure.Auth.Services
 {
@@ -79,7 +80,7 @@ namespace ProjectVG.Infrastructure.Auth.Services
 
                 // API 호출 - requiresAuth=false (로그인 전이므로)
                 var response = await _httpClient.PostAsync<GuestLoginResponse>(
-                    "/api/v1/auth/guest-login",
+                    "api/v1/auth/guest-login",
                     deviceId, // 서버는 [FromBody] string guestId를 받음
                     requiresAuth: false
                 );

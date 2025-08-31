@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using ProjectVG.Infrastructure.Config;
 
@@ -70,6 +71,8 @@ namespace ProjectVG.Infrastructure.Network.Configs
                         Debug.LogError("NetworkConfig를 찾을 수 없습니다. Resources 폴더에 NetworkConfig.asset 파일을 생성하세요.");
                         _instance = CreateDefaultInstance();
                     }
+                    // 런타임 환경 가드 적용
+                    ApplyRuntimeGuard(_instance);
                 }
                 return _instance;
             }
@@ -118,7 +121,8 @@ namespace ProjectVG.Infrastructure.Network.Configs
                     case EnvironmentType.Production:  server = Instance.productionServer;  break;
                     default:                          server = Instance.developmentServer; break;
                 }
-                return $"http://{server}";
+                var scheme = CurrentEnvironment == EnvironmentType.Production ? "https" : "http";
+                return $"{scheme}://{server}";
             }
         }
         
@@ -134,7 +138,8 @@ namespace ProjectVG.Infrastructure.Network.Configs
                     case EnvironmentType.Production:  server = Instance.productionServer;  break;
                     default:                          server = Instance.developmentServer; break;
                 }
-                return $"ws://{server}";
+                var wsScheme = CurrentEnvironment == EnvironmentType.Production ? "wss" : "ws";
+                return $"{wsScheme}://{server}";
             }
         }
         
@@ -148,7 +153,8 @@ namespace ProjectVG.Infrastructure.Network.Configs
                 case EnvironmentType.Production:  server = Instance.productionServer;  break;
                 default:                          server = Instance.developmentServer; break;
             }
-            return $"ws://{server}";
+            var wsScheme = env == EnvironmentType.Production ? "wss" : "ws";
+            return $"{wsScheme}://{server}";
         }
         
         public static string GetWebSocketUrl()
@@ -172,7 +178,7 @@ namespace ProjectVG.Infrastructure.Network.Configs
         public static string GetWebSocketUrlWithSession(string sessionId)
         {
             var baseWsUrl = GetWebSocketUrlWithVersion();
-            return $"{baseWsUrl}?sessionId={sessionId}";
+            return $"{baseWsUrl}?sessionId={Uri.EscapeDataString(sessionId ?? string.Empty)}";
         }
         
         // HTTP 공통 설정 정적 접근자 복원
@@ -209,6 +215,14 @@ namespace ProjectVG.Infrastructure.Network.Configs
             var baseUrl = HttpServerAddress;
             return $"{baseUrl.TrimEnd('/')}/{endpoint.TrimStart('/')}";
         }
+        
+        // 버전이 포함된 API URL 헬퍼 메서드들
+        public static string GetVersionedApiUrl(string endpoint)
+        {
+            var baseUrl = HttpServerAddress;
+            return $"{baseUrl.TrimEnd('/')}/{Instance.apiPath.TrimStart('/').TrimEnd('/')}/{Instance.apiVersion.TrimStart('/').TrimEnd('/')}/{endpoint.TrimStart('/')}";
+        }
+        
         public static string GetUserApiUrl(string path = "") => GetFullApiUrl($"users/{path.TrimStart('/')}");
         public static string GetCharacterApiUrl(string path = "") => GetFullApiUrl($"characters/{path.TrimStart('/')}");
         public static string GetConversationApiUrl(string path = "") => GetFullApiUrl($"conversations/{path.TrimStart('/')}");

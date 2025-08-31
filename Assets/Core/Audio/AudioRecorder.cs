@@ -161,12 +161,10 @@ namespace ProjectVG.Core.Audio
                     {
                         Debug.Log($"[AudioRecorder] 음성 녹음 완료됨 ({actualRecordingDuration:F1}초, {processedClip.samples} 샘플)");
                         OnRecordingCompleted?.Invoke(processedClip);
-                        OnRecordingStopped?.Invoke();
                         return processedClip;
                     }
                 }
                 
-                OnRecordingStopped?.Invoke();
                 return null;
             }
             catch (Exception ex)
@@ -178,7 +176,7 @@ namespace ProjectVG.Core.Audio
             }
             finally
             {
-                // 중복 호출 방지를 위해 성공 분기에서 이미 호출했다면 옵저버 측에서 idempotent 처리 가정
+                // 성공/실패 불문하고 한 번만 Stopped 이벤트를 발생
                 OnRecordingStopped?.Invoke();
             }
         }

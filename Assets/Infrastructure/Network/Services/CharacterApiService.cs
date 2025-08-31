@@ -2,6 +2,7 @@ using System.Threading;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Http;
+using ProjectVG.Infrastructure.Network.Configs;
 using ProjectVG.Infrastructure.Network.DTOs.Character;
 
 namespace ProjectVG.Infrastructure.Network.Services
@@ -35,7 +36,7 @@ namespace ProjectVG.Infrastructure.Network.Services
                 return null;
             }
             
-            return await _httpClient.GetAsync<CharacterData[]>("/api/v1/character", cancellationToken: cancellationToken);
+            return await _httpClient.GetAsync<CharacterData[]>("api/v1/character", cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -52,7 +53,7 @@ namespace ProjectVG.Infrastructure.Network.Services
                 return null;
             }
             
-            return await _httpClient.GetAsync<CharacterData>($"/api/v1/character/{characterId}", cancellationToken: cancellationToken);
+            return await _httpClient.GetAsync<CharacterData>($"api/v1/character/{characterId}", cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -63,7 +64,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <returns>생성된 캐릭터 정보</returns>
         public async UniTask<CharacterData> CreateCharacterAsync(CreateCharacterRequest request, CancellationToken cancellationToken = default)
         {
-            return await _httpClient.PostAsync<CharacterData>("/api/v1/character", request, cancellationToken: cancellationToken);
+            return await _httpClient.PostAsync<CharacterData>("api/v1/character", request, cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -102,7 +103,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <returns>수정된 캐릭터 정보</returns>
         public async UniTask<CharacterData> UpdateCharacterAsync(string characterId, UpdateCharacterRequest request, CancellationToken cancellationToken = default)
         {
-            return await _httpClient.PutAsync<CharacterData>($"/api/v1/character/{characterId}", request, cancellationToken: cancellationToken);
+            return await _httpClient.PutAsync<CharacterData>($"api/v1/character/{characterId}", request, cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -143,7 +144,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         {
             try
             {
-                await _httpClient.DeleteAsync<object>($"/api/v1/character/{characterId}", cancellationToken: cancellationToken);
+                await _httpClient.DeleteAsync<object>($"api/v1/character/{characterId}", cancellationToken: cancellationToken);
                 return true;
             }
             catch
