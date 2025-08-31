@@ -160,7 +160,7 @@ namespace ProjectVG.Infrastructure.Auth
                 };
                 
                 var response = await httpClient.PostAsync<ServerOAuth2TokenResponse>(
-                    "api/v1/auth/oauth2/refresh",
+                    "api/v1/auth/refresh",
                     refreshRequest,
                     requiresAuth: false  // 토큰 갱신은 인증 불필요
                 );
