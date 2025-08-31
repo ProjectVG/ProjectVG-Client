@@ -168,11 +168,8 @@ namespace ProjectVG.Domain.Character.Service
 
             try
 			{
-				// 기존 모션 중지 (새 액션이 트리거될 때)
-				if (_currentAction == CharacterActionType.Idle && actionType != CharacterActionType.Idle)
-				{
-					StopAllMotionCoroutines();
-				}
+				// 새 액션 시작 전에 항상 이전 모션 관련 코루틴 정리
+				StopAllMotionCoroutines();
 
 				_currentAction = actionType;
 				string motionGroup = GetMotionGroupName(actionType);
@@ -335,7 +332,6 @@ namespace ProjectVG.Domain.Character.Service
 		{
 			// Idle 모션은 항상 재귀적으로 다음 Idle 모션 재생 (0.3초 딜레이 후)
 			System.Action recursiveIdleCallback = () => {
-				Debug.Log("[CharacterActionController] Idle 모션 종료 - 0.3초 후 다음 Idle 모션 재생");
 				if (_currentAction == CharacterActionType.Idle)
 				{
 					StartCoroutine(DelayedIdleMotionStart()); // 딜레이 후 다음 Idle 모션 재생
@@ -482,12 +478,9 @@ namespace ProjectVG.Domain.Character.Service
 		/// </summary>
 		private void StopAllMotionCoroutines()
 		{
-			if (_currentMotionCoroutine != null)
-			{
-				StopCoroutine(_currentMotionCoroutine);
-				_currentMotionCoroutine = null;
-			}
-			
+			// 이 컴포넌트가 시작한 모든 코루틴 중지
+			StopAllCoroutines();
+			_currentMotionCoroutine = null;
 			_currentMotionEndCallback = null;
 		}
 
@@ -498,10 +491,6 @@ namespace ProjectVG.Domain.Character.Service
 		/// </summary>
 		private void OnLive2DMotionEnd(int instanceId)
 		{
-			Debug.Log($"[CharacterActionController] Live2D 모션 종료 이벤트 (InstanceId: {instanceId})");
-			
-			// 코루틴에서 모션 종료를 처리하므로 여기서는 로깅만 수행
-			// 만약 코루틴이 없을 경우에 대비하여 콜백 호출
 			if (_currentMotionCoroutine == null && _currentMotionEndCallback != null)
 			{
 				var callback = _currentMotionEndCallback;
