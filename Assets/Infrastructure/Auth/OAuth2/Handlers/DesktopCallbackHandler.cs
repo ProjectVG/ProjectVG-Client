@@ -24,7 +24,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
         private bool _isWaitingForCallback = false;
         
         public string PlatformName => "Desktop";
-        public bool IsSupported => true;
+        public bool IsSupported => HttpListener.IsSupported;
         
         public async Task InitializeAsync(string expectedState, float timeoutSeconds)
         {
@@ -104,10 +104,16 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
             try
             {
                 _listener = new HttpListener();
-                _listener.Prefixes.Add("http://localhost:3000/");
+                
+                // OAuth2Config의 현재 플랫폼 리다이렉트 URI를 사용
+                var redirectUri = ProjectVG.Infrastructure.Auth.OAuth2.Config.ServerOAuth2Config.Instance.GetCurrentPlatformRedirectUri();
+                var uri = new Uri(redirectUri);
+                // HttpListener는 pathless 프리픽스를 권장(하위 경로 허용)
+                var prefix = $"{uri.Scheme}://{uri.Host}:{uri.Port}/";
+                _listener.Prefixes.Add(prefix);
                 _listener.Start();
                 
-                Debug.Log("[DesktopCallbackHandler] 로컬 서버 시작: http://localhost:3000/");
+                Debug.Log($"[DesktopCallbackHandler] 로컬 서버 시작: {prefix}");
                 
                 // 서버 리스닝 시작
                 _ = ListenForCallbackAsync();
@@ -153,7 +159,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
                 var request = context.Request;
                 var response = context.Response;
                 
-                Debug.Log($"[DesktopCallbackHandler] 요청 수신: {request.Url}");
+                Debug.Log($"[DesktopCallbackHandler] 요청 수신: {SanitizeUrl(request.Url?.ToString())}");
                 
                 // OAuth2 콜백 URL인지 확인 (auth/callback 또는 auth/google/callback)
                 if (request.Url.AbsolutePath.Contains("auth/callback") || request.Url.AbsolutePath.Contains("auth/google/callback"))
@@ -166,6 +172,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
                     if (!string.IsNullOrEmpty(state) && state == _expectedState)
                     {
                         // 성공 응답
+                        response.StatusCode = (int)HttpStatusCode.OK;
                         var successHtml = @"
                             <!DOCTYPE html>
                             <html>
@@ -199,6 +206,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
                     else
                     {
                         // 실패 응답
+                        response.StatusCode = (int)HttpStatusCode.BadRequest;
                         var errorHtml = @"
                             <!DOCTYPE html>
                             <html>
@@ -230,6 +238,7 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
                 else
                 {
                     // 기본 응답
+                    response.StatusCode = (int)HttpStatusCode.OK;
                     var html = @"
                         <!DOCTYPE html>
                         <html>
@@ -256,6 +265,11 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
             catch (Exception ex)
             {
                 Debug.LogError($"[DesktopCallbackHandler] 콜백 처리 중 오류: {ex.Message}");
+            }
+            finally
+            {
+                try { context.Response?.OutputStream?.Close(); } catch { }
+                try { context.Response?.Close(); } catch { }
             }
         }
         
@@ -292,6 +306,29 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Handlers
             catch (Exception ex)
             {
                 Debug.LogError($"[DesktopCallbackHandler] 콜백 URL 확인 중 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// URL에서 민감한 정보를 마스킹
+        /// </summary>
+        private static string SanitizeUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url)) 
+                return url;
+            
+            try
+            {
+                var u = new Uri(url);
+                var qs = System.Web.HttpUtility.ParseQueryString(u.Query);
+                if (qs["state"] != null) qs["state"] = "***";
+                if (qs["code"] != null) qs["code"] = "***";
+                var builder = new UriBuilder(u) { Query = qs.ToString() };
+                return builder.Uri.ToString();
+            }
+            catch 
+            { 
+                return url; 
             }
         }
     }
