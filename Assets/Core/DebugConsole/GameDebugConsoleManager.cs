@@ -103,8 +103,8 @@ namespace ProjectVG.Core.Utils
                 return;
             }
             
-            _consolePanel.SetActive(true);
-            _isConsoleVisible = true;
+            _consolePanel.SetActive(false);
+            _isConsoleVisible = false;
             
             SetupLayoutGroup();
             
