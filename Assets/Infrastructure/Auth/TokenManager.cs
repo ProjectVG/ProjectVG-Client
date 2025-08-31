@@ -235,11 +235,13 @@ namespace ProjectVG.Infrastructure.Auth
                 using (var aes = Aes.Create())
                 {
                     aes.Key = Encoding.UTF8.GetBytes(ENCRYPTION_KEY.PadRight(32, '0').Substring(0, 32));
-                    aes.IV = new byte[16];
+                    aes.GenerateIV(); // 랜덤 IV 생성
                     
                     using (var encryptor = aes.CreateEncryptor())
                     using (var ms = new System.IO.MemoryStream())
                     {
+                        // 먼저 IV를 기록
+                        ms.Write(aes.IV, 0, aes.IV.Length);
                         using (var cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
                         using (var sw = new System.IO.StreamWriter(cs))
                         {
@@ -260,24 +262,68 @@ namespace ProjectVG.Infrastructure.Auth
         {
             try
             {
-                using (var aes = Aes.Create())
+                // 새로운 방식 (랜덤 IV) 시도
+                return DecryptDataWithRandomIV(encryptedData);
+            }
+            catch (Exception)
+            {
+                // 실패 시 기존 방식 (고정 IV) 시도
+                try
                 {
-                    aes.Key = Encoding.UTF8.GetBytes(ENCRYPTION_KEY.PadRight(32, '0').Substring(0, 32));
-                    aes.IV = new byte[16];
-                    
-                    using (var decryptor = aes.CreateDecryptor())
-                    using (var ms = new System.IO.MemoryStream(Convert.FromBase64String(encryptedData)))
-                    using (var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read))
-                    using (var sr = new System.IO.StreamReader(cs))
-                    {
-                        return sr.ReadToEnd();
-                    }
+                    Debug.LogWarning("[TokenManager] 새로운 방식 복호화 실패, 기존 방식으로 시도합니다.");
+                    return DecryptDataWithFixedIV(encryptedData);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[TokenManager] 모든 복호화 방식 실패: {ex.Message}");
+                    throw;
                 }
             }
-            catch (Exception ex)
+        }
+        
+        private string DecryptDataWithRandomIV(string encryptedData)
+        {
+            using (var aes = Aes.Create())
             {
-                Debug.LogError($"[TokenManager] 복호화 실패: {ex.Message}");
-                throw;
+                aes.Key = Encoding.UTF8.GetBytes(ENCRYPTION_KEY.PadRight(32, '0').Substring(0, 32));
+                
+                var allBytes = Convert.FromBase64String(encryptedData);
+                if (allBytes.Length < 16) throw new InvalidOperationException("암호문 길이가 유효하지 않습니다.");
+                
+                // IV 추출
+                var iv = new byte[16];
+                Buffer.BlockCopy(allBytes, 0, iv, 0, iv.Length);
+                
+                // 암호문 추출
+                var cipher = new byte[allBytes.Length - iv.Length];
+                Buffer.BlockCopy(allBytes, iv.Length, cipher, 0, cipher.Length);
+                
+                aes.IV = iv;
+                
+                using (var decryptor = aes.CreateDecryptor())
+                using (var ms = new System.IO.MemoryStream(cipher))
+                using (var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read))
+                using (var sr = new System.IO.StreamReader(cs))
+                {
+                    return sr.ReadToEnd();
+                }
+            }
+        }
+        
+        private string DecryptDataWithFixedIV(string encryptedData)
+        {
+            using (var aes = Aes.Create())
+            {
+                aes.Key = Encoding.UTF8.GetBytes(ENCRYPTION_KEY.PadRight(32, '0').Substring(0, 32));
+                aes.IV = new byte[16]; // 기존 고정 IV
+                
+                using (var decryptor = aes.CreateDecryptor())
+                using (var ms = new System.IO.MemoryStream(Convert.FromBase64String(encryptedData)))
+                using (var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read))
+                using (var sr = new System.IO.StreamReader(cs))
+                {
+                    return sr.ReadToEnd();
+                }
             }
         }
         

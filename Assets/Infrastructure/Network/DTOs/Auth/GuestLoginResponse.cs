@@ -44,6 +44,11 @@ namespace ProjectVG.Infrastructure.Network.DTOs.Auth
                 return null;
             }
 
+            if (string.IsNullOrEmpty(Tokens.AccessToken))
+            {
+                // 서버 응답에 액세스 토큰이 없으면 TokenSet 생성 불가
+                return null;
+            }
             var accessToken = new AccessToken(Tokens.AccessToken);
 
             RefreshToken refreshToken = null;

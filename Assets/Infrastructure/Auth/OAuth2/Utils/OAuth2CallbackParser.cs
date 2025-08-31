@@ -29,8 +29,8 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Utils
                 var uri = new Uri(callbackUrl);
                 var query = HttpUtility.ParseQueryString(uri.Query);
                 
-                // 쿼리 파라미터를 Dictionary로 변환
-                var queryParams = new Dictionary<string, string>();
+                // 쿼리 파라미터를 Dictionary로 변환 (대소문자 무시)
+                var queryParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (string key in query.AllKeys)
                 {
                     if (!string.IsNullOrEmpty(key))
@@ -40,14 +40,13 @@ namespace ProjectVG.Infrastructure.Auth.OAuth2.Utils
                 }
                 
                 // success 파라미터 확인
-                if (!queryParams.ContainsKey("success"))
+                if (!queryParams.TryGetValue("success", out var successRaw) || string.IsNullOrEmpty(successRaw))
                 {
-                    return OAuth2CallbackResult.ErrorResult("success 파라미터가 없습니다.", callbackUrl);
+                    return OAuth2CallbackResult.ErrorResult("success 파라미터가 비어있습니다.", callbackUrl);
                 }
+                var success = successRaw.Equals("true", StringComparison.OrdinalIgnoreCase);
                 
-                var success = queryParams["success"].ToLower();
-                
-                if (success == "true")
+                if (success)
                 {
                     // 성공 케이스: state 파라미터 확인
                     if (!queryParams.ContainsKey("state"))
