@@ -29,12 +29,12 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <param name="request">채팅 요청 데이터</param>
         /// <param name="cancellationToken">취소 토큰</param>
         /// <returns>채팅 응답</returns>
-        public async UniTask<ChatResponse> SendChatAsync(ChatRequest request, CancellationToken cancellationToken = default)
+        public async UniTask<WebSocketResponse> SendChatAsync(ChatRequest request, CancellationToken cancellationToken = default)
         {
             ValidateHttpClient();
             
             
-            return await _httpClient.PostAsync<ChatResponse>($"api/v1/{CHAT_ENDPOINT}", request, requiresAuth: true, cancellationToken: cancellationToken);
+            return await _httpClient.PostAsync<WebSocketResponse>($"api/v1/{CHAT_ENDPOINT}", request, requiresAuth: true, cancellationToken: cancellationToken);
         }
 
         #region Private Methods
