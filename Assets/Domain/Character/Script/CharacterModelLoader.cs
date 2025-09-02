@@ -58,10 +58,17 @@ namespace ProjectVG.Domain.Character.Service
 		#region Private Methods
 
 		/// <summary>
-		/// Animator Controller를 제거한다 (Live2D와 충돌 방지)
+		/// Animator Controller를 제거한다 (Live2D 모드에서만, Live2D와 충돌 방지)
 		/// </summary>
-		private void ClearAnimatorController(GameObject modelInstance)
+		private void ClearAnimatorController(GameObject modelInstance, Live2DModelConfig? config)
 		{
+			// Animator 모드인 경우 Animator Controller를 제거하지 않음
+			if (config != null && config.ActionControllerMode == Live2DModelConfig.ActionControllerType.Animator)
+			{
+				Debug.Log($"[CharacterModelLoader] Animator 모드이므로 Animator Controller를 유지합니다: {modelInstance.name}");
+				return;
+			}
+
 			var animator = modelInstance.GetComponent<Animator>();
 			if (animator != null && animator.runtimeAnimatorController != null)
 			{
@@ -109,8 +116,8 @@ namespace ProjectVG.Domain.Character.Service
 		/// </summary>
 		private void SetupModelComponents(GameObject modelInstance, Live2DModelConfig config)
 		{
-			// Animator Controller 제거 (Live2D와 충돌)
-			ClearAnimatorController(modelInstance);
+			// Animator Controller 제거 (Live2D 모드에서만)
+			ClearAnimatorController(modelInstance, config);
 			
 			SetupLipSync(modelInstance, config);
 			SetupAutoEyeBlink(modelInstance, config);
@@ -241,13 +248,40 @@ namespace ProjectVG.Domain.Character.Service
 		}
 
 		/// <summary>
-		/// 액션 서비스를 설정한다
+		/// 액션 컨트롤러를 설정한다 (Live2D 또는 Animator 기반)
 		/// </summary>
 		private void SetupActionController(GameObject modelInstance)
 		{
-			var actionService = modelInstance.GetComponent<CharacterActionController>();
+			// 현재 모델의 Config 찾기
+			string modelId = modelInstance.name;
+			if (_modelRegistry == null || !_modelRegistry.TryGetConfig(modelId, out var config))
+			{
+				Debug.LogWarning($"[CharacterModelLoader] 모델 '{modelId}'의 Config를 찾을 수 없습니다. Live2D 방식으로 기본 설정합니다.");
+				SetupLive2DActionController(modelInstance, null);
+				return;
+			}
+
+			// Config에 따라 적절한 액션 컨트롤러 설정
+			switch (config.ActionControllerMode)
+			{
+				case Live2DModelConfig.ActionControllerType.Animator:
+					SetupAnimatorActionController(modelInstance, config);
+					break;
+				case Live2DModelConfig.ActionControllerType.Live2D:
+				default:
+					SetupLive2DActionController(modelInstance, config);
+					break;
+			}
+		}
+
+		/// <summary>
+		/// Live2D 기반 액션 컨트롤러를 설정한다
+		/// </summary>
+		private void SetupLive2DActionController(GameObject modelInstance, Live2DModelConfig? config)
+		{
+			var actionService = modelInstance.GetComponent<Live2DCharacterActionController>();
 			if (actionService == null) {
-				actionService = modelInstance.AddComponent<CharacterActionController>();
+				actionService = modelInstance.AddComponent<Live2DCharacterActionController>();
 			}
 
 			var motionController = modelInstance.GetComponent<CubismMotionController>();
@@ -256,18 +290,47 @@ namespace ProjectVG.Domain.Character.Service
 				return;
 			}
 
-			// 현재 모델의 Config 찾기
-			string modelId = modelInstance.name;
-			if (_modelRegistry != null && _modelRegistry.TryGetConfig(modelId, out var config))
+			if (config != null)
 			{
 				actionService.Initialize(motionController, config.MotionClips);
-				Debug.Log($"[CharacterModelLoader] CharacterActionController 초기화 완료: {modelInstance.name}, Motion Clips: {config.MotionClips?.Count ?? 0}개, Auto Idle: {config.EnableAutoIdle}");
+				Debug.Log($"[CharacterModelLoader] Live2DCharacterActionController 초기화 완료: {modelInstance.name}, Motion Clips: {config.MotionClips?.Count ?? 0}개");
 			}
 			else
 			{
-				Debug.LogWarning($"[CharacterModelLoader] 모델 '{modelId}'의 Config를 찾을 수 없어 빈 Motion Clips로 초기화합니다.");
+				Debug.LogWarning($"[CharacterModelLoader] Config가 null이므로 빈 Motion Clips로 초기화합니다: {modelInstance.name}");
 				actionService.Initialize(motionController, new System.Collections.Generic.List<Live2DModelConfig.MotionClipMapping>());
 			}
+		}
+
+		/// <summary>
+		/// Animator 기반 액션 컨트롤러를 설정한다
+		/// </summary>
+		private void SetupAnimatorActionController(GameObject modelInstance, Live2DModelConfig config)
+		{
+			var actionService = modelInstance.GetComponent<AnimatorCharacterActionController>();
+			if (actionService == null) {
+				actionService = modelInstance.AddComponent<AnimatorCharacterActionController>();
+			}
+
+			var animator = modelInstance.GetComponent<Animator>();
+			if (animator == null) {
+				Debug.LogError($"[CharacterModelLoader] Animator 컴포넌트를 찾을 수 없습니다: {modelInstance.name}");
+				return;
+			}
+
+			// Animator Controller 설정
+			if (config.AnimatorController != null)
+			{
+				animator.runtimeAnimatorController = config.AnimatorController;
+				Debug.Log($"[CharacterModelLoader] Animator Controller 설정 완료: {config.AnimatorController.name}");
+			}
+			else
+			{
+				Debug.LogWarning($"[CharacterModelLoader] Animator Controller가 Config에 설정되지 않았습니다: {modelInstance.name}");
+			}
+
+			actionService.Initialize(animator);
+			Debug.Log($"[CharacterModelLoader] AnimatorCharacterActionController 초기화 완료: {modelInstance.name}");
 		}
 
 		#endregion

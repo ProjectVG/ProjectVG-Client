@@ -12,15 +12,7 @@ using UnityEngine;
 
 namespace ProjectVG.Domain.Character.Service
 {
-
-	public enum CharacterActionType
-	{
-		Idle,
-		Listen,
-		Talk
-	}
-
-	public class CharacterActionController : MonoBehaviour
+	public class Live2DCharacterActionController : MonoBehaviour, ICharacterActionController
 	{
 		private CubismMotionController? _motionController;
 		private CubismFadeController? _fadeController;
@@ -37,9 +29,9 @@ namespace ProjectVG.Domain.Character.Service
 		private System.Action? _currentMotionEndCallback;
 		
 		// Motion End Behavior Control
-		public System.Action? OnMotionStop;
-		public System.Action? OnMotionLoop;
-		public System.Action? OnMotionReturnToIdle;
+		public System.Action? OnMotionStop { get; set; }
+		public System.Action? OnMotionLoop { get; set; }
+		public System.Action? OnMotionReturnToIdle { get; set; }
 
         #region Unity Lifecycle
 
@@ -64,25 +56,39 @@ namespace ProjectVG.Domain.Character.Service
 			
 			if (_fadeController == null)
 			{
-				Debug.LogWarning("[CharacterActionController] CubismFadeController를 찾을 수 없습니다. 모션 전환이 부자연스러울 수 있습니다.");
+				Debug.LogWarning("[Live2DCharacterActionController] CubismFadeController를 찾을 수 없습니다. 모션 전환이 부자연스러울 수 있습니다.");
 			}
 			
 			// 기본 Action 콜백 설정
 			SetupDefaultCallbacks();
 			
 			// 모션 클립 구성 디버깅
-			Debug.Log($"===============[CharacterActionController] 초기화 완료 - Motion Clips: {_motionClips?.Count ?? 0}개");
+			Debug.Log($"===============[Live2DCharacterActionController] 초기화 완료 - Motion Clips: {_motionClips?.Count ?? 0}개");
 			if (_motionClips != null)
 			{
 				foreach (var clip in _motionClips)
 				{
-					Debug.Log($"[CharacterActionController] Motion Clip: {clip.Id} | Group: '{clip.MotionGroup}' | AnimationClip: {(clip.animationClip != null ? "O" : "X")}");
+					Debug.Log($"[Live2DCharacterActionController] Motion Clip: {clip.Id} | Group: '{clip.MotionGroup}' | AnimationClip: {(clip.animationClip != null ? "O" : "X")}");
 				}
 				
 				// idle 그룹 확인
 				var idleClips = _motionClips.Where(c => c.MotionGroup.Equals("idle", System.StringComparison.OrdinalIgnoreCase)).ToList();
-				Debug.Log($"[CharacterActionController] idle 그룹 모션 클립 수: {idleClips.Count}개");
+				Debug.Log($"[Live2DCharacterActionController] idle 그룹 모션 클립 수: {idleClips.Count}개");
 			}
+		}
+
+		/// <summary>
+		/// 인터페이스 구현을 위한 매개변수 없는 초기화 메서드
+		/// </summary>
+		public void Initialize()
+		{
+			// 이미 초기화된 경우 추가 작업 없음
+			if (_motionController != null && _motionClips != null)
+			{
+				return;
+			}
+			
+			Debug.LogWarning("[Live2DCharacterActionController] Initialize() called without parameters. Make sure to call Initialize(motionController, motionClips) first.");
 		}
 
 		/// <summary>
@@ -131,12 +137,12 @@ namespace ProjectVG.Domain.Character.Service
         private void SetupDefaultCallbacks()
 		{
 			OnMotionStop = () => {
-				Debug.Log("[CharacterActionController] 모션 정지");
+				Debug.Log("[Live2DCharacterActionController] 모션 정지");
 				_isPlayingAction = false;
 			};
 			
 			OnMotionLoop = () => {
-				Debug.Log("[CharacterActionController] 모션 루프 - 같은 그룹의 다른 모션 재생");
+				Debug.Log("[Live2DCharacterActionController] 모션 루프 - 같은 그룹의 다른 모션 재생");
 				if (_currentMotionClip != null)
 				{
 					PlayRandomMotionFromGroup(_currentMotionClip.MotionGroup, endCallback: OnMotionLoop);
@@ -144,7 +150,7 @@ namespace ProjectVG.Domain.Character.Service
 			};
 			
 			OnMotionReturnToIdle = () => {
-				Debug.Log("[CharacterActionController] 모션 종료 - Idle로 복귀");
+				Debug.Log("[Live2DCharacterActionController] 모션 종료 - Idle로 복귀");
 				PlayAction(CharacterActionType.Idle);
 			};
 		}
@@ -157,12 +163,12 @@ namespace ProjectVG.Domain.Character.Service
 		{
 			if (_motionController == null)
 			{
-				Debug.LogWarning("[CharacterActionController] MotionController가 초기화되지 않았습니다.");
+				Debug.LogWarning("[Live2DCharacterActionController] MotionController가 초기화되지 않았습니다.");
 				return;
 			}
 
 			if (_motionClips == null || _motionClips.Count == 0) {
-				Debug.LogWarning("[CharacterActionController] MotionClips이 설정되지 않았습니다.");
+				Debug.LogWarning("[Live2DCharacterActionController] MotionClips이 설정되지 않았습니다.");
 				return;
 			}
 
@@ -185,11 +191,11 @@ namespace ProjectVG.Domain.Character.Service
 					PlayRandomMotionFromGroup(motionGroup, endCallback: OnMotionReturnToIdle);
 				}
 				
-				Debug.Log($"[CharacterActionController] 액션 재생: {actionType}, 그룹: {motionGroup}");
+				Debug.Log($"[Live2DCharacterActionController] 액션 재생: {actionType}, 그룹: {motionGroup}");
 			}
 			catch (System.Exception ex)
 			{
-				Debug.LogError($"[CharacterActionController] 액션 재생 실패: {ex.Message}");
+				Debug.LogError($"[Live2DCharacterActionController] 액션 재생 실패: {ex.Message}");
 				_isPlayingAction = false;
 			}
 		}
@@ -208,7 +214,7 @@ namespace ProjectVG.Domain.Character.Service
 			PlayAction(CharacterActionType.Idle);
 			_isPlayingAction = false;
 			_currentAction = CharacterActionType.Idle;
-			Debug.Log("[CharacterActionController] 액션 중지");
+			Debug.Log("[Live2DCharacterActionController] 액션 중지");
 		}
 
 		/// <summary>
@@ -229,7 +235,7 @@ namespace ProjectVG.Domain.Character.Service
 			
 			PlayRandomIdleMotion();
 
-			Debug.Log("[CharacterActionController] 강제 중지 후 Idle로 복귀");
+			Debug.Log("[Live2DCharacterActionController] 강제 중지 후 Idle로 복귀");
 		}
 
 
@@ -284,7 +290,7 @@ namespace ProjectVG.Domain.Character.Service
 				
 			if (groupMotions.Count == 0)
 			{
-				Debug.LogWarning($"[CharacterActionController] '{motionGroup}' 그룹의 모션을 찾을 수 없습니다.");
+				Debug.LogWarning($"[Live2DCharacterActionController] '{motionGroup}' 그룹의 모션을 찾을 수 없습니다.");
 				return;
 			}
 			
@@ -321,7 +327,7 @@ namespace ProjectVG.Domain.Character.Service
 				StopAllMotionCoroutines();
 				_currentMotionCoroutine = StartCoroutine(WaitForMotionEnd(clip.length, endCallback));
 				
-				Debug.Log($"[CharacterActionController] 모션 재생: {_currentMotionClip?.Id} (그룹: {_currentMotionClip?.MotionGroup}), 길이: {clip.length}s");
+				Debug.Log($"[Live2DCharacterActionController] 모션 재생: {_currentMotionClip?.Id} (그룹: {_currentMotionClip?.MotionGroup}), 길이: {clip.length}s");
 			}
 		}
 		
@@ -357,7 +363,7 @@ namespace ProjectVG.Domain.Character.Service
 				
 			if (idleMotions.Count == 0)
 			{
-				Debug.LogWarning("[CharacterActionController] idle 모션을 찾을 수 없습니다.");
+				Debug.LogWarning("[Live2DCharacterActionController] idle 모션을 찾을 수 없습니다.");
 				return;
 			}
 			
@@ -454,7 +460,7 @@ namespace ProjectVG.Domain.Character.Service
 			}
 			catch (System.Exception ex)
 			{
-				Debug.LogWarning($"[CharacterActionController] 모션 상태 체크 실패: {ex.Message}");
+				Debug.LogWarning($"[Live2DCharacterActionController] 모션 상태 체크 실패: {ex.Message}");
 				return false;
 			}
 		}
@@ -467,7 +473,7 @@ namespace ProjectVG.Domain.Character.Service
 			if (_motionController != null)
 			{
 				_motionController.StopAllAnimation();
-				Debug.Log("[CharacterActionController] 모든 모션 강제 중지");
+				Debug.Log("[Live2DCharacterActionController] 모든 모션 강제 중지");
 			}
 		}
 

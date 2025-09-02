@@ -18,7 +18,7 @@ namespace ProjectVG.Domain.Character.Service
 
 		private CharacterModelLoader _modelLoader;
 		private GameObject _currentCharacter;
-		private CharacterActionController _actionController;
+		private ICharacterActionController _actionController;
 		private int _loadVersion = 0;
 
         #region Unity Lifecycle
@@ -89,9 +89,20 @@ namespace ProjectVG.Domain.Character.Service
 			if (newCharacter != null)
 			{
 				_currentCharacter = newCharacter;
-				_actionController = _currentCharacter.GetComponent<CharacterActionController>();
+				// ICharacterActionController 인터페이스를 구현하는 컴포넌트를 찾기
+				_actionController = _currentCharacter.GetComponent<ICharacterActionController>();
+				if (_actionController == null)
+				{
+					// 구현체들을 직접 확인 (fallback)
+					_actionController = _currentCharacter.GetComponent<Live2DCharacterActionController>();
+					if (_actionController == null)
+					{
+						_actionController = _currentCharacter.GetComponent<AnimatorCharacterActionController>();
+					}
+				}
+				
 				_currentCharacter.SetActive(true);
-				Debug.Log($"[CharacterManager] 캐릭터 로드 완료: {characterId}");
+				Debug.Log($"[CharacterManager] 캐릭터 로드 완료: {characterId}, ActionController: {_actionController?.GetType().Name ?? "None"}");
 			}
 		}
 

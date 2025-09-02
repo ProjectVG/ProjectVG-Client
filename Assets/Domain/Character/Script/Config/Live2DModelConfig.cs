@@ -19,6 +19,14 @@ namespace ProjectVG.Domain.Character.Live2D.Model
             ReturnToIdle
         }
 
+        public enum ActionControllerType
+        {
+            [Tooltip("Live2D CubismMotionController 기반 제어")]
+            Live2D,
+            [Tooltip("Unity Animator 기반 제어")]
+            Animator
+        }
+
         [Serializable]
         public class MotionClipMapping
         {
@@ -114,12 +122,20 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         [Header("────────────────────────────────────────")]
 
         [Space(5)]
+        [Header("[ Action Controller 설정 ]")]
+        [Space(2)]
+        [Tooltip("액션 컨트롤러 타입")]
+        [SerializeField] private ActionControllerType actionControllerType = ActionControllerType.Live2D;
+
+        [Tooltip("Unity Animator Controller (Animator 타입 사용 시)")]
+        [SerializeField] private RuntimeAnimatorController animatorController;
+
         [Header("[ Motion 클립 설정 ]")]
         [Space(2)]
-        [Tooltip("AnimationClip 목록")]
+        [Tooltip("AnimationClip 목록 (Live2D 타입 사용 시)")]
         [SerializeField] private List<MotionClipMapping> motionClips = new List<MotionClipMapping>();
 
-        [Tooltip("CubismFadeMotionList (선택사항)")]
+        [Tooltip("CubismFadeMotionList (Live2D 타입 사용 시, 선택사항)")]
         [SerializeField] private CubismFadeMotionList fadeMotionList;
 
         [Header("[ Auto Idle 설정 ]")]
@@ -209,6 +225,10 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         public string ModelName => characterName;
         public GameObject ModelPrefab => characterPrefab;
         public string ModelDescription => characterDescription;
+
+        // Action Controller 설정
+        public ActionControllerType ActionControllerMode => actionControllerType;
+        public RuntimeAnimatorController AnimatorController => animatorController;
 
         // Motion 클립
         public List<MotionClipMapping> MotionClips => motionClips;

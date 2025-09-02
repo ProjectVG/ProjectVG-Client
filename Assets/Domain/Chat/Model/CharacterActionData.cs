@@ -1,7 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
 using ProjectVG.Domain.Character.Service;
 
 namespace ProjectVG.Domain.Chat.Model
