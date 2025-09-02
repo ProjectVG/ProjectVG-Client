@@ -41,6 +41,8 @@ namespace ProjectVG.Infrastructure.Auth
         
         private bool _isInitialized = false;
         private bool _isAutoRefreshInProgress = false;
+        private bool _initStarted = false;
+        private UniTask _initTask;
         
         #endregion
         
@@ -106,7 +108,8 @@ namespace ProjectVG.Infrastructure.Auth
             {
                 _instance = this;
                 DontDestroyOnLoad(gameObject);
-                InitializeAsync().Forget();
+                _initStarted = true;
+                _initTask = InitializeAsync();
             }
             else if (_instance != this)
             {
@@ -114,7 +117,18 @@ namespace ProjectVG.Infrastructure.Auth
             }
         }
         
-        private async UniTaskVoid InitializeAsync()
+        private async UniTask EnsureInitializedAsync()
+        {
+            if (_isInitialized) return;
+            if (!_initStarted)
+            {
+                _initStarted = true;
+                _initTask = InitializeAsync();
+            }
+            await _initTask;
+        }
+        
+        private async UniTask InitializeAsync()
         {
             try
             {
@@ -183,9 +197,11 @@ namespace ProjectVG.Infrastructure.Auth
         /// <returns>로그인 성공 여부</returns>
         public async UniTask<bool> LoginAsGuestAsync()
         {
+            await EnsureInitializedAsync();
+            
             if (!_isInitialized)
             {
-                Debug.LogError("[AuthManager] AuthManager가 초기화되지 않았습니다.");
+                Debug.LogError("[AuthManager] AuthManager 초기화에 실패했습니다.");
                 return false;
             }
             
@@ -208,9 +224,11 @@ namespace ProjectVG.Infrastructure.Auth
         /// <returns>로그인 성공 여부</returns>
         public async UniTask<bool> LoginWithOAuth2Async()
         {
+            await EnsureInitializedAsync();
+            
             if (!_isInitialized)
             {
-                Debug.LogError("[AuthManager] AuthManager가 초기화되지 않았습니다.");
+                Debug.LogError("[AuthManager] AuthManager 초기화에 실패했습니다.");
                 return false;
             }
             
@@ -281,9 +299,11 @@ namespace ProjectVG.Infrastructure.Auth
         /// <returns>갱신 성공 여부</returns>
         public async UniTask<bool> RefreshTokenAsync()
         {
+            await EnsureInitializedAsync();
+            
             if (!_isInitialized)
             {
-                Debug.LogError("[AuthManager] AuthManager가 초기화되지 않았습니다.");
+                Debug.LogError("[AuthManager] AuthManager 초기화에 실패했습니다.");
                 return false;
             }
             
@@ -306,9 +326,11 @@ namespace ProjectVG.Infrastructure.Auth
         /// <returns>유효한 토큰 보장 여부</returns>
         public async UniTask<bool> EnsureValidTokenAsync(int minutesBeforeExpiry = 5)
         {
+            await EnsureInitializedAsync();
+            
             if (!_isInitialized)
             {
-                Debug.LogError("[AuthManager] AuthManager가 초기화되지 않았습니다.");
+                Debug.LogError("[AuthManager] AuthManager 초기화에 실패했습니다.");
                 return false;
             }
             

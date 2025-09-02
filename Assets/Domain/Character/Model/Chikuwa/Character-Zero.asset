@@ -17,15 +17,66 @@ MonoBehaviour:
   characterPrefab: {fileID: 7609475132481125670, guid: 9e7b6e32e30a8e144aac535afecd9340, type: 3}
   thumbnail: {fileID: 2800000, guid: a443448c8422da640825449c667a9378, type: 3}
   characterDescription: "\uCE58\uC640\uC9F1 \uBAA8\uB378 \uAE30\uBC18"
-  emotionMappings:
-  - emotionKey: 
-    expressionName: 
-    defaultIntensity: 0
-    defaultDurationMs: 0
-  actionMappings:
-  - actionKey: 
-    motionGroup: 
-    motionName: 
+  motionClips:
+  - id: idle-001
+    animationClip: {fileID: 7400000, guid: 5b3644cae20d1a146a7ca8d29925d135, type: 2}
+    motionGroup: idle
+    endBehavior: 2
+  - id: idle-002
+    animationClip: {fileID: 7400000, guid: 0efa33e6067f6bc4f8f52d2db2d16dc9, type: 2}
+    motionGroup: idle
+    endBehavior: 2
+  - id: idle-003
+    animationClip: {fileID: 7400000, guid: cc4dc2ead0e65e8428069b4cf8025d0e, type: 2}
+    motionGroup: idle
+    endBehavior: 2
+  - id: idle-004
+    animationClip: {fileID: 7400000, guid: 53df6e94dd66db04ea25417432f57f9b, type: 2}
+    motionGroup: idle
+    endBehavior: 2
+  - id: idle-005
+    animationClip: {fileID: 7400000, guid: 75265740bcd415b4c9a7a4b2b345792f, type: 2}
+    motionGroup: idle
+    endBehavior: 2
+  - id: reaction-001
+    animationClip: {fileID: 7400000, guid: 42e9cdec6f408ec46b6412c6469dda7d, type: 2}
+    motionGroup: reaction
+    endBehavior: 2
+  - id: reaction-003
+    animationClip: {fileID: 7400000, guid: 4b6b057adfddf154a9e3dcf7da473530, type: 2}
+    motionGroup: reaction
+    endBehavior: 2
+  - id: talk-001
+    animationClip: {fileID: 7400000, guid: 072cd8c391ae42f42a39656159e35ad9, type: 2}
+    motionGroup: talk
+    endBehavior: 2
+  - id: talk-002
+    animationClip: {fileID: 7400000, guid: 89cee24987f9232488208dec4e8c013b, type: 2}
+    motionGroup: talk
+    endBehavior: 2
+  - id: talk-003
+    animationClip: {fileID: 7400000, guid: 6f123d03354080e45aa867de59eaeec2, type: 2}
+    motionGroup: talk
+    endBehavior: 2
+  - id: talk-004
+    animationClip: {fileID: 7400000, guid: 22f41941dbe5b9f41a6e594c58040732, type: 2}
+    motionGroup: talk
+    endBehavior: 2
+  - id: talk-005
+    animationClip: {fileID: 7400000, guid: 8dd9a6482b05b9a47ab42cc8069312f4, type: 2}
+    motionGroup: talk
+    endBehavior: 2
+  - id: tilting_head-001
+    animationClip: {fileID: 7400000, guid: 6006af9d28af263498dd56c9b760972e, type: 2}
+    motionGroup: tilting_head
+    endBehavior: 2
+  - id: tilting_head-001
+    animationClip: {fileID: 7400000, guid: 6006af9d28af263498dd56c9b760972e, type: 2}
+    motionGroup: tilting_head
+    endBehavior: 2
+  fadeMotionList: {fileID: 11400000, guid: 22396aca66750b949a35e986ba93eb19, type: 2}
+  enableAutoIdle: 1
+  autoIdleInterval: 2
   isLookAtActive: 1
   lookSensitivity: 1
   lookAtDamping: 0

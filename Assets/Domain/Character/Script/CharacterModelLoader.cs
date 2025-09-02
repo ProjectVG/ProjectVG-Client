@@ -1,6 +1,9 @@
-using Cysharp.Threading.Tasks;
+ using Cysharp.Threading.Tasks;
 using Live2D.Cubism.Framework;
 using Live2D.Cubism.Framework.MouthMovement;
+using Live2D.Cubism.Framework.Motion;
+using Live2D.Cubism.Framework.Expression;
+using Live2D.Cubism.Framework.MotionFade;
 using Live2D.Cubism.Core;
 using ProjectVG.Core.Audio;
 using ProjectVG.Domain.Character.Live2D.Model;
@@ -55,6 +58,27 @@ namespace ProjectVG.Domain.Character.Service
 		#region Private Methods
 
 		/// <summary>
+		/// Animator Controller를 제거한다 (Live2D 모드에서만, Live2D와 충돌 방지)
+		/// </summary>
+		private void ClearAnimatorController(GameObject modelInstance, Live2DModelConfig? config)
+		{
+			// Animator 모드인 경우 Animator Controller를 제거하지 않음
+			if (config != null && config.ActionControllerMode == Live2DModelConfig.ActionControllerType.Animator)
+			{
+				Debug.Log($"[CharacterModelLoader] Animator 모드이므로 Animator Controller를 유지합니다: {modelInstance.name}");
+				return;
+			}
+
+			var animator = modelInstance.GetComponent<Animator>();
+			if (animator != null && animator.runtimeAnimatorController != null)
+			{
+				Debug.LogWarning($"[CharacterModelLoader] Animator Controller가 설정되어 있습니다. Live2D 호환성을 위해 제거합니다: {modelInstance.name}");
+				animator.runtimeAnimatorController = null;
+				Debug.Log($"[CharacterModelLoader] Animator Controller 제거 완료: {modelInstance.name}");
+			}
+		}
+
+		/// <summary>
 		/// 캐릭터 설정을 가져온다
 		/// </summary>
 		private Live2DModelConfig GetCharacterConfig(string characterId)
@@ -92,8 +116,14 @@ namespace ProjectVG.Domain.Character.Service
 		/// </summary>
 		private void SetupModelComponents(GameObject modelInstance, Live2DModelConfig config)
 		{
+			// Animator Controller 제거 (Live2D 모드에서만)
+			ClearAnimatorController(modelInstance, config);
+			
 			SetupLipSync(modelInstance, config);
 			SetupAutoEyeBlink(modelInstance, config);
+			SetupMotionController(modelInstance, config);
+			SetupExpressionController(modelInstance, config);
+			SetupFadeController(modelInstance, config);
 			SetupActionController(modelInstance);
 		}
 
@@ -107,9 +137,16 @@ namespace ProjectVG.Domain.Character.Service
 				return;
 			}
 
-			var mouthController = modelInstance.GetComponent<CubismAudioMouthInput>();
+			var mouthController = modelInstance.GetComponent<CubismMouthController>();
 			if (mouthController == null) {
-				mouthController = modelInstance.AddComponent<CubismAudioMouthInput>();
+				mouthController = modelInstance.AddComponent<CubismMouthController>();
+				Debug.Log($"[CharacterModelLoader] CubismAudioMouthInput 컴포넌트를 추가했습니다: {modelInstance.name}");
+			}
+            mouthController.BlendMode = CubismParameterBlendMode.Additive;
+
+            var mouthInputController = modelInstance.GetComponent<CubismAudioMouthInput>();
+			if (mouthInputController == null) {
+                mouthInputController = modelInstance.AddComponent<CubismAudioMouthInput>();
 				Debug.Log($"[CharacterModelLoader] CubismAudioMouthInput 컴포넌트를 추가했습니다: {modelInstance.name}");
 			}
 
@@ -117,10 +154,10 @@ namespace ProjectVG.Domain.Character.Service
 				Debug.LogWarning($"[CharacterModelLoader] Voice AudioSource가 null입니다. 립싱크가 동작하지 않을 수 있습니다: {modelInstance.name}");
 			} else {
 				Debug.Log($"[CharacterModelLoader] Voice AudioSource 설정 완료: {modelInstance.name}, AudioSource: {_voiceAudioSource.name}");
-				mouthController.AudioInput = _voiceAudioSource;
+                mouthInputController.AudioInput = _voiceAudioSource;
 			}
-			mouthController.Gain = config.Gain;
-			mouthController.Smoothing = config.Smoothing;
+            mouthInputController.Gain = config.Gain;
+            mouthInputController.Smoothing = config.Smoothing;
 			
 			// Live2D 모델에 Mouth 파라미터가 있는지 확인
 			var model = modelInstance.GetComponent<CubismModel>();
@@ -161,23 +198,140 @@ namespace ProjectVG.Domain.Character.Service
 		}
 
 		/// <summary>
-		/// 액션 서비스를 설정한다
+		/// Motion 컨트롤러를 설정한다
+		/// </summary>
+		private void SetupMotionController(GameObject modelInstance, Live2DModelConfig config)
+		{
+			var motionController = modelInstance.GetComponent<CubismMotionController>();
+			if (motionController == null) {
+				motionController = modelInstance.AddComponent<CubismMotionController>();
+			}
+
+			Debug.Log($"[CharacterModelLoader] CubismMotionController 설정 완료: {modelInstance.name}");
+		}
+
+		/// <summary>
+		/// Expression 컨트롤러를 설정한다
+		/// </summary>
+		private void SetupExpressionController(GameObject modelInstance, Live2DModelConfig config)
+		{
+			var expressionController = modelInstance.GetComponent<CubismExpressionController>();
+			if (expressionController == null) {
+				expressionController = modelInstance.AddComponent<CubismExpressionController>();
+			}
+
+			Debug.Log($"[CharacterModelLoader] CubismExpressionController 설정 완료: {modelInstance.name}");
+		}
+
+		/// <summary>
+		/// Fade 컨트롤러를 설정한다
+		/// </summary>
+		private void SetupFadeController(GameObject modelInstance, Live2DModelConfig config)
+		{
+			var fadeController = modelInstance.GetComponent<CubismFadeController>();
+			if (fadeController == null) {
+				fadeController = modelInstance.AddComponent<CubismFadeController>();
+				Debug.Log($"[CharacterModelLoader] CubismFadeController 컴포넌트를 추가했습니다: {modelInstance.name}");
+			}
+
+			if (config.FadeMotionList != null) {
+				fadeController.CubismFadeMotionList = config.FadeMotionList;
+				Debug.Log($"[CharacterModelLoader] CubismFadeMotionList 설정 완료: {modelInstance.name}");
+			}
+			else {
+				Debug.LogWarning($"[CharacterModelLoader] CubismFadeMotionList가 설정되지 않았습니다. Live2D 모션 페이드가 제대로 작동하지 않을 수 있습니다: {modelInstance.name}");
+				Debug.LogWarning($"해결방법: Live2DModelConfig에서 'Cubism Fade Motion List' 필드를 설정하거나, Live2D 모델에 포함된 .fadeMotionList 에셋을 할당하세요.");
+			}
+			
+			// Fade Controller 리프레시 (컴포넌트 초기화)
+			fadeController.Refresh();
+		}
+
+		/// <summary>
+		/// 액션 컨트롤러를 설정한다 (Live2D 또는 Animator 기반)
 		/// </summary>
 		private void SetupActionController(GameObject modelInstance)
 		{
-			var actionService = modelInstance.GetComponent<CharacterActionController>();
+			// 현재 모델의 Config 찾기
+			string modelId = modelInstance.name;
+			if (_modelRegistry == null || !_modelRegistry.TryGetConfig(modelId, out var config))
+			{
+				Debug.LogWarning($"[CharacterModelLoader] 모델 '{modelId}'의 Config를 찾을 수 없습니다. Live2D 방식으로 기본 설정합니다.");
+				SetupLive2DActionController(modelInstance, null);
+				return;
+			}
+
+			// Config에 따라 적절한 액션 컨트롤러 설정
+			switch (config.ActionControllerMode)
+			{
+				case Live2DModelConfig.ActionControllerType.Animator:
+					SetupAnimatorActionController(modelInstance, config);
+					break;
+				case Live2DModelConfig.ActionControllerType.Live2D:
+				default:
+					SetupLive2DActionController(modelInstance, config);
+					break;
+			}
+		}
+
+		/// <summary>
+		/// Live2D 기반 액션 컨트롤러를 설정한다
+		/// </summary>
+		private void SetupLive2DActionController(GameObject modelInstance, Live2DModelConfig? config)
+		{
+			var actionService = modelInstance.GetComponent<Live2DCharacterActionController>();
 			if (actionService == null) {
-				actionService = modelInstance.AddComponent<CharacterActionController>();
+				actionService = modelInstance.AddComponent<Live2DCharacterActionController>();
+			}
+
+			var motionController = modelInstance.GetComponent<CubismMotionController>();
+			if (motionController == null) {
+				Debug.LogWarning($"[CharacterModelLoader] CubismMotionController를 찾을 수 없습니다: {modelInstance.name}");
+				return;
+			}
+
+			if (config != null)
+			{
+				actionService.Initialize(motionController, config.MotionClips);
+				Debug.Log($"[CharacterModelLoader] Live2DCharacterActionController 초기화 완료: {modelInstance.name}, Motion Clips: {config.MotionClips?.Count ?? 0}개");
+			}
+			else
+			{
+				Debug.LogWarning($"[CharacterModelLoader] Config가 null이므로 빈 Motion Clips로 초기화합니다: {modelInstance.name}");
+				actionService.Initialize(motionController, new System.Collections.Generic.List<Live2DModelConfig.MotionClipMapping>());
+			}
+		}
+
+		/// <summary>
+		/// Animator 기반 액션 컨트롤러를 설정한다
+		/// </summary>
+		private void SetupAnimatorActionController(GameObject modelInstance, Live2DModelConfig config)
+		{
+			var actionService = modelInstance.GetComponent<AnimatorCharacterActionController>();
+			if (actionService == null) {
+				actionService = modelInstance.AddComponent<AnimatorCharacterActionController>();
 			}
 
 			var animator = modelInstance.GetComponent<Animator>();
 			if (animator == null) {
-                Debug.LogWarning($"[CharacterModelLoader] Animator를 찾을 수 없습니다: {modelInstance.name}");
+				Debug.LogError($"[CharacterModelLoader] Animator 컴포넌트를 찾을 수 없습니다: {modelInstance.name}");
 				return;
-            }
-            actionService.Initialize(animator);
-            Debug.Log($"[CharacterModelLoader] CharacterActionController 초기화 완료: {modelInstance.name}");
-        }
+			}
+
+			// Animator Controller 설정
+			if (config.AnimatorController != null)
+			{
+				animator.runtimeAnimatorController = config.AnimatorController;
+				Debug.Log($"[CharacterModelLoader] Animator Controller 설정 완료: {config.AnimatorController.name}");
+			}
+			else
+			{
+				Debug.LogWarning($"[CharacterModelLoader] Animator Controller가 Config에 설정되지 않았습니다: {modelInstance.name}");
+			}
+
+			actionService.Initialize(animator);
+			Debug.Log($"[CharacterModelLoader] AnimatorCharacterActionController 초기화 완료: {modelInstance.name}");
+		}
 
 		#endregion
 	}

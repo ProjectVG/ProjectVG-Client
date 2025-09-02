@@ -13,7 +13,8 @@ namespace ProjectVG.Infrastructure.Auth.Models
         public AccessToken(string token)
         {
             Token = token ?? throw new ArgumentNullException(nameof(token));
-            ExpiresAt = JwtTokenParser.GetExpirationTime(token);
+            var exp = JwtTokenParser.GetExpirationTime(token);
+            ExpiresAt = exp == DateTime.MinValue ? DateTime.MinValue : exp.ToUniversalTime();
         }
         
         public bool IsExpired()

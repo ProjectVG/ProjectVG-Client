@@ -19,18 +19,26 @@ namespace ProjectVG.Infrastructure.Auth
                     return DateTime.MinValue;
 
                 var payload = parts[1];
-                payload = PadBase64String(payload);
-                
-                var payloadJson = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+                var payloadJson = Encoding.UTF8.GetString(Base64UrlDecode(payload));
                 var jwtPayload = JsonConvert.DeserializeObject<JwtPayload>(payloadJson);
                 
-                return DateTimeOffset.FromUnixTimeSeconds(jwtPayload.exp).DateTime;
+                if (jwtPayload == null || jwtPayload.exp <= 0)
+                    return DateTime.MinValue;
+
+                return DateTimeOffset.FromUnixTimeSeconds(jwtPayload.exp).UtcDateTime;
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[JwtTokenParser] JWT 파싱 실패: {ex.Message}");
                 return DateTime.MinValue;
             }
+        }
+        
+        private static byte[] Base64UrlDecode(string input)
+        {
+            input = input.Replace('-', '+').Replace('_', '/');
+            input = PadBase64String(input);
+            return Convert.FromBase64String(input);
         }
         
         private static string PadBase64String(string base64)

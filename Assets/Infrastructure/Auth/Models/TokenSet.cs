@@ -118,7 +118,13 @@ namespace ProjectVG.Infrastructure.Auth.Models
             if (AccessToken != null)
             {
                 info += $"Access Token:\n";
-                info += $"  Token: {AccessToken.Token?.Substring(0, Math.Min(20, AccessToken.Token.Length))}...\n";
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                var at = AccessToken.Token;
+                var atMasked = string.IsNullOrEmpty(at) || at.Length < 8 ? "***" : $"{at.Substring(0,4)}****{at.Substring(at.Length-4)}";
+                info += $"  Token: {atMasked}\n";
+#else
+                info += $"  Token: (hidden in release)\n";
+#endif
                 info += $"  Expires At: {AccessToken.ExpiresAt:yyyy-MM-dd HH:mm:ss} UTC\n";
                 info += $"  Is Expired: {AccessToken.IsExpired()}\n";
             }
@@ -126,10 +132,16 @@ namespace ProjectVG.Infrastructure.Auth.Models
             if (RefreshToken != null)
             {
                 info += $"Refresh Token:\n";
-                info += $"  Token: {RefreshToken.Token?.Substring(0, Math.Min(20, RefreshToken.Token.Length))}...\n";
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                var rt = RefreshToken.Token;
+                var rtMasked = string.IsNullOrEmpty(rt) || rt.Length < 8 ? "***" : $"{rt.Substring(0,4)}****{rt.Substring(rt.Length-4)}";
+                info += $"  Token: {rtMasked}\n";
+#else
+                info += $"  Token: (hidden in release)\n";
+#endif
                 info += $"  Expires At: {RefreshToken.ExpiresAt:yyyy-MM-dd HH:mm:ss} UTC\n";
                 info += $"  Is Expired: {RefreshToken.IsExpired()}\n";
-                info += $"  Device ID: {RefreshToken.DeviceId}\n";
+                info += $"  Device ID: (masked)\n";
             }
             
             return info;

@@ -1,4 +1,5 @@
 #nullable enable
+#if !UNITY_WEBGL || UNITY_EDITOR
 using System;
 using UnityEngine;
 using System.Collections.Generic;
@@ -36,7 +37,12 @@ namespace ProjectVG.Core.Audio
         // 프로퍼티
         public bool IsRecording => _isRecording;
         public float RecordingDuration => _isRecording ? Time.time - _recordingStartTime : 0f;
-        public bool IsRecordingAvailable => Microphone.devices.Length > 0;
+        public bool IsRecordingAvailable => 
+#if UNITY_WEBGL && !UNITY_EDITOR
+            false;
+#else
+            Microphone.devices.Length > 0;
+#endif
         public float RecordingProgress => _isRecording ? Mathf.Clamp01(RecordingDuration / _maxRecordingLength) : 0f;
         
         #region Unity Lifecycle
@@ -98,7 +104,14 @@ namespace ProjectVG.Core.Audio
                 _isRecording = true;
                 _recordingStartTime = Time.time;
                 
+#if UNITY_WEBGL && !UNITY_EDITOR
+                Debug.LogWarning("[AudioRecorder] WebGL에서는 마이크로폰이 지원되지 않습니다.");
+                OnError?.Invoke("WebGL에서는 음성 녹음이 지원되지 않습니다.");
+                _isRecording = false;
+                return false;
+#else
                 _recordingClip = Microphone.Start(_currentDevice ?? string.Empty, false, _maxRecordingLength, _sampleRate);
+#endif
                 if (_recordingClip == null)
                 {
                     _isRecording = false;
@@ -148,12 +161,10 @@ namespace ProjectVG.Core.Audio
                     {
                         Debug.Log($"[AudioRecorder] 음성 녹음 완료됨 ({actualRecordingDuration:F1}초, {processedClip.samples} 샘플)");
                         OnRecordingCompleted?.Invoke(processedClip);
-                        OnRecordingStopped?.Invoke();
                         return processedClip;
                     }
                 }
                 
-                OnRecordingStopped?.Invoke();
                 return null;
             }
             catch (Exception ex)
@@ -165,7 +176,7 @@ namespace ProjectVG.Core.Audio
             }
             finally
             {
-                // 중복 호출 방지를 위해 성공 분기에서 이미 호출했다면 옵저버 측에서 idempotent 처리 가정
+                // 성공/실패 불문하고 한 번만 Stopped 이벤트를 발생
                 OnRecordingStopped?.Invoke();
             }
         }
@@ -354,4 +365,5 @@ namespace ProjectVG.Core.Audio
         
         #endregion
     }
-} 
+}
+#endif 

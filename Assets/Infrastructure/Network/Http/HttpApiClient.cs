@@ -118,6 +118,19 @@ namespace ProjectVG.Infrastructure.Network.Http
             return await SendJsonRequestWithHeadersAsync<T>(url, UnityWebRequest.kHttpVerbGET, null, headers, cancellationToken);
         }
 
+        /// <summary>
+        /// POST 요청 (HTTP 헤더 포함 응답)
+        /// </summary>
+        public async UniTask<(T Data, Dictionary<string, string> Headers)> PostWithHeadersAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
+        {
+            EnsureInitialized();
+            EnsureAuthToken(requiresAuth);
+            
+            var url = GetFullUrl(endpoint);
+            var jsonData = SerializeData(data);
+            return await SendJsonRequestWithHeadersAsync<T>(url, UnityWebRequest.kHttpVerbPOST, jsonData, headers, cancellationToken);
+        }
+
         public async UniTask<T> PostAsync<T>(string endpoint, object data = null, Dictionary<string, string> headers = null, bool requiresAuth = false, CancellationToken cancellationToken = default)
         {
             EnsureInitialized();
@@ -228,7 +241,15 @@ namespace ProjectVG.Infrastructure.Network.Http
         {
             defaultHeaders.Clear();
             defaultHeaders["Content-Type"] = NetworkConfig.ContentType;
+            
+#if !UNITY_WEBGL || UNITY_EDITOR
             defaultHeaders["User-Agent"] = NetworkConfig.UserAgent;
+#else
+            // WebGL에서는 커스텀 헤더로 클라이언트 식별
+            defaultHeaders["X-Client-Type"] = "ProjectVG-WebGL";
+            defaultHeaders["X-Client-Version"] = Application.version;
+#endif
+            
             defaultHeaders["Accept"] = ACCEPT_HEADER;
         }
 
@@ -376,7 +397,7 @@ namespace ProjectVG.Infrastructure.Network.Http
                 }
                 else
                 {
-                    form.AddField(kvp.Key, kvp.Value.ToString());
+                    form.AddField(kvp.Key, kvp.Value?.ToString() ?? string.Empty);
                 }
             }
             

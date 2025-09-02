@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using System.Threading;
+using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Network.Configs;
@@ -33,6 +34,9 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         private TokenManager _tokenManager;
         private TokenRefreshService _tokenRefreshService;
 
+        // 요청 추적을 위한 딕셔너리
+        private Dictionary<string, List<ChatData>> _responseTracker = new Dictionary<string, List<ChatData>>();
+        
         // 메시지 이벤트
         public event Action<string> OnMessageReceived;
         
@@ -53,6 +57,14 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             base.Awake();
             _tokenManager = TokenManager.Instance;
             _tokenRefreshService = TokenRefreshService.Instance;
+        }
+
+        private void Update()
+        {
+#if !UNITY_WEBGL || UNITY_EDITOR
+            // NativeWebSocket의 메시지 큐 처리 (WebGL 제외)
+            _nativeWebSocket?.DispatchMessageQueue();
+#endif
         }
 
         private void OnDestroy()
@@ -215,6 +227,9 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             }
             _isShutdown = true;
 
+            // 리소스 정리
+            _responseTracker?.Clear();
+            
             // 이벤트 구독 해제
             if (_tokenManager != null)
             {
@@ -422,17 +437,20 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
         {
             try
             {
-                var jsonObject = JObject.Parse(message);
-                string messageType = jsonObject["type"]?.ToString();
-                JToken dataToken = jsonObject["data"];
-
-                switch (messageType)
+                var response = JsonConvert.DeserializeObject<WebSocketResponse>(message);
+                if (response?.Data == null)
+                {
+                    Debug.LogWarning($"[WebSocket] 유효하지 않은 메시지 구조: {message.Substring(0, Math.Min(message.Length, 100))}");
+                    return;
+                }
+                
+                switch (response.Type)
                 {
                     case "chat":
-                        ProcessChatMessage(dataToken.ToString(Formatting.None));
+                        ProcessChatMessage(response.Data);
                         break;
                     default:
-                        Debug.Log($"[WebSocket] 메시지 타입: {messageType}");
+                        Debug.Log($"[WebSocket] 알 수 없는 메시지 타입: {response.Type}");
                         OnMessageReceived?.Invoke(message);
                         break;
                 }
@@ -440,21 +458,19 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
             catch (Exception ex)
             {
                 Debug.LogError($"[WebSocket] 메시지 처리 중 오류: {ex.Message}");
+                Debug.LogError($"[WebSocket] 원시 메시지: {message}");
             }
         }
 
-        private void ProcessChatMessage(string data)
+        private void ProcessChatMessage(ChatData chatData)
         {
             try
             {
-                var chatResponse = JsonConvert.DeserializeObject<ChatResponse>(data);
-                if (chatResponse == null)
-                {
-                    Debug.LogError("[WebSocket] ChatResponse 파싱 실패");
-                    return;
-                }
-
-                var chatMessage = ChatMessage.FromChatResponse(chatResponse);
+                // 요청 ID로 응답 추적
+                TrackResponse(chatData);
+                
+                // ChatMessage로 변환하여 이벤트 발생
+                var chatMessage = ChatMessage.FromChatData(chatData);
                 if (chatMessage == null)
                 {
                     Debug.LogError("[WebSocket] ChatMessage 변환 실패");
@@ -462,12 +478,47 @@ namespace ProjectVG.Infrastructure.Network.WebSocket
                 }
                 
                 OnChatMessageReceived?.Invoke(chatMessage);
+                
+                Debug.Log($"[WebSocket] 채팅 메시지 처리: RequestId={chatData.RequestId}, Order={chatData.Order}, Text={chatData.Text?.Substring(0, Math.Min(chatData.Text.Length, 50))}...");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[WebSocket] 채팅 메시지 처리 중 오류: {ex.Message}");
-                Debug.LogError($"[WebSocket] 원시 데이터: {data}");
+                Debug.LogError($"[WebSocket] 새 채팅 메시지 처리 중 오류: {ex.Message}");
             }
+        }
+        
+        private void TrackResponse(ChatData chatData)
+        {
+            string requestId = chatData.RequestId;
+            
+            if (string.IsNullOrEmpty(requestId))
+            {
+                return;
+            }
+            
+            if (!_responseTracker.ContainsKey(requestId))
+            {
+                _responseTracker[requestId] = new List<ChatData>();
+            }
+            
+            _responseTracker[requestId].Add(chatData);
+            
+            // order 필드를 사용하여 메시지 순서 관리
+            _responseTracker[requestId].Sort((a, b) => a.Order.CompareTo(b.Order));
+            
+            // 임시: 단일 응답으로 간주하고 바로 완료 처리
+            // 실제로는 서버에서 완료 신호를 보내거나 타임아웃 로직이 필요
+            OnRequestComplete(requestId, _responseTracker[requestId]);
+            _responseTracker.Remove(requestId);
+        }
+        
+        private void OnRequestComplete(string requestId, List<ChatData> responses)
+        {
+            Debug.Log($"[WebSocket] 요청 완료: RequestId={requestId}, 응답 수={responses.Count}");
+            
+            // 필요시 완료된 요청에 대한 추가 처리 가능
+            // 예: 모든 응답을 합쳐서 하나의 메시지로 처리하거나
+            //     UI에 요청 완료 상태를 표시하는 등
         }
         
         /// <summary>

@@ -10,6 +10,7 @@ using ProjectVG.Infrastructure.Network.WebSocket;
 using ProjectVG.Infrastructure.Network.Services;
 using ProjectVG.Domain.Chat.View;
 using ProjectVG.Domain.Character.Service;
+using ProjectVG.Infrastructure.Network.DTOs.Chat;
 
 
 namespace ProjectVG.Domain.Chat.Service
@@ -25,8 +26,7 @@ namespace ProjectVG.Domain.Chat.Service
         [SerializeField] private CharacterManager? _characterManager;
 
         [Header("Chat Settings")]
-        [SerializeField] private string _characterId = "44444444-4444-4444-4444-444444444444";
-        [SerializeField] private string _userId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+        [SerializeField] private string _characterId = "11111111-1111-1111-1111-111111111111";
 
         private WebSocketManager? _webSocketManager;
         private AudioManager? _audioManager;
@@ -137,11 +137,13 @@ namespace ProjectVG.Domain.Chat.Service
                 }
 
                 if (_chatApiService != null) {
-                    var response = await _chatApiService.SendChatAsync(
-                        message: message,
-                        characterId: _characterId,
-                        userId: _userId
-                    );
+                    ChatRequest chatRequest = new() {
+                        Message = message,
+                        CharacterId = _characterId,
+                        UseTTS = true,
+                        RequestAt = DateTime.Now
+                    };
+                    var response = await _chatApiService.SendChatAsync(chatRequest);
                     if (response == null) {
                         Debug.LogWarning("[ChatSystemManager] 채팅 응답이 null입니다.");
                     }
