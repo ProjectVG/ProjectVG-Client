@@ -8,26 +8,11 @@ using Newtonsoft.Json;
 
 namespace ProjectVG.Infrastructure.Auth
 {
-    public class TokenManager : MonoBehaviour
+    public class TokenManager : Singleton<TokenManager>
     {
         private const string REFRESH_TOKEN_KEY = "refresh_token";
         private const string USER_ID_KEY = "user_id";
         private const string ENCRYPTION_KEY = "ProjectVG_OAuth2_Secure_Key_2024";
-        
-        private static TokenManager _instance;
-        public static TokenManager Instance
-        {
-            get
-            {
-                if (_instance == null)
-                {
-                    var go = new GameObject("TokenManager");
-                    _instance = go.AddComponent<TokenManager>();
-                    DontDestroyOnLoad(go);
-                }
-                return _instance;
-            }
-        }
         
         private AccessToken _currentAccessToken;
         private RefreshToken _currentRefreshToken;
@@ -40,26 +25,23 @@ namespace ProjectVG.Infrastructure.Auth
         public bool HasValidTokens => _currentAccessToken != null && !_currentAccessToken.IsExpired();
         public bool HasRefreshToken => _currentRefreshToken != null;
         public string CurrentUserId => _currentUserId;
-        
-        private void Awake()
+
+
+        #region Unity Lifecycle
+        protected override void Awake()
         {
-            if (_instance == null)
-            {
-                _instance = this;
-                DontDestroyOnLoad(gameObject);
+            base.Awake();
+            if (Instance == this) {
                 LoadTokensFromStorage();
-                
-                if (HasRefreshToken && !IsRefreshTokenExpired())
-                {
+                if (HasRefreshToken && !IsRefreshTokenExpired()) {
                     StartCoroutine(AutoRecoverAccessTokenCoroutine());
                 }
             }
-            else if (_instance != this)
-            {
-                Destroy(gameObject);
-            }
         }
-        
+
+        #endregion
+
+        #region Public Methods
         public void SaveTokens(TokenSet tokenSet)
         {
             if (tokenSet?.AccessToken == null)
@@ -196,7 +178,10 @@ namespace ProjectVG.Infrastructure.Auth
                 throw;
             }
         }
-        
+
+        #endregion
+
+        #region Private Methods
         private void LoadTokensFromStorage()
         {
             try
@@ -306,7 +291,9 @@ namespace ProjectVG.Infrastructure.Auth
             }
         }
     }
-    
+
+    #endregion
+
     [Serializable]
     public class TokenStorageData
     {

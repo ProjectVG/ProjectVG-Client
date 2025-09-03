@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public abstract class Singleton<T> : MonoBehaviour where T : MonoBehaviour
 {
@@ -30,7 +31,7 @@ public abstract class Singleton<T> : MonoBehaviour where T : MonoBehaviour
         }
 
         _instance = this as T;
-        
-        DontDestroyOnLoad(gameObject);
+
+        // Optional: 싱글톤 유지 전략
     }
 }

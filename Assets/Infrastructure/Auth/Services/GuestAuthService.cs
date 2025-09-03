@@ -13,41 +13,18 @@ namespace ProjectVG.Infrastructure.Auth.Services
     /// Guest 인증 서비스
     /// 디바이스 고유 ID를 사용한 게스트 로그인 처리
     /// </summary>
-    public class GuestAuthService : MonoBehaviour
+    public class GuestAuthService : Singleton<GuestAuthService>
     {
-        private static GuestAuthService _instance;
-        public static GuestAuthService Instance
-        {
-            get
-            {
-                if (_instance == null)
-                {
-                    var go = new GameObject("GuestAuthService");
-                    _instance = go.AddComponent<GuestAuthService>();
-                    DontDestroyOnLoad(go);
-                }
-                return _instance;
-            }
-        }
-
         private HttpApiClient _httpClient;
         private TokenManager _tokenManager;
 
         public event Action<TokenSet> OnGuestLoginSuccess;
         public event Action<string> OnGuestLoginFailed;
 
-        private void Awake()
+        #region Unity Lifecycle Methods
+        private void Start()
         {
-            if (_instance == null)
-            {
-                _instance = this;
-                DontDestroyOnLoad(gameObject);
-                Initialize();
-            }
-            else if (_instance != this)
-            {
-                Destroy(gameObject);
-            }
+            Initialize();
         }
 
         private void Initialize()
@@ -57,6 +34,14 @@ namespace ProjectVG.Infrastructure.Auth.Services
             
             Debug.Log("[GuestAuthService] 초기화 완료");
         }
+        private void OnDestroy()
+        {
+            // 이벤트 정리는 구독자가 담당
+        }
+
+        #endregion
+
+        #region Public Methods
 
         /// <summary>
         /// Guest 로그인 수행
@@ -180,6 +165,10 @@ namespace ProjectVG.Infrastructure.Auth.Services
             return status;
         }
 
+        #endregion
+
+        #region Private Methods
+
         /// <summary>
         /// 디바이스 ID 마스킹 (로깅용)
         /// </summary>
@@ -204,14 +193,11 @@ namespace ProjectVG.Infrastructure.Auth.Services
             info += $"Has Valid Tokens: {_tokenManager?.HasValidTokens ?? false}\n";
             info += $"Has Refresh Token: {_tokenManager?.HasRefreshToken ?? false}\n";
             info += $"{DeviceIdProvider.GetPlatformInfo()}\n";
-            
+
             return info;
         }
 
-        private void OnDestroy()
-        {
-            // 이벤트 정리는 구독자가 담당
-        }
+        #endregion
     }
 
     /// <summary>

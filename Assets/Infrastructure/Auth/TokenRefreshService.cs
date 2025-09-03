@@ -14,44 +14,24 @@ namespace ProjectVG.Infrastructure.Auth
     /// 토큰 갱신 서비스
     /// Refresh Token을 사용하여 Access Token을 자동으로 갱신
     /// </summary>
-    public class TokenRefreshService : MonoBehaviour
+    public class TokenRefreshService : Singleton<TokenRefreshService>
     {
-        private static TokenRefreshService _instance;
-        public static TokenRefreshService Instance
-        {
-            get
-            {
-                if (_instance == null)
-                {
-                    var go = new GameObject("TokenRefreshService");
-                    _instance = go.AddComponent<TokenRefreshService>();
-                    DontDestroyOnLoad(go);
-                }
-                return _instance;
-            }
-        }
-        
         private TokenManager _tokenManager;
         private ServerOAuth2Provider _oauth2Provider;
         private bool _isRefreshing = false;
         
         public event Action<string> OnTokenRefreshed;
         public event Action<string> OnTokenRefreshFailed;
-        
-        private void Awake()
+
+        /// <summary> 토큰 갱신 상태 확인 </summary>
+        public bool IsRefreshing => _isRefreshing;
+
+        #region Unity Lifecycle Methods
+        private void Start()
         {
-            if (_instance == null)
-            {
-                _instance = this;
-                DontDestroyOnLoad(gameObject);
-                Initialize();
-            }
-            else if (_instance != this)
-            {
-                Destroy(gameObject);
-            }
+            Initialize();
         }
-        
+
         private void Initialize()
         {
             _tokenManager = TokenManager.Instance;
@@ -61,7 +41,17 @@ namespace ProjectVG.Infrastructure.Auth
             
             Debug.Log("[TokenRefreshService] 초기화 완료");
         }
-        
+        private void OnDestroy()
+        {
+            if (_tokenManager != null) {
+                _tokenManager.OnTokensExpired -= HandleTokensExpired;
+            }
+        }
+
+        #endregion
+
+        #region Public Methods
+
         /// <summary>
         /// 토큰 만료 시 자동 갱신 시도
         /// </summary>
@@ -141,7 +131,37 @@ namespace ProjectVG.Infrastructure.Auth
                 _isRefreshing = false;
             }
         }
-        
+
+        /// <summary>
+        /// 강제 토큰 갱신 (사용자가 직접 호출)
+        /// </summary>
+        public async UniTask<bool> ForceRefreshAsync()
+        {
+            Debug.Log("[TokenRefreshService] 강제 토큰 갱신 시작");
+            return await RefreshAccessTokenAsync();
+        }
+
+        /// <summary>
+        /// 토큰 상태 확인 및 필요시 갱신
+        /// </summary>
+        public async UniTask<bool> EnsureValidTokenAsync()
+        {
+            if (_tokenManager.HasValidTokens) {
+                return true;
+            }
+
+            if (_tokenManager.HasRefreshToken && !_tokenManager.IsRefreshTokenExpired()) {
+                return await RefreshAccessTokenAsync();
+            }
+
+            Debug.LogWarning("[TokenRefreshService] 유효한 토큰이 없고 Refresh Token도 만료되었습니다.");
+            return false;
+        }
+
+        #endregion
+
+        #region Private Methods
+
         /// <summary>
         /// 서버에 토큰 갱신 요청
         /// </summary>
@@ -183,47 +203,8 @@ namespace ProjectVG.Infrastructure.Auth
                 throw;
             }
         }
-        
-        /// <summary>
-        /// 토큰 갱신 상태 확인
-        /// </summary>
-        public bool IsRefreshing => _isRefreshing;
-        
-        /// <summary>
-        /// 강제 토큰 갱신 (사용자가 직접 호출)
-        /// </summary>
-        public async UniTask<bool> ForceRefreshAsync()
-        {
-            Debug.Log("[TokenRefreshService] 강제 토큰 갱신 시작");
-            return await RefreshAccessTokenAsync();
-        }
-        
-        /// <summary>
-        /// 토큰 상태 확인 및 필요시 갱신
-        /// </summary>
-        public async UniTask<bool> EnsureValidTokenAsync()
-        {
-            if (_tokenManager.HasValidTokens)
-            {
-                return true;
-            }
-            
-            if (_tokenManager.HasRefreshToken && !_tokenManager.IsRefreshTokenExpired())
-            {
-                return await RefreshAccessTokenAsync();
-            }
-            
-            Debug.LogWarning("[TokenRefreshService] 유효한 토큰이 없고 Refresh Token도 만료되었습니다.");
-            return false;
-        }
-        
-        
-        private void OnDestroy()
-        {
-            if (_tokenManager != null)
-            {
-                _tokenManager.OnTokensExpired -= HandleTokensExpired;
-            }
-        }
+
+
+        #endregion
     }
 }
