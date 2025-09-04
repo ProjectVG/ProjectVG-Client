@@ -4,6 +4,7 @@ using Cysharp.Threading.Tasks;
 using ProjectVG.Infrastructure.Auth.Models;
 using ProjectVG.Infrastructure.Auth.Services;
 using ProjectVG.Infrastructure.Auth.OAuth2;
+using ProjectVG.Infrastructure.Auth.OAuth2.Config;
 
 namespace ProjectVG.Infrastructure.Auth
 {
@@ -11,29 +12,8 @@ namespace ProjectVG.Infrastructure.Auth
     /// 인증 시스템 전체를 관리하는 파사드/중재자 역할의 매니저
     /// Guest 로그인, OAuth2 로그인, 토큰 자동 갱신 등을 통합 관리
     /// </summary>
-    public class AuthManager : MonoBehaviour
+    public class AuthManager : Singleton<AuthManager>
     {
-        #region Singleton Pattern
-        
-        private static AuthManager _instance;
-        public static AuthManager Instance
-        {
-            get
-            {
-                if (_instance == null)
-                {
-                    var go = new GameObject("AuthManager");
-                    _instance = go.AddComponent<AuthManager>();
-                    DontDestroyOnLoad(go);
-                }
-                return _instance;
-            }
-        }
-        
-        #endregion
-        
-        #region Private Fields
-        
         private TokenManager _tokenManager;
         private TokenRefreshService _tokenRefreshService;
         private GuestAuthService _guestAuthService;
@@ -41,8 +21,6 @@ namespace ProjectVG.Infrastructure.Auth
         
         private bool _isInitialized = false;
         private bool _isAutoRefreshInProgress = false;
-        
-        #endregion
         
         #region Public Properties
         
@@ -95,25 +73,16 @@ namespace ProjectVG.Infrastructure.Auth
         /// 토큰 갱신 실패로 재로그인이 필요한 경우 발생하는 이벤트
         /// </summary>
         public event Action<string> OnReLoginRequired;
-        
+
         #endregion
-        
+
         #region Unity Lifecycle
-        
-        private void Awake()
+
+        private void Start()
         {
-            if (_instance == null)
-            {
-                _instance = this;
-                DontDestroyOnLoad(gameObject);
-                InitializeAsync().Forget();
-            }
-            else if (_instance != this)
-            {
-                Destroy(gameObject);
-            }
+            InitializeAsync().Forget();
         }
-        
+
         private async UniTaskVoid InitializeAsync()
         {
             try
@@ -221,7 +190,7 @@ namespace ProjectVG.Infrastructure.Auth
                 // OAuth2Provider 초기화 (필요한 경우)
                 if (_oauth2Provider == null)
                 {
-                    var config = ProjectVG.Infrastructure.Auth.OAuth2.Config.ServerOAuth2Config.Instance;
+                    var config = ServerOAuth2Config.Instance;
                     if (config == null)
                     {
                         throw new InvalidOperationException("ServerOAuth2Config를 찾을 수 없습니다.");
@@ -252,7 +221,55 @@ namespace ProjectVG.Infrastructure.Auth
                 return false;
             }
         }
-        
+
+
+        /// <summary>
+        /// 앱 시작 시 자동 로그인 시도
+        /// </summary>
+        public async UniTask TryAutoLoginAsync()
+        {
+            try {
+                Debug.Log("[AuthManager] 자동 로그인 시도 시작");
+
+                // 이미 유효한 Access Token이 있는 경우
+                if (IsLoggedIn) {
+                    Debug.Log("[AuthManager] 이미 유효한 Access Token이 존재합니다.");
+                    var tokenSet = _tokenManager.LoadTokens();
+                    OnLoginSuccess?.Invoke(tokenSet);
+                    return;
+                }
+
+                // Refresh Token으로 Access Token 재발급 시도
+                if (HasValidRefreshToken) {
+                    Debug.Log("[AuthManager] Refresh Token으로 자동 로그인 시도");
+                    _isAutoRefreshInProgress = true;
+
+                    bool refreshSuccess = await _tokenRefreshService.RefreshAccessTokenAsync();
+
+                    _isAutoRefreshInProgress = false;
+
+                    if (refreshSuccess) {
+                        Debug.Log("[AuthManager] 자동 로그인 성공");
+                        var tokenSet = _tokenManager.LoadTokens();
+                        OnLoginSuccess?.Invoke(tokenSet);
+                        OnTokenAutoRefreshed?.Invoke("자동 로그인 성공");
+                    }
+                    else {
+                        Debug.LogWarning("[AuthManager] 자동 로그인 실패 - 재로그인 필요");
+                        OnReLoginRequired?.Invoke("자동 로그인 실패");
+                    }
+                }
+                else {
+                    Debug.Log("[AuthManager] 저장된 유효한 토큰이 없습니다 - 로그인 필요");
+                    OnReLoginRequired?.Invoke("토큰 없음");
+                }
+            }
+            catch (Exception ex) {
+                Debug.LogError($"[AuthManager] 자동 로그인 시도 실패: {ex.Message}");
+                OnReLoginRequired?.Invoke(ex.Message);
+            }
+        }
+
         /// <summary>
         /// 로그아웃 수행 (토큰 삭제)
         /// </summary>
@@ -314,15 +331,6 @@ namespace ProjectVG.Infrastructure.Auth
             
             try
             {
-                // 이미 유효한 토큰이 있고 만료가 임박하지 않은 경우
-                /*
-                var currentToken = _tokenManager.GetAccessToken();
-                if (IsLoggedIn && currentToken != null && !currentToken.IsExpiringSoon(minutesBeforeExpiry))
-                {
-                    return true;
-                }
-                */
-                
                 // 토큰이 만료되었거나 곧 만료될 경우 갱신 시도
                 if (HasValidRefreshToken)
                 {
@@ -342,63 +350,6 @@ namespace ProjectVG.Infrastructure.Auth
         
         #endregion
         
-        #region Private Methods - Auto Login
-        
-        /// <summary>
-        /// 앱 시작 시 자동 로그인 시도
-        /// </summary>
-        private async UniTask TryAutoLoginAsync()
-        {
-            try
-            {
-                Debug.Log("[AuthManager] 자동 로그인 시도 시작");
-                
-                // 이미 유효한 Access Token이 있는 경우
-                if (IsLoggedIn)
-                {
-                    Debug.Log("[AuthManager] 이미 유효한 Access Token이 존재합니다.");
-                    var tokenSet = _tokenManager.LoadTokens();
-                    OnLoginSuccess?.Invoke(tokenSet);
-                    return;
-                }
-                
-                // Refresh Token으로 Access Token 재발급 시도
-                if (HasValidRefreshToken)
-                {
-                    Debug.Log("[AuthManager] Refresh Token으로 자동 로그인 시도");
-                    _isAutoRefreshInProgress = true;
-                    
-                    bool refreshSuccess = await _tokenRefreshService.RefreshAccessTokenAsync();
-                    
-                    _isAutoRefreshInProgress = false;
-                    
-                    if (refreshSuccess)
-                    {
-                        Debug.Log("[AuthManager] 자동 로그인 성공");
-                        var tokenSet = _tokenManager.LoadTokens();
-                        OnLoginSuccess?.Invoke(tokenSet);
-                        OnTokenAutoRefreshed?.Invoke("자동 로그인 성공");
-                    }
-                    else
-                    {
-                        Debug.LogWarning("[AuthManager] 자동 로그인 실패 - 재로그인 필요");
-                        OnReLoginRequired?.Invoke("자동 로그인 실패");
-                    }
-                }
-                else
-                {
-                    Debug.Log("[AuthManager] 저장된 유효한 토큰이 없습니다 - 로그인 필요");
-                    OnReLoginRequired?.Invoke("토큰 없음");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AuthManager] 자동 로그인 시도 실패: {ex.Message}");
-                OnReLoginRequired?.Invoke(ex.Message);
-            }
-        }
-        
-        #endregion
         
         #region Event Handlers
         

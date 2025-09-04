@@ -14,31 +14,13 @@ namespace ProjectVG.Core.Managers
 {
     public class SystemManager : Singleton<SystemManager>
     {
-        [Header("Core Managers")]
-        [SerializeField] private WebSocketManager? _webSocketManager;
-        [SerializeField] private HttpApiClient? _httpApiClient;
-        [SerializeField] private AudioManager? _audioManager;
-        [SerializeField] private LoadingManager? _loadingManager;
-        [SerializeField] private ChatSystemManager? _chatManager;
-
-        
         [Header("Settings")]
-        [SerializeField] private bool _autoInitializeOnStart = true;
-        [SerializeField] private bool _createManagersIfNotExist = true;
         [SerializeField] private bool _autoUpdateCameraOnSceneChange = true;
 
         [Header("Camera Settings")]
         [SerializeField] private Camera? _camera;
         
-        private bool _initializationKickoffDone = false;
-        public bool IsInitialized { get; private set; }
-
-        public WebSocketManager? WebSocketManager => _webSocketManager;
-        public AudioManager? AudioManager => _audioManager;
-        public LoadingManager? LoadingManager => _loadingManager;
-
-        public event Action? OnAppInitialized;
-        public event Action<string>? OnInitializationError;
+        public event Action? OnCameraUpdated;
 
         protected override void Awake()
         {
@@ -47,13 +29,9 @@ namespace ProjectVG.Core.Managers
             {
                 return;
             }
-            InitializeComponents();
             
-            if (_autoInitializeOnStart && !_initializationKickoffDone && !IsInitialized)
-            {
-                _initializationKickoffDone = true;
-                Initialize();
-            }
+            // 초기 카메라 설정
+            UpdateCamera();
         }
 
         private void Start()
@@ -99,11 +77,18 @@ namespace ProjectVG.Core.Managers
                 _camera = mainCamera;
                 Debug.Log($"[SystemManager] Camera 업데이트: {mainCamera.name}");
                 
-                // ScreenTapManager에 Camera 주입
-                if (ScreenTapManager.Instance != null)
+                // ScreenTapManager에 Camera 주입 (CoreManagerRegistry를 통해)
+                var coreRegistry = CoreManagerRegistry.Instance;
+                if (coreRegistry?.IsAllManagersInitialized == true)
                 {
-                    ScreenTapManager.Instance.UpdateCamera(_camera);
+                    var screenTapManager = ScreenTapManager.Instance;
+                    if (screenTapManager != null)
+                    {
+                        screenTapManager.UpdateCamera(_camera);
+                    }
                 }
+                
+                OnCameraUpdated?.Invoke();
             }
             else
             {
@@ -119,60 +104,24 @@ namespace ProjectVG.Core.Managers
             _camera = camera;
             Debug.Log($"[SystemManager] Camera 수동 설정: {(camera != null ? camera.name : "null")}");
             
-            // ScreenTapManager에 Camera 주입
-            if (ScreenTapManager.Instance != null)
+            // ScreenTapManager에 Camera 주입 (CoreManagerRegistry를 통해)
+            var coreRegistry = CoreManagerRegistry.Instance;
+            if (coreRegistry?.IsAllManagersInitialized == true)
             {
-                ScreenTapManager.Instance.UpdateCamera(_camera);
+                var screenTapManager = ScreenTapManager.Instance;
+                if (screenTapManager != null)
+                {
+                    screenTapManager.UpdateCamera(_camera);
+                }
             }
+            
+            OnCameraUpdated?.Invoke();
         }
         
-        public async void Initialize()
-        {
-            try
-            {
-                if (_initializationKickoffDone && IsInitialized)
-                {
-                    return;
-                }
-                _initializationKickoffDone = true;
 
-                // Camera 업데이트 및 ScreenTapManager 초기화
-                UpdateCamera();
-                if (_camera != null)
-                {
-                    ScreenTapManager.Instance.Initialize(_camera);
-                }
-
-                await InitializeAppAsync();
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[SystemManager] Initialize 중 오류 발생: {ex.Message}");
-                OnInitializationError?.Invoke(ex.Message);
-            }
-        }
-
-        public async UniTask InitializeAppAsync()
-        {
-            try
-            {
-                await InitializeManagersAsync();
-                IsInitialized = true;
-                Debug.Log("[SystemManager] 앱 시스템 준비 완료");
-                OnAppInitialized?.Invoke();
-            }
-            catch (Exception ex)
-            {
-                IsInitialized = false;
-                Debug.LogError($"[SystemManager] 초기화 실패: {ex.Message}");
-                OnInitializationError?.Invoke(ex.Message);
-            }
-        }
-        
         public void Shutdown()
         {
-            try { _httpApiClient?.Shutdown(); } catch {}
-            try { _webSocketManager?.Shutdown(); } catch {}
+            // 매니저들의 셧다운은 CoreManagerRegistry에서 담당하도록 변경 가능
             Debug.Log("[SystemManager] 시스템 종료 완료");
         }
 
@@ -209,33 +158,6 @@ namespace ProjectVG.Core.Managers
             }
         }
         
-        private void InitializeComponents()
-        {
-            CreateManagersIfNotExist();
-        }
-        
-        private void CreateManagersIfNotExist()
-        {
-            if (_createManagersIfNotExist)
-            {
-                _webSocketManager = WebSocketManager.Instance;
-                _httpApiClient = HttpApiClient.Instance;
-                _audioManager = AudioManager.Instance;
-                _loadingManager = LoadingManager.Instance;
-            }
-        }
-
-        private async UniTask InitializeManagersAsync()
-        {
-            if (_webSocketManager == null || _httpApiClient == null)
-            {
-                throw new InvalidOperationException("필수 매니저 인스턴스를 찾을 수 없습니다.");
-            }
-            _loadingManager?.BeginLoadingUI();
-            _audioManager?.Initialize();
-            _webSocketManager.Initialize();
-            _httpApiClient.Initialize();
-        }
     }
     
     

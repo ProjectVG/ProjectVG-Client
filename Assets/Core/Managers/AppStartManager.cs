@@ -116,7 +116,7 @@ namespace ProjectVG.Core.Managers
                 
             if (_autoStartOnAwake)
             {
-                //StartAppProcess().Forget();
+                StartAppProcess().Forget();
             }
         }
         
@@ -199,7 +199,7 @@ namespace ProjectVG.Core.Managers
             
             if (!managersReady)
             {
-                UpdateState(AppStartState.CheckingManagers, "필수 매니저 초기화 실패", 0.1f, true, "SystemManager 또는 AuthManager를 찾을 수 없습니다.");
+                UpdateState(AppStartState.CheckingManagers, "필수 매니저 초기화 실패", 0.1f, true, "CoreManagerRegistry 초기화 실패");
                 return;
             }
             
@@ -250,38 +250,46 @@ namespace ProjectVG.Core.Managers
         
         /// <summary>
         /// 필수 매니저들의 초기화 상태를 확인합니다
+        /// CoreManagerRegistry를 통해 모든 핵심 매니저들의 초기화 완료를 확인
         /// </summary>
         private async UniTask<bool> CheckRequiredManagers()
         {
-            // SystemManager 확인
-            if (SystemManager.Instance == null)
+            // CoreManagerRegistry 확인
+            if (CoreManagerRegistry.Instance == null)
             {
-                Debug.LogError("[AppStartManager] SystemManager를 찾을 수 없습니다.");
+                Debug.LogError("[AppStartManager] CoreManagerRegistry를 찾을 수 없습니다.");
                 return false;
             }
             
-            // SystemManager 초기화 대기
-            int waitCount = 0;
-            while (!SystemManager.Instance.IsInitialized && waitCount < 50) // 최대 5초 대기
+            // CoreManagerRegistry 초기화가 시작되지 않았다면 시작
+            if (!CoreManagerRegistry.Instance.IsInitializationStarted)
             {
+                Debug.Log("[AppStartManager] CoreManagerRegistry 초기화 시작");
+                await CoreManagerRegistry.Instance.InitializeAllManagersAsync();
+            }
+            
+            // CoreManagerRegistry의 모든 매니저 초기화 완료 대기
+            int waitCount = 0;
+            while (!CoreManagerRegistry.Instance.IsAllManagersInitialized && waitCount < 300) // 최대 30초 대기
+            {
+                // 초기화 에러가 있는지 확인
+                if (CoreManagerRegistry.Instance.InitializationError != null)
+                {
+                    Debug.LogError($"[AppStartManager] CoreManagerRegistry 초기화 실패: {CoreManagerRegistry.Instance.InitializationError.Message}");
+                    return false;
+                }
+                
                 await UniTask.Delay(100);
                 waitCount++;
             }
             
-            if (!SystemManager.Instance.IsInitialized)
+            if (!CoreManagerRegistry.Instance.IsAllManagersInitialized)
             {
-                Debug.LogError("[AppStartManager] SystemManager 초기화 실패");
+                Debug.LogError("[AppStartManager] CoreManagerRegistry 초기화 타임아웃 (30초)");
                 return false;
             }
             
-            // AuthManager 확인
-            if (AuthManager.Instance == null)
-            {
-                Debug.LogError("[AppStartManager] AuthManager를 찾을 수 없습니다.");
-                return false;
-            }
-            
-            Debug.Log("[AppStartManager] 필수 매니저 확인 완료");
+            Debug.Log("[AppStartManager] 모든 핵심 매니저 초기화 확인 완료");
             return true;
         }
         
@@ -368,7 +376,8 @@ namespace ProjectVG.Core.Managers
         {
             try
             {
-                var authManager = AuthManager.Instance;
+                // CoreManagerRegistry를 통해 AuthManager 가져오기
+                var authManager = CoreManagerRegistry.Instance?.AuthManager;
                 if (authManager == null)
                 {
                     Debug.LogError("[AppStartManager] AuthManager를 찾을 수 없습니다.");

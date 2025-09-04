@@ -15,14 +15,15 @@ namespace ProjectVG.Domain.Character.Service
 	{
 		[SerializeField] private Transform _modelTransform;
 		[SerializeField] private Live2DModelRegistry _modelRegistry;
+        [SerializeField] private AudioSource _voiceAudioSource;
 
-		private CharacterModelLoader _modelLoader;
+        private CharacterModelLoader _modelLoader;
 		private GameObject _currentCharacter;
 		private CharacterActionController _currentActionService;
 		private int _loadVersion = 0;
 
         #region Unity Lifecycle
-		void Start()
+        void Start()
 		{
 			Initialize();
         }
@@ -46,9 +47,12 @@ namespace ProjectVG.Domain.Character.Service
             }
 
             // AudioManager에서 Voice AudioSource 가져오기
-            var voiceAudioSource = GetVoiceAudioSource();
+			if (AudioManager.Instance == null || !AudioManager.Instance.IsInitialized) {
+                _voiceAudioSource = GetVoiceAudioSource();
+            }
+               
 
-            _modelLoader.Initialize(_modelRegistry, voiceAudioSource);
+            _modelLoader.Initialize(_modelRegistry, _voiceAudioSource);
 
             // 임시로 zero 캐릭터 로드
             LoadCharacter("zero");
@@ -91,7 +95,7 @@ namespace ProjectVG.Domain.Character.Service
 				_currentCharacter = newCharacter;
 				_currentActionService = _currentCharacter.GetComponent<CharacterActionController>();
 				_currentCharacter.SetActive(true);
-				Debug.Log($"[CharacterManager] 캐릭터 로드 완료: {characterId}");
+				Debug.Log($"[CharacterManager] 캐릭터 로드 완료: {characterId.ToString()}");
 			}
 		}
 

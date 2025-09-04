@@ -25,8 +25,7 @@ namespace ProjectVG.Domain.Chat.Service
         [SerializeField] private CharacterManager? _characterManager;
 
         [Header("Chat Settings")]
-        [SerializeField] private string _characterId = "44444444-4444-4444-4444-444444444444";
-        [SerializeField] private string _userId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+        private string _characterId = "11111111-1111-1111-1111-111111111111";
 
         private WebSocketManager? _webSocketManager;
         private AudioManager? _audioManager;
@@ -139,8 +138,7 @@ namespace ProjectVG.Domain.Chat.Service
                 if (_chatApiService != null) {
                     var response = await _chatApiService.SendChatAsync(
                         message: message,
-                        characterId: _characterId,
-                        userId: _userId
+                        characterId: _characterId
                     );
                     if (response == null) {
                         Debug.LogWarning("[ChatSystemManager] 채팅 응답이 null입니다.");

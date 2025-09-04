@@ -146,7 +146,7 @@ namespace ProjectVG.Core.Audio
             if (_audioMixer != null)
             {
                 float dbValue = _masterVolume > 0 ? 20f * Mathf.Log10(_masterVolume) : -80f;
-                _audioMixer.SetFloat("MasterVolume", dbValue);
+                _audioMixer.SetFloat("Master", dbValue);
             }
             
             OnMasterVolumeChanged?.Invoke(_masterVolume);
@@ -323,7 +323,6 @@ namespace ProjectVG.Core.Audio
             if (audioSource != null)
             {
                 audioSource.outputAudioMixerGroup = group;
-                Debug.Log($"[AudioManager] {controller.GetType().Name}에 {group.name} 그룹 할당");
             }
         }
         

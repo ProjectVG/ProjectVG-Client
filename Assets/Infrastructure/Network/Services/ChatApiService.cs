@@ -35,7 +35,6 @@ namespace ProjectVG.Infrastructure.Network.Services
             ValidateHttpClient();
             
             var serverRequest = CreateServerRequest(request);
-            LogRequestDetails(serverRequest);
             
             return await _httpClient.PostAsync<ChatResponse>(CHAT_ENDPOINT, serverRequest, requiresAuth: true, cancellationToken: cancellationToken);
         }
@@ -52,11 +51,10 @@ namespace ProjectVG.Infrastructure.Network.Services
         public async UniTask<ChatResponse> SendChatAsync(
             string message, 
             string characterId, 
-            string userId, 
             string actor = null,
             CancellationToken cancellationToken = default)
         {
-            var request = CreateSimpleRequest(message, characterId, userId, actor);
+            var request = CreateSimpleRequest(message, characterId);
             return await SendChatAsync(request, cancellationToken);
         }
 
@@ -86,11 +84,6 @@ namespace ProjectVG.Infrastructure.Network.Services
             {
                 throw new ArgumentException("캐릭터 ID가 비어있습니다.", nameof(request.characterId));
             }
-
-            if (string.IsNullOrEmpty(request.userId))
-            {
-                throw new ArgumentException("사용자 ID가 비어있습니다.", nameof(request.userId));
-            }
         }
 
         private ChatRequest CreateServerRequest(ChatRequest originalRequest)
@@ -108,22 +101,15 @@ namespace ProjectVG.Infrastructure.Network.Services
             };
         }
 
-        private ChatRequest CreateSimpleRequest(string message, string characterId, string userId, string actor)
+        private ChatRequest CreateSimpleRequest(string message, string characterId)
         {
             return new ChatRequest
             {
-                sessionId = "", // HttpApiClient에서 자동 주입
                 message = message,
                 characterId = characterId,
-                userId = userId,
-                actor = actor,
                 action = DEFAULT_ACTION,
-                requestedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                requestedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fff")
             };
-        }
-
-        private void LogRequestDetails(ChatRequest request)
-        {
         }
 
         #endregion
