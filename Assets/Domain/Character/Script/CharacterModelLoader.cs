@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using Live2D.Cubism.Framework;
 using Live2D.Cubism.Framework.MouthMovement;
+using Live2D.Cubism.Framework.MotionFade;
 using Live2D.Cubism.Core;
 using ProjectVG.Core.Audio;
 using ProjectVG.Domain.Character.Live2D.Model;
@@ -92,9 +93,63 @@ namespace ProjectVG.Domain.Character.Service
 		/// </summary>
 		private void SetupModelComponents(GameObject modelInstance, Live2DModelConfig config)
 		{
+			SetupAnimator(modelInstance, config);
+			SetupFadeController(modelInstance, config);
 			SetupLipSync(modelInstance, config);
 			SetupAutoEyeBlink(modelInstance, config);
 			SetupActionController(modelInstance);
+		}
+
+		/// <summary>
+		/// 애니메이터 컴포넌트를 설정한다
+		/// </summary>
+		private void SetupAnimator(GameObject modelInstance, Live2DModelConfig config)
+		{
+			if (config.AnimatorController == null)
+			{
+				Debug.LogWarning($"[CharacterModelLoader] Animator Controller가 설정되지 않았습니다: {modelInstance.name}");
+				return;
+			}
+
+			var animator = modelInstance.GetComponent<Animator>();
+			if (animator == null)
+			{
+				animator = modelInstance.AddComponent<Animator>();
+				Debug.Log($"[CharacterModelLoader] Animator 컴포넌트를 추가했습니다: {modelInstance.name}");
+			}
+
+			animator.runtimeAnimatorController = config.AnimatorController;
+			Debug.Log($"[CharacterModelLoader] Animator Controller 설정 완료: {modelInstance.name}, Controller: {config.AnimatorController.name}");
+		}
+
+		/// <summary>
+		/// 페이드 컨트롤러 컴포넌트를 설정한다
+		/// </summary>
+		private void SetupFadeController(GameObject modelInstance, Live2DModelConfig config)
+		{
+			if (!config.UseFadeController)
+			{
+				Debug.Log($"[CharacterModelLoader] 페이드 컨트롤러가 비활성화되어 있습니다: {modelInstance.name}");
+				return;
+			}
+
+			if (config.FadeMotionList == null)
+			{
+				Debug.LogWarning($"[CharacterModelLoader] FadeMotionList가 설정되지 않았습니다: {modelInstance.name}");
+				return;
+			}
+
+			// CubismFadeController 추가
+			var fadeController = modelInstance.GetComponent<CubismFadeController>();
+			if (fadeController == null)
+			{
+				fadeController = modelInstance.AddComponent<CubismFadeController>();
+				Debug.Log($"[CharacterModelLoader] CubismFadeController 컴포넌트를 추가했습니다: {modelInstance.name}");
+			}
+
+			// Config에서 가져온 FadeMotionList 설정
+			fadeController.CubismFadeMotionList = config.FadeMotionList;
+			Debug.Log($"[CharacterModelLoader] CubismFadeController에 FadeMotionList 설정 완료: {modelInstance.name}");
 		}
 
 		/// <summary>

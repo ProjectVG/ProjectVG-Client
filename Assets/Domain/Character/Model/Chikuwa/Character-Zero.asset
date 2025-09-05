@@ -15,6 +15,8 @@ MonoBehaviour:
   characterId: zero
   characterName: "\uC81C\uB85C"
   characterPrefab: {fileID: 7609475132481125670, guid: 9e7b6e32e30a8e144aac535afecd9340, type: 3}
+  animatorController: {fileID: 9100000, guid: e401eceb30dc69a41baab2897161a98f, type: 2}
+  fadeMotionList: {fileID: 11400000, guid: 22396aca66750b949a35e986ba93eb19, type: 2}
   thumbnail: {fileID: 2800000, guid: a443448c8422da640825449c667a9378, type: 3}
   characterDescription: "\uCE58\uC640\uC9F1 \uBAA8\uB378 \uAE30\uBC18"
   emotionMappings:
@@ -32,6 +34,7 @@ MonoBehaviour:
   useLipSync: 1
   gain: 10
   smoothing: 1
+  useFadeController: 1
   useAutoEyeBlink: 1
   eyeBlinkMean: 2.5
   eyeBlinkMaximumDeviation: 2

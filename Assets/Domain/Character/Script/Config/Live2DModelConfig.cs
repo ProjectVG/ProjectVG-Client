@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
+using Live2D.Cubism.Framework.MotionFade;
 
 namespace ProjectVG.Domain.Character.Live2D.Model
 {
@@ -53,6 +54,11 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         [Tooltip("Live2D 캐릭터 프리팹 (Cubism 모델 포함)")]
         [SerializeField] private GameObject characterPrefab;
 
+        [Tooltip("캐릭터 애니메이션 컨트롤러")]
+        [SerializeField] private RuntimeAnimatorController animatorController;
+
+        [Tooltip("페이드 모션 리스트 (CubismFadeController에서 사용)")]
+        [SerializeField] private CubismFadeMotionList fadeMotionList;
         
         [Tooltip("캐릭터 썸네일 이미지")]
         [SerializeField] private Texture2D thumbnail;
@@ -105,6 +111,14 @@ namespace ProjectVG.Domain.Character.Live2D.Model
 
         [Space(5)]
         [Header("────────────────────────────────────────")]
+        [Header("[ 표정 페이드 설정 ]")]
+        [Space(2)]
+
+        [Tooltip("표정 페이드 컨트롤러 사용 여부")]
+        [SerializeField] private bool useFadeController = true;
+
+        [Space(5)]
+        [Header("────────────────────────────────────────")]
         [Header("[ 자동 애니메이션 설정 ]")]
         [Space(2)]
 
@@ -141,6 +155,8 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         public string CharacterId => characterId;
         public string CharacterName => characterName;
         public GameObject CharacterPrefab => characterPrefab;
+        public RuntimeAnimatorController AnimatorController => animatorController;
+        public CubismFadeMotionList FadeMotionList => fadeMotionList;
         public Texture2D Thumbnail => thumbnail;
         public string CharacterDescription => characterDescription;
 
@@ -162,6 +178,7 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         public float Gain => gain;
         public float Smoothing => smoothing;
         public bool UseLipSync => useLipSync;
+        public bool UseFadeController => useFadeController;
         public bool UseAutoEyeBlink => useAutoEyeBlink;
         
         // 눈 깜빡임 설정
