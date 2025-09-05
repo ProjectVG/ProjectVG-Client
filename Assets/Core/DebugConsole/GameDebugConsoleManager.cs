@@ -15,20 +15,14 @@ namespace ProjectVG.Core.Utils
         [SerializeField] private ScrollRect? _scrollRect;
         [SerializeField] private Transform? _logContentParent;
         [SerializeField] private GameObject? _logEntryPrefab;
-        [SerializeField] private Button? _clearButton;
-        [SerializeField] private Button? _toggleButton;
-        [SerializeField] private TMP_InputField? _filterInput;
-        
+
         [Header("Settings")]
         [SerializeField] private DebugConsoleSettings? _settings;
-        
-        private string _filterKeyword = "";
         
         private List<LogEntry> _logEntries = new List<LogEntry>();
         private List<GameObject> _logEntryObjects = new List<GameObject>();
         private Queue<GameObject> _objectPool = new Queue<GameObject>();
         private bool _isConsoleVisible = false;
-        private float _lastCleanupTime = 0f;
         
         [System.Serializable]
         public class LogEntry
@@ -56,7 +50,6 @@ namespace ProjectVG.Core.Utils
         {
             Application.logMessageReceived += OnLogMessageReceived;
             SetupUI();
-            ValidateButtonSetup();
         }
         
         void OnDestroy()
@@ -70,30 +63,6 @@ namespace ProjectVG.Core.Utils
             {
                 ToggleConsole();
             }
-            
-            if (_settings?.EnableMobileInput == true && Input.touchCount == _settings.MobileTouchCount)
-            {
-                bool allTouchesBegan = true;
-                for (int i = 0; i < Input.touchCount; i++)
-                {
-                    if (Input.GetTouch(i).phase != TouchPhase.Began)
-                    {
-                        allTouchesBegan = false;
-                        break;
-                    }
-                }
-                
-                if (allTouchesBegan)
-                {
-                    ToggleConsole();
-                }
-            }
-            
-            if (_settings?.AutoClearOldLogs == true && Time.time - _lastCleanupTime > 30f)
-            {
-                CleanupOldLogs();
-                _lastCleanupTime = Time.time;
-            }
         }
         
         private void InitializeConsole()
@@ -103,8 +72,8 @@ namespace ProjectVG.Core.Utils
                 return;
             }
             
-            _consolePanel.SetActive(true);
-            _isConsoleVisible = true;
+            _consolePanel.SetActive(false);
+            _isConsoleVisible = false;
             
             SetupLayoutGroup();
             
@@ -116,37 +85,7 @@ namespace ProjectVG.Core.Utils
         
         private void SetupUI()
         {
-            Debug.Log("[DEBUG_CONSOLE] SetupUI called");
-            
-            if (_clearButton != null)
-            {
-                _clearButton.onClick.AddListener(ClearLogs);
-                Debug.Log("[DEBUG_CONSOLE] Clear button listener added");
-            }
-            else
-            {
-                Debug.LogWarning("[DEBUG_CONSOLE] _clearButton is null!");
-            }
-            
-            if (_toggleButton != null)
-            {
-                _toggleButton.onClick.AddListener(ToggleConsole);
-                Debug.Log("[DEBUG_CONSOLE] Toggle button listener added");
-            }
-            else
-            {
-                Debug.LogWarning("[DEBUG_CONSOLE] _toggleButton is null!");
-            }
-            
-            if (_filterInput != null)
-            {
-                _filterInput.onValueChanged.AddListener(OnFilterChanged);
-                Debug.Log("[DEBUG_CONSOLE] Filter input listener added");
-            }
-            else
-            {
-                Debug.LogWarning("[DEBUG_CONSOLE] _filterInput is null!");
-            }
+            SetupLayoutGroup();
         }
         
         private void OnLogMessageReceived(string logString, string stackTrace, LogType type)
@@ -189,13 +128,6 @@ namespace ProjectVG.Core.Utils
             for (int i = 0; i < _logEntries.Count; i++)
             {
                 var entry = _logEntries[i];
-                
-                if (_settings?.EnableFiltering == true && !string.IsNullOrEmpty(_filterKeyword))
-                {
-                    if (!entry.message.Contains(_filterKeyword, StringComparison.OrdinalIgnoreCase))
-                        continue;
-                }
-                
                 CreateLogEntryObject(entry);
             }
             
@@ -401,43 +333,7 @@ namespace ProjectVG.Core.Utils
             }
         }
         
-        private void OnFilterChanged(string filterText)
-        {
-            _filterKeyword = filterText;
-            UpdateLogDisplay();
-        }
         
-        public void SetFilter(string keyword)
-        {
-            _filterKeyword = keyword;
-            if (_filterInput != null)
-            {
-                _filterInput.text = keyword;
-            }
-            UpdateLogDisplay();
-        }
-        
-        private void CleanupOldLogs()
-        {
-            if (_settings == null) return;
-            
-            var cutoffTime = DateTime.Now.AddSeconds(-_settings.LogRetentionTime);
-            int removedCount = 0;
-            
-            for (int i = _logEntries.Count - 1; i >= 0; i--)
-            {
-                if (_logEntries[i].timestamp < cutoffTime)
-                {
-                    _logEntries.RemoveAt(i);
-                    removedCount++;
-                }
-            }
-            
-            if (removedCount > 0)
-            {
-                UpdateLogDisplay();
-            }
-        }
         
         public List<LogEntry> GetLogEntries()
         {
@@ -445,77 +341,6 @@ namespace ProjectVG.Core.Utils
         }
         
 
-        
-        // 스크롤 관련 메서드들
-        public void ScrollToTop()
-        {
-            if (_scrollRect != null)
-            {
-                _scrollRect.verticalNormalizedPosition = 1f;
-            }
-        }
-        
-        public void ScrollToBottom()
-        {
-            if (_scrollRect != null)
-            {
-                StartCoroutine(ScrollToBottomCoroutine());
-            }
-        }
-        
-        public float GetScrollPosition()
-        {
-            return _scrollRect?.verticalNormalizedPosition ?? 0f;
-        }
-        
-        public bool IsAtBottom()
-        {
-            if (_scrollRect == null) return false;
-            return _scrollRect.verticalNormalizedPosition <= 0.01f;
-        }
-        
-        public void ValidateScrollRect()
-        {
-            if (_scrollRect == null)
-            {
-                return;
-            }
-        }
-        
-        public void ForceScrollUpdate()
-        {
-            if (_scrollRect != null)
-            {
-                Canvas.ForceUpdateCanvases();
-                _scrollRect.verticalNormalizedPosition = 0f;
-            }
-        }
-        
-        public void ForceEnableScrollbar()
-        {
-            if (_scrollRect != null)
-            {
-                _scrollRect.vertical = true;
-                
-                if (_scrollRect.verticalScrollbar != null)
-                {
-                    _scrollRect.verticalScrollbar.gameObject.SetActive(true);
-                    _scrollRect.verticalScrollbar.interactable = true;
-                }
-                
-                if (_scrollRect.content != null && _scrollRect.viewport != null)
-                {
-                    var contentRect = _scrollRect.content.GetComponent<RectTransform>();
-                    var viewportRect = _scrollRect.viewport.GetComponent<RectTransform>();
-                    
-                    float minContentHeight = viewportRect.sizeDelta.y + 100f;
-                    if (contentRect.sizeDelta.y < minContentHeight)
-                    {
-                        contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, minContentHeight);
-                    }
-                }
-            }
-        }
         
         public void SetupLayoutGroup()
         {
@@ -543,33 +368,5 @@ namespace ProjectVG.Core.Utils
             contentSizeFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         }
         
-        public void ValidateButtonSetup()
-        {
-            Debug.Log("[DEBUG_CONSOLE] === Button Setup Validation ===");
-            
-            if (_toggleButton == null)
-            {
-                Debug.LogError("[DEBUG_CONSOLE] _toggleButton is null! Please assign it in the inspector.");
-                return;
-            }
-            
-            Debug.Log($"[DEBUG_CONSOLE] Toggle button found: {_toggleButton.name}");
-            Debug.Log($"[DEBUG_CONSOLE] Toggle button active: {_toggleButton.gameObject.activeInHierarchy}");
-            Debug.Log($"[DEBUG_CONSOLE] Toggle button interactable: {_toggleButton.interactable}");
-            Debug.Log($"[DEBUG_CONSOLE] Toggle button onClick event count: {_toggleButton.onClick.GetPersistentEventCount()}");
-            
-            if (_consolePanel == null)
-            {
-                Debug.LogError("[DEBUG_CONSOLE] _consolePanel is null! Please assign it in the inspector.");
-            }
-            else
-            {
-                Debug.Log($"[DEBUG_CONSOLE] Console panel found: {_consolePanel.name}");
-                Debug.Log($"[DEBUG_CONSOLE] Console panel active: {_consolePanel.activeInHierarchy}");
-            }
-            
-            Debug.Log($"[DEBUG_CONSOLE] Console visible state: {_isConsoleVisible}");
-            Debug.Log("[DEBUG_CONSOLE] === End Validation ===");
-        }
     }
 } 
