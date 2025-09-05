@@ -33,11 +33,7 @@ namespace ProjectVG.Infrastructure.Network.Services
         {
             ValidateRequest(request);
             ValidateHttpClient();
-            
-            var serverRequest = CreateServerRequest(request);
-            LogRequestDetails(serverRequest);
-            
-            return await _httpClient.PostAsync<ChatResponse>(CHAT_ENDPOINT, serverRequest, requiresAuth: true, cancellationToken: cancellationToken);
+            return await _httpClient.PostAsync<ChatResponse>(CHAT_ENDPOINT, request, requiresAuth: true, cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -46,17 +42,16 @@ namespace ProjectVG.Infrastructure.Network.Services
         /// <param name="message">메시지</param>
         /// <param name="characterId">캐릭터 ID</param>
         /// <param name="userId">사용자 ID</param>
-        /// <param name="actor">액터 (선택사항)</param>
+        /// <param name="action">행위</param>
         /// <param name="cancellationToken">취소 토큰</param>
         /// <returns>채팅 응답</returns>
         public async UniTask<ChatResponse> SendChatAsync(
             string message, 
-            string characterId, 
-            string userId, 
-            string actor = null,
+            string characterId,
+            string action = null,
             CancellationToken cancellationToken = default)
         {
-            var request = CreateSimpleRequest(message, characterId, userId, actor);
+            var request = CreateSimpleRequest(message, characterId, action);
             return await SendChatAsync(request, cancellationToken);
         }
 
@@ -86,44 +81,17 @@ namespace ProjectVG.Infrastructure.Network.Services
             {
                 throw new ArgumentException("캐릭터 ID가 비어있습니다.", nameof(request.characterId));
             }
-
-            if (string.IsNullOrEmpty(request.userId))
-            {
-                throw new ArgumentException("사용자 ID가 비어있습니다.", nameof(request.userId));
-            }
         }
 
-        private ChatRequest CreateServerRequest(ChatRequest originalRequest)
+        private ChatRequest CreateSimpleRequest(string message, string characterId, string action)
         {
             return new ChatRequest
             {
-                sessionId = originalRequest.sessionId,
-                message = originalRequest.message,
-                characterId = originalRequest.characterId,
-                userId = originalRequest.userId,
-                action = originalRequest.action,
-                actor = originalRequest.actor,
-                instruction = originalRequest.instruction,
-                requestedAt = originalRequest.requestedAt
-            };
-        }
-
-        private ChatRequest CreateSimpleRequest(string message, string characterId, string userId, string actor)
-        {
-            return new ChatRequest
-            {
-                sessionId = "", // HttpApiClient에서 자동 주입
                 message = message,
                 characterId = characterId,
-                userId = userId,
-                actor = actor,
-                action = DEFAULT_ACTION,
-                requestedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                action = action,
+                requestedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
             };
-        }
-
-        private void LogRequestDetails(ChatRequest request)
-        {
         }
 
         #endregion
