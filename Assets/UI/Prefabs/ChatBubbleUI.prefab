@@ -70,7 +70,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: -5034953499350411472, guid: 9190ca2b12b5a484cbc50ab2530cefa1, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -95,7 +95,6 @@ MonoBehaviour:
   _rectTransform: {fileID: 5934218265075059895}
   _textComponent: {fileID: 6435369494941089196}
   _backgroundImage: {fileID: 2018097482680898932}
-  _slideInDuration: 0.5
   _slideOutDuration: 0.3
   _typingSpeed: 0.05
   _enableAutoDestroy: 1
@@ -104,13 +103,15 @@ MonoBehaviour:
   _toastBounceHeight: 20
   _toastBounceScale: 1.1
   _queueSlideDuration: 0.2
-  _queueSlideDistance: 10
   _enableBounceEffect: 1
   _enableScaleEffect: 1
   _bounceEasing: 0
   _queueEasing: 1
-  _userBubbleColor: {r: 0.72828406, g: 0.9145165, b: 0.9245283, a: 1}
-  _characterBubbleColor: {r: 0.8962264, g: 0.875089, b: 0.875089, a: 1}
+  _userBubbleColor: {r: 1, g: 1, b: 1, a: 1}
+  _characterBubbleColor: {r: 1, g: 1, b: 1, a: 1}
+  _userBubbleSprite: {fileID: -1487452705489804347, guid: 12de2dc1c77946145a0fdb2b857ff56c, type: 3}
+  _characterBubbleSprite: {fileID: -5034953499350411472, guid: 9190ca2b12b5a484cbc50ab2530cefa1, type: 3}
+  _useSpritesInsteadOfColors: 0
   _contentSizeFitter: {fileID: 0}
   _layoutElement: {fileID: 0}
 --- !u!114 &2428183702326760765

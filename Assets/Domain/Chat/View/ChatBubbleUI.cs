@@ -51,6 +51,11 @@ namespace ProjectVG.Domain.Chat.View
         [SerializeField] private Color _userBubbleColor = Color.blue;
         [SerializeField] private Color _characterBubbleColor = Color.gray;
         
+        [Header("Bubble Sprite Settings")]
+        [SerializeField] private Sprite? _userBubbleSprite;
+        [SerializeField] private Sprite? _characterBubbleSprite;
+        [SerializeField] private bool _useSpritesInsteadOfColors = false;
+        
         [Header("Layout Settings")]
         [SerializeField] private ContentSizeFitter? _contentSizeFitter;
         [SerializeField] private LayoutElement? _layoutElement;
@@ -136,6 +141,25 @@ namespace ProjectVG.Domain.Chat.View
             OnBubbleCreated?.Invoke(this);
         }
         
+        /// <summary>
+        /// 런타임에서 커스텀 스프라이트로 버블을 초기화합니다.
+        /// </summary>
+        public void Initialize(Actor actor, string text, float displayTime, Sprite? userSprite, Sprite? characterSprite, ChatBubblePanel? manager = null)
+        {
+            // 런타임 스프라이트 설정
+            if (userSprite != null)
+                _userBubbleSprite = userSprite;
+            if (characterSprite != null)
+                _characterBubbleSprite = characterSprite;
+                
+            // 스프라이트가 제공되면 자동으로 스프라이트 모드 활성화
+            if (userSprite != null || characterSprite != null)
+                _useSpritesInsteadOfColors = true;
+            
+            // 기본 초기화 호출
+            Initialize(actor, text, displayTime, manager);
+        }
+        
         public void StartQueueSlideAnimation()
         {
             if (!_isToastAnimationComplete) return;
@@ -188,6 +212,24 @@ namespace ProjectVG.Domain.Chat.View
         {
             StartFadeOut();
         }
+        
+        /// <summary>
+        /// 버블 스프라이트를 런타임에서 설정합니다.
+        /// </summary>
+        public void SetBubbleSprites(Sprite? userSprite, Sprite? characterSprite, bool useSprites = true)
+        {
+            _userBubbleSprite = userSprite;
+            _characterBubbleSprite = characterSprite;
+            _useSpritesInsteadOfColors = useSprites;
+            
+            // 스타일 다시 적용
+            ApplyStyle();
+        }
+        
+        /// <summary>
+        /// 현재 스프라이트 사용 여부를 반환합니다.
+        /// </summary>
+        public bool IsUsingSprites => _useSpritesInsteadOfColors;
         
         #endregion
         
@@ -284,7 +326,28 @@ namespace ProjectVG.Domain.Chat.View
         {
             if (_backgroundImage != null)
             {
-                _backgroundImage.color = _actor == Actor.User ? _userBubbleColor : _characterBubbleColor;
+                if (_useSpritesInsteadOfColors)
+                {
+                    // 스프라이트 기반 스타일 적용
+                    Sprite? targetSprite = _actor == Actor.User ? _userBubbleSprite : _characterBubbleSprite;
+                    if (targetSprite != null)
+                    {
+                        _backgroundImage.sprite = targetSprite;
+                        // 스프라이트를 사용할 때는 색상을 흰색으로 설정하여 원본 색상이 나오도록 함
+                        _backgroundImage.color = Color.white;
+                    }
+                    else
+                    {
+                        // 스프라이트가 없으면 기본 색상 사용
+                        Debug.LogWarning($"[ChatBubbleUI] {_actor} 스프라이트가 설정되지 않았습니다. 기본 색상을 사용합니다.");
+                        _backgroundImage.color = _actor == Actor.User ? _userBubbleColor : _characterBubbleColor;
+                    }
+                }
+                else
+                {
+                    // 색상 기반 스타일 적용 (기존 방식)
+                    _backgroundImage.color = _actor == Actor.User ? _userBubbleColor : _characterBubbleColor;
+                }
             }
         }
         
