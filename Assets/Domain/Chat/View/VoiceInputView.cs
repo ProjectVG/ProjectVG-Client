@@ -2,6 +2,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using ProjectVG.Domain.Chat.Service;
 using ProjectVG.Infrastructure.Network.Services;
@@ -12,11 +13,11 @@ using UnityEditor;
 
 namespace ProjectVG.Domain.Chat.View
 {
-    public class VoiceInputView : MonoBehaviour
+    public class VoiceInputView : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
         [Header("UI Components")]
-        [SerializeField] private Button? _btnVoice;
-        [SerializeField] private Button? _btnVoiceStop;
+        [SerializeField] private Button? _btnVoiceRecord;
+        [SerializeField] private TextMeshProUGUI? _txtVoiceStatus;
         
         
         private ChatSystemManager? _chatManager;
@@ -24,6 +25,7 @@ namespace ProjectVG.Domain.Chat.View
         private STTService? _sttService;
         private bool _isRecording = false;
         private float _recordingStartTime;
+        private bool _isKeyboardRecording = false;
         
         public event Action<string>? OnVoiceMessageSent;
         public event Action<string>? OnError;
@@ -37,11 +39,7 @@ namespace ProjectVG.Domain.Chat.View
         
         private void Update()
         {
-            // 새로운 AudioRecorder는 자체적으로 최대 시간을 관리하므로 제거
-            // if (_isRecording && Time.time - _recordingStartTime > _maxRecordingTime)
-            // {
-            //     StopVoiceRecording();
-            // }
+            HandleKeyboardInput();
         }
         
         private void OnDestroy()
@@ -145,6 +143,9 @@ namespace ProjectVG.Domain.Chat.View
             if (!_isRecording)
                 return;
                 
+            // 키보드 녹음 상태도 초기화
+            _isKeyboardRecording = false;
+                
             if (_audioRecorder == null)
             {
                 Debug.LogError("[VoiceInputView] AudioRecorder가 없습니다.");
@@ -179,21 +180,21 @@ namespace ProjectVG.Domain.Chat.View
         
         private void SetupComponents()
         {
-            if (_btnVoice == null)
+            if (_btnVoiceRecord == null)
             {
-                _btnVoice = transform.Find("BtnVoice")?.GetComponent<Button>();
-                if (_btnVoice == null)
+                _btnVoiceRecord = transform.Find("BtnVoice")?.GetComponent<Button>();
+                if (_btnVoiceRecord == null)
                 {
                     Debug.LogWarning("[VoiceInputView] BtnVoice 버튼을 찾을 수 없습니다.");
                 }
             }
                 
-            if (_btnVoiceStop == null)
+            if (_txtVoiceStatus == null)
             {
-                _btnVoiceStop = transform.Find("BtnVoiceStop")?.GetComponent<Button>();
-                if (_btnVoiceStop == null)
+                _txtVoiceStatus = _btnVoiceRecord?.GetComponentInChildren<TextMeshProUGUI>();
+                if (_txtVoiceStatus == null)
                 {
-                    Debug.LogWarning("[VoiceInputView] BtnVoiceStop 버튼을 찾을 수 없습니다.");
+                    Debug.LogWarning("[VoiceInputView] 음성 상태 텍스트를 찾을 수 없습니다.");
                 }
             }
                 
@@ -220,11 +221,6 @@ namespace ProjectVG.Domain.Chat.View
         
         private void SetupEventHandlers()
         {
-            if (_btnVoice != null)
-                _btnVoice.onClick.AddListener(OnVoiceButtonClicked);
-                
-            if (_btnVoiceStop != null)
-                _btnVoiceStop.onClick.AddListener(OnVoiceStopButtonClicked);
                 
             if (_audioRecorder != null)
             {
@@ -249,11 +245,30 @@ namespace ProjectVG.Domain.Chat.View
         
         private void UpdateVoiceButtonState(bool isRecording)
         {
-            if (_btnVoice != null)
-                _btnVoice.gameObject.SetActive(!isRecording);
+            if (_btnVoiceRecord != null)
+            {
+                _btnVoiceRecord.interactable = true;
                 
-            if (_btnVoiceStop != null)
-                _btnVoiceStop.gameObject.SetActive(isRecording);
+                // 버튼 크기 변경으로 시각적 피드백 제공
+                var rectTransform = _btnVoiceRecord.GetComponent<RectTransform>();
+                if (rectTransform != null)
+                {
+                    float scale = isRecording ? 1.1f : 1.0f;
+                    rectTransform.localScale = Vector3.one * scale;
+                }
+                
+                // 버튼 색상 변경
+                var buttonColors = _btnVoiceRecord.colors;
+                buttonColors.normalColor = isRecording ? Color.red : Color.white;
+                buttonColors.highlightedColor = isRecording ? new Color(1f, 0.5f, 0.5f) : new Color(0.9f, 0.9f, 0.9f);
+                _btnVoiceRecord.colors = buttonColors;
+                
+                if (_txtVoiceStatus != null)
+                {
+                    _txtVoiceStatus.text = isRecording ? "녹음 중... (버튼을 떼거나 T키를 놓으세요)" : "음성 입력 (버튼을 누르거나 T키 유지)";
+                    _txtVoiceStatus.color = isRecording ? Color.white : new Color(0.8f, 0.8f, 0.8f);
+                }
+            }
         }
         
 
@@ -302,15 +317,77 @@ namespace ProjectVG.Domain.Chat.View
             }
         }
         
-        private void OnVoiceButtonClicked()
+        #region Press & Hold UI Events
+        
+        /// <summary>
+        /// 마우스/터치 버튼을 누를 때 녹음 시작
+        /// </summary>
+        public void OnPointerDown(PointerEventData eventData)
         {
-            StartVoiceRecording();
+            if (eventData.button == PointerEventData.InputButton.Left)
+            {
+                StartVoiceRecording();
+            }
         }
         
-        private void OnVoiceStopButtonClicked()
+        /// <summary>
+        /// 마우스/터치 버튼을 뗄 때 녹음 종료
+        /// </summary>
+        public void OnPointerUp(PointerEventData eventData)
         {
-            StopVoiceRecording();
+            if (eventData.button == PointerEventData.InputButton.Left)
+            {
+                StopVoiceRecording();
+            }
         }
+        
+        #endregion
+        
+        #region Keyboard Input
+        
+        /// <summary>
+        /// T키 Press & Hold 입력 처리
+        /// </summary>
+        private void HandleKeyboardInput()
+        {
+            // UI 포커스 상태 확인 - InputField 등이 포커스를 가지고 있으면 키보드 입력 무시
+            if (IsUIInputFieldFocused())
+                return;
+                
+            bool tKeyPressed = Input.GetKeyDown(KeyCode.T);
+            bool tKeyReleased = Input.GetKeyUp(KeyCode.T);
+            
+            if (tKeyPressed && !_isKeyboardRecording)
+            {
+                _isKeyboardRecording = true;
+                StartVoiceRecording();
+            }
+            else if (tKeyReleased && _isKeyboardRecording)
+            {
+                _isKeyboardRecording = false;
+                StopVoiceRecording();
+            }
+        }
+        
+        /// <summary>
+        /// 현재 InputField가 포커스를 가지고 있는지 확인
+        /// 텍스트 입력 중일 때 T키 입력을 무시하기 위함
+        /// </summary>
+        private bool IsUIInputFieldFocused()
+        {
+            // EventSystem을 통해 현재 선택된 오브젝트가 InputField인지 확인
+            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
+            {
+                var inputField = EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>();
+                if (inputField != null)
+                {
+                    return inputField.isFocused;
+                }
+            }
+            return false;
+        }
+        
+        #endregion
         
         private void OnRecordingStarted()
         {
