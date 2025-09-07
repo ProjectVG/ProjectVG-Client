@@ -2,6 +2,7 @@ using Cysharp.Threading.Tasks;
 using Live2D.Cubism.Framework;
 using Live2D.Cubism.Framework.MouthMovement;
 using Live2D.Cubism.Framework.MotionFade;
+using Live2D.Cubism.Framework.LookAt;
 using Live2D.Cubism.Core;
 using ProjectVG.Core.Audio;
 using ProjectVG.Domain.Character.Live2D.Model;
@@ -97,6 +98,7 @@ namespace ProjectVG.Domain.Character.Service
 			SetupFadeController(modelInstance, config);
 			SetupLipSync(modelInstance, config);
 			SetupAutoEyeBlink(modelInstance, config);
+			SetupLookController(modelInstance, config);
 			SetupActionController(modelInstance);
 		}
 
@@ -177,6 +179,18 @@ namespace ProjectVG.Domain.Character.Service
 			mouthController.Gain = config.Gain;
 			mouthController.Smoothing = config.Smoothing;
 			
+			// CubismMouthController의 블렌드 모드 설정
+			var cubismMouthController = modelInstance.GetComponent<CubismMouthController>();
+			if (cubismMouthController == null)
+			{
+				cubismMouthController = modelInstance.AddComponent<CubismMouthController>();
+				Debug.Log($"[CharacterModelLoader] CubismMouthController 컴포넌트를 추가했습니다: {modelInstance.name}");
+			}
+			
+			// 블렌드 모드를 무조건 Additive로 설정
+			cubismMouthController.BlendMode = CubismParameterBlendMode.Additive;
+			Debug.Log($"[CharacterModelLoader] CubismMouthController 블렌드 모드를 Additive로 설정: {modelInstance.name}");
+			
 			// Live2D 모델에 Mouth 파라미터가 있는지 확인
 			var model = modelInstance.GetComponent<CubismModel>();
 			if (model != null) {
@@ -213,6 +227,30 @@ namespace ProjectVG.Domain.Character.Service
 				config.EyeBlinkClosedSeconds,
 				config.EyeBlinkOpeningSeconds
 			);
+		}
+
+		/// <summary>
+		/// Look Controller 컴포넌트를 설정한다
+		/// </summary>
+		private void SetupLookController(GameObject modelInstance, Live2DModelConfig config)
+		{
+			if (!config.IsLookAtActive)
+			{
+				Debug.Log($"[CharacterModelLoader] Look Controller가 비활성화되어 있습니다: {modelInstance.name}");
+				return;
+			}
+
+			var lookController = modelInstance.GetComponent<CubismLookController>();
+			if (lookController == null)
+			{
+				lookController = modelInstance.AddComponent<CubismLookController>();
+				Debug.Log($"[CharacterModelLoader] CubismLookController 컴포넌트를 추가했습니다: {modelInstance.name}");
+			}
+
+			// 블렌드 모드를 Additive로 설정 (설정값에 따라)
+			lookController.Damping = config.LookAtDamping;
+
+			Debug.Log($"[CharacterModelLoader] CubismLookController 설정 완료: {modelInstance.name}, BlendMode: Damping: {config.LookAtDamping}");
 		}
 
 		/// <summary>

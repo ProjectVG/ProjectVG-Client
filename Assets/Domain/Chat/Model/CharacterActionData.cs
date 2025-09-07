@@ -50,6 +50,12 @@ namespace ProjectVG.Domain.Chat.Model
                 "idle" => CharacterActionType.Idle,
                 "listen" => CharacterActionType.Listen,
                 "talk" => CharacterActionType.Talk,
+                "nodding" => CharacterActionType.Nodding,
+                "shaking_head" => CharacterActionType.ShakingHead,
+                "looking_away" => CharacterActionType.LookingAway,
+                "tilting_head" => CharacterActionType.TiltingHead,
+                "sighing" => CharacterActionType.Sighing,
+                "pouting" => CharacterActionType.Pouting,
                 _ => CharacterActionType.Idle
             };
         }

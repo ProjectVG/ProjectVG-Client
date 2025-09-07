@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 using Live2D.Cubism.Framework.MotionFade;
+using Live2D.Cubism.Core;
 
 namespace ProjectVG.Domain.Character.Live2D.Model
 {
@@ -92,6 +93,7 @@ namespace ProjectVG.Domain.Character.Live2D.Model
         [Range(0f, 5f)]
         [SerializeField, FormerlySerializedAs("lockAtDamping")]
         private float lookAtDamping = 0.0f;
+        
 
         [Space(5)]
         [Header("────────────────────────────────────────")]

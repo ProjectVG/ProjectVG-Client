@@ -121,6 +121,30 @@ namespace ProjectVG.Domain.Character.Service
 		}
 
 		/// <summary>
+		/// 액션을 실행한다 (문자열 오버로드).
+		/// </summary>
+		/// <param name="actionString">액션 문자열</param>
+		public void PlayAction(string actionString)
+		{
+			if (_currentActionService != null)
+			{
+				_currentActionService.PlayAction(actionString);
+			}
+		}
+
+		/// <summary>
+		/// 액션을 실행한다 (enum 오버로드).
+		/// </summary>
+		/// <param name="actionType">액션 타입</param>
+		public void PlayAction(CharacterActionType actionType)
+		{
+			if (_currentActionService != null)
+			{
+				_currentActionService.PlayAction(actionType);
+			}
+		}
+
+		/// <summary>
 		/// 현재 액션을 중지한다.
 		/// </summary>
 		public void StopCurrentAction()

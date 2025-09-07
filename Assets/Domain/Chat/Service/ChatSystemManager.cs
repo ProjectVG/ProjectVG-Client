@@ -135,6 +135,10 @@ namespace ProjectVG.Domain.Chat.Service
                     _characterManager.PlayAction(listenAction);
                 }
 
+                if (_chatBubblePanel != null) {
+                    _chatBubblePanel.CreateBubble(Actor.User, message);
+                }
+
                 if (_chatApiService != null) {
                     var response = await _chatApiService.SendChatAsync(
                         message: message,
@@ -144,9 +148,7 @@ namespace ProjectVG.Domain.Chat.Service
                         Debug.LogWarning("[ChatSystemManager] 채팅 응답이 null입니다.");
                     }
                 }
-                if (_chatBubblePanel != null) {
-                    _chatBubblePanel.CreateBubble(Actor.User, message);
-                }
+
             }
             catch (Exception ex) {
                 // todo : 메시지 실패 처리
