@@ -135,15 +135,12 @@ namespace ProjectVG.Infrastructure.Auth.Utils
         {
             try
             {
-                // Windows Machine GUID 사용
-                var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
-                if (key != null)
+                // Windows Machine GUID 사용 - Registry 대신 SystemInfo 사용
+                // Registry 접근이 제한된 환경을 위해 SystemInfo 기반으로 변경
+                string systemId = SystemInfo.deviceUniqueIdentifier;
+                if (!string.IsNullOrEmpty(systemId) && systemId != "n/a")
                 {
-                    var machineGuid = key.GetValue("MachineGuid")?.ToString();
-                    if (!string.IsNullOrEmpty(machineGuid))
-                    {
-                        return machineGuid;
-                    }
+                    return systemId;
                 }
             }
             catch (Exception ex)
