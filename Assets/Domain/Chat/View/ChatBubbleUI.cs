@@ -47,14 +47,9 @@ namespace ProjectVG.Domain.Chat.View
             Elastic
         }
         
-        [Header("Style Settings")]
-        [SerializeField] private Color _userBubbleColor = Color.blue;
-        [SerializeField] private Color _characterBubbleColor = Color.gray;
-        
         [Header("Bubble Sprite Settings")]
         [SerializeField] private Sprite? _userBubbleSprite;
         [SerializeField] private Sprite? _characterBubbleSprite;
-        [SerializeField] private bool _useSpritesInsteadOfColors = false;
         
         [Header("Layout Settings")]
         [SerializeField] private ContentSizeFitter? _contentSizeFitter;
@@ -119,15 +114,17 @@ namespace ProjectVG.Domain.Chat.View
             _fullText = text;
             _displayTime = displayTime < 0f ? _defaultDisplayTime : displayTime;
             _manager = manager;
-            
+
+            Debug.Log($"[ChatBubbleUI] 기본 Initialize 호출 - Actor: {_actor}");
+
             ApplyStyle();
-            
+
             Canvas.ForceUpdateCanvases();
             _originalPosition = _rectTransform?.localPosition ?? Vector3.zero;
             _originalScale = _rectTransform?.localScale ?? Vector3.one;
-            
+
             StartToastAnimation();
-            
+
             if (_actor == Actor.User)
             {
                 _isTyping = false;
@@ -137,7 +134,7 @@ namespace ProjectVG.Domain.Chat.View
                     _textComponent.text = _fullText;
                 }
             }
-            
+
             OnBubbleCreated?.Invoke(this);
         }
         
@@ -146,16 +143,15 @@ namespace ProjectVG.Domain.Chat.View
         /// </summary>
         public void Initialize(Actor actor, string text, float displayTime, Sprite? userSprite, Sprite? characterSprite, ChatBubblePanel? manager = null)
         {
+            Debug.Log($"[ChatBubbleUI] 스프라이트와 함께 초기화 - UserSprite: {userSprite?.name ?? "null"}, CharacterSprite: {characterSprite?.name ?? "null"}");
+
             // 런타임 스프라이트 설정
             if (userSprite != null)
                 _userBubbleSprite = userSprite;
             if (characterSprite != null)
                 _characterBubbleSprite = characterSprite;
-                
-            // 스프라이트가 제공되면 자동으로 스프라이트 모드 활성화
-            if (userSprite != null || characterSprite != null)
-                _useSpritesInsteadOfColors = true;
-            
+
+
             // 기본 초기화 호출
             Initialize(actor, text, displayTime, manager);
         }
@@ -216,20 +212,19 @@ namespace ProjectVG.Domain.Chat.View
         /// <summary>
         /// 버블 스프라이트를 런타임에서 설정합니다.
         /// </summary>
-        public void SetBubbleSprites(Sprite? userSprite, Sprite? characterSprite, bool useSprites = true)
+        public void SetBubbleSprites(Sprite? userSprite, Sprite? characterSprite)
         {
+            Debug.Log($"[ChatBubbleUI] SetBubbleSprites 호출 - UserSprite: {userSprite?.name ?? "null"}, CharacterSprite: {characterSprite?.name ?? "null"}");
+
             _userBubbleSprite = userSprite;
             _characterBubbleSprite = characterSprite;
-            _useSpritesInsteadOfColors = useSprites;
-            
+
+            Debug.Log($"[ChatBubbleUI] 스프라이트 설정 완료 - 현재 Actor: {_actor}");
+
             // 스타일 다시 적용
             ApplyStyle();
         }
         
-        /// <summary>
-        /// 현재 스프라이트 사용 여부를 반환합니다.
-        /// </summary>
-        public bool IsUsingSprites => _useSpritesInsteadOfColors;
         
         #endregion
         
@@ -324,30 +319,29 @@ namespace ProjectVG.Domain.Chat.View
         
         private void ApplyStyle()
         {
+            Debug.Log($"[ChatBubbleUI] ApplyStyle 호출 - Actor: {_actor}");
+
             if (_backgroundImage != null)
             {
-                if (_useSpritesInsteadOfColors)
+                // 항상 스프라이트 기반 스타일만 사용
+                Sprite? targetSprite = _actor == Actor.User ? _userBubbleSprite : _characterBubbleSprite;
+                Debug.Log($"[ChatBubbleUI] 대상 스프라이트: {targetSprite?.name ?? "null"} (Actor: {_actor})");
+
+                if (targetSprite != null)
                 {
-                    // 스프라이트 기반 스타일 적용
-                    Sprite? targetSprite = _actor == Actor.User ? _userBubbleSprite : _characterBubbleSprite;
-                    if (targetSprite != null)
-                    {
-                        _backgroundImage.sprite = targetSprite;
-                        // 스프라이트를 사용할 때는 색상을 흰색으로 설정하여 원본 색상이 나오도록 함
-                        _backgroundImage.color = Color.white;
-                    }
-                    else
-                    {
-                        // 스프라이트가 없으면 기본 색상 사용
-                        Debug.LogWarning($"[ChatBubbleUI] {_actor} 스프라이트가 설정되지 않았습니다. 기본 색상을 사용합니다.");
-                        _backgroundImage.color = _actor == Actor.User ? _userBubbleColor : _characterBubbleColor;
-                    }
+                    _backgroundImage.sprite = targetSprite;
+                    // 스프라이트를 사용할 때는 색상을 흰색으로 설정하여 원본 색상이 나오도록 함
+                    _backgroundImage.color = Color.white;
+                    Debug.Log($"[ChatBubbleUI] 스프라이트 적용 완료: {targetSprite.name}");
                 }
                 else
                 {
-                    // 색상 기반 스타일 적용 (기존 방식)
-                    _backgroundImage.color = _actor == Actor.User ? _userBubbleColor : _characterBubbleColor;
+                    Debug.LogError($"[ChatBubbleUI] {_actor} 스프라이트가 설정되지 않았습니다! Inspector에서 스프라이트를 할당해주세요.");
                 }
+            }
+            else
+            {
+                Debug.LogError($"[ChatBubbleUI] Background Image가 null입니다!");
             }
         }
         
